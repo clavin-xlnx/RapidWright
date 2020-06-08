@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.timing.TimingGroup;
  * To estimate a route delay from a TG to a site-pin  TG.
  */
 public interface DelayEstimator {
+    // TODO: Define what is this TimingGroup.
     public short getMinDelayToSinkPin (TimingGroup TG, TimingGroup sinkPin);
 }
 

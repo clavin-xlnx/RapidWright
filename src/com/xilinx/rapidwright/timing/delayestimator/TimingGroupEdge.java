@@ -22,9 +22,7 @@ public class TimingGroupEdge extends DefaultWeightedEdge {
 
     @Override
     public String toString() {
-        return "TimingGroupEdge{" +
-                "tg=" + tg.name() +
-                '}';
+        return "TimingGroupEdge{" + "tg=" + tg.name() + '}';
     }
 
     public String toGraphvizDotString() {
