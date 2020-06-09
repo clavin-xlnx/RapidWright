@@ -41,9 +41,11 @@ import java.util.Collections;
 import java.util.Dictionary;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 
@@ -108,9 +110,7 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
     }
 
 
-    private void buildTables() {
 
-    }
 
     // TODO: make this private
     /**
@@ -119,7 +119,7 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
      * @param to   end timingGroup
      * @param dir  horizontal or vertical
      * @param dist distance of end timing group from the start
-     * @param maxDist
+     * @param detourDist extra distance allow to overshoot the target distance
      * @return DelayGraphEntry representing all possible connectios between from and to.
      *
      *
@@ -142,10 +142,8 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
      * There will be 3 edges connecting those 3 nodes to one node at distance x+2.
      * TODO: change Object to T
      */
-    public DelayGraphEntry listPaths(TimingGroup from, TimingGroup to, Direction dir, int dist, int maxDist) {
-
-        boolean verbose = false;
-        boolean plot    = true;
+    public DelayGraphEntry listPaths(TimingGroup from, TimingGroup to, Direction dir, int dist, int detourDist,
+                                     boolean verbose, boolean plot) {
 
         class WaveEntry {
             public TimingGroup tg;
@@ -166,6 +164,7 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
             }
         }
 
+        int maxDist = dist + detourDist;
 
         Map<Short, Map<TimingGroup,Object>> distTypeNodemap = new HashMap();
 
@@ -200,14 +199,25 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
                         // TODO: consider both going forward and backward
                         short tloc = (short) (frEntry.loc - toTg.length());
                         // allow only one overshoot
-                        if (tloc >= dist)
+                        if (tloc >= dist) {
                             locs.add(tloc);
+                            if (verbose)
+                                System.out.println("    add to locs " + tloc + " : " + locs.size());
+                        }
                     }
 
                     short tloc = (short) (frEntry.loc + toTg.length());
+                    if ((toTg == to) && (frEntry.loc == dist) && (frEntry.tg.direction() != toTg.direction())) {
+                        locs.add(frEntry.loc);
+                        if (verbose)
+                            System.out.println("    add to locs " + frEntry.loc + " : " + locs.size());
+                    }
                     // Ignore too large overshoot
-                    if (tloc <= maxDist)
+                    else if (tloc <= maxDist) {
                         locs.add(tloc);
+                        if (verbose)
+                            System.out.println("    add to locs " + tloc + " : " + locs.size());
+                    }
 
                     if (verbose)
                         System.out.println("  locs " + locs.toString());
@@ -267,9 +277,20 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
         (ig, in) -> {
             List<Object> termNodes = new ArrayList<>();
             for (Object n : ig.vertexSet()) {
-                if (ig.outDegreeOf(n) <= 0) {
-                    if (n != in)
+                // node with no fanout
+                if ((ig.outDegreeOf(n) <= 0) && (n != in)) {
+                    termNodes.add(n);
+                }
+                // node with an inedge and outedge to another node
+                if ((ig.outDegreeOf(n) == 1)&&(ig.inDegreeOf(n)==1)) {
+                    Set<Object> nodeSet = new HashSet<Object>();
+                    for (TimingGroupEdge e : ig.edgesOf(n)) {
+                        nodeSet.add(ig.getEdgeSource(e));
+                        nodeSet.add(ig.getEdgeTarget(e));
+                    }
+                    if (nodeSet.size() == 2) {
                         termNodes.add(n);
+                    }
                 }
             }
             return termNodes;
@@ -293,7 +314,7 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
 
 
         if (plot) {
-            String dotFileName = from + "_" + to + "_" + dir + "_" + dist + "_" + maxDist;
+            String dotFileName = "dbg_data/" + from + "_" + to + "_" + dir + "_" + dist + "_" + maxDist;
             PrintStream graphVizPrintStream = null;
             try {
                 graphVizPrintStream = new PrintStream(dotFileName);
@@ -327,34 +348,101 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
         res.dst = dst;
         return res;
     }
+    public DelayGraphEntry listPaths(TimingGroup from, TimingGroup to, Direction dir, int dist, int detourDist) {
+        return listPaths(from, to, dir, dist, detourDist, false, false);
+    }
 
-    private void buildSitePinToSitePinTables() {
+    private void buildTables() {
+        int maxHorDetourDist = TimingGroup.HORT_LONG.length()-1;
+        int maxVerDetourDist = TimingGroup.VERT_LONG.length()-1;
+
+        boolean verbose = false;
+        boolean plot    = true;
 
         // For SitePinToSitePinHorizontally
         // Detour horizontally may cross hard-block column. Allow vertical detour to.
-        for (int x = 0; x < width; x++) {
-
+        SitePinToSitePinHorizontally = new ArrayList<>();
+        for (int i = 0; i < width; i++) {
+            System.out.println("build hor " + i);
+            SitePinToSitePinHorizontally.add(
+                listPaths(TimingGroup.CLE_OUT, TimingGroup.CLE_IN, Direction.HORIZONTAL,
+                        i, Math.min(i,maxHorDetourDist), verbose, plot));
         }
 
-        for (int y = 0; y < width; y++) {
-
+        SitePinToSitePinVertically = new ArrayList<>();
+        for (int i = 0; i < height; i++) {
+            System.out.println("build ver " + i);
+            SitePinToSitePinVertically.add(
+                    listPaths(TimingGroup.CLE_OUT, TimingGroup.CLE_IN, Direction.VERTICAL,
+                            i, Math.min(i,maxVerDetourDist), verbose, plot));
         }
 
+
+        sitePinToVerticalTG = new ArrayList<>();
+        VerticalTGToSitePin = new ArrayList<>();
+        List<TimingGroup> vertTgs = getTimingGroup((TimingGroup e) -> (e.direction() == Direction.VERTICAL));
+        // There is no need to turn for dist 0, add a dummy to keep using index as distance
+        sitePinToVerticalTG.add(new EnumMap<>(TimingGroup.class));
+        VerticalTGToSitePin.add(new EnumMap<>(TimingGroup.class));
+        for (int i = 1; i < width; i++) {
+            sitePinToVerticalTG.add(new EnumMap<>(TimingGroup.class));
+            VerticalTGToSitePin.add(new EnumMap<>(TimingGroup.class));
+            for (TimingGroup tg : vertTgs) {
+                System.out.println("C i " + i + " " + tg.name());
+                int minDetour = i;
+                if (tg == TimingGroup.VERT_LONG)
+                    // TODO: this should come from interconnectInfo somehow
+                    minDetour = Math.max(i, TimingGroup.HORT_QUAD.length()); // LONG must be driven by QUAD, it need at least detour 4
+                sitePinToVerticalTG.get(i).put(tg,
+                        listPaths(TimingGroup.CLE_OUT, tg, Direction.HORIZONTAL,
+                                i, Math.min(minDetour, maxHorDetourDist), verbose, plot));
+                System.out.println("D i " + i + " " + tg.name());
+                VerticalTGToSitePin.get(i).put(tg,
+                        listPaths(tg, TimingGroup.CLE_IN, Direction.HORIZONTAL,
+                                i, Math.min(i, maxHorDetourDist), verbose, plot));
+            }
+        }
+
+        sitePinToHorizontalTG = new ArrayList<>();
+        HorizontalTGToSitePin = new ArrayList<>();
+        List<TimingGroup> hortTgs = getTimingGroup((TimingGroup e) -> (e.direction() == Direction.HORIZONTAL));
+        // There is no need to turn for dist 0, add a dummy to keep using index as distance
+        sitePinToHorizontalTG.add(new EnumMap<>(TimingGroup.class));
+        HorizontalTGToSitePin .add(new EnumMap<>(TimingGroup.class));
+        for (int i = 1; i < height; i++) {
+            sitePinToHorizontalTG.add(new EnumMap<>(TimingGroup.class));
+            HorizontalTGToSitePin .add(new EnumMap<>(TimingGroup.class));
+            for (TimingGroup tg : hortTgs) {
+                System.out.println("E i " + i + " " + tg.name());
+                int minDetour = i;
+                if (tg == TimingGroup.HORT_LONG)
+                    // TODO: this should come from interconnectInfo somehow
+                    minDetour = Math.max(i, TimingGroup.VERT_QUAD.length()); // LONG must be driven by QUAD, it need at least detour 4
+                sitePinToHorizontalTG.get(i).put(tg,
+                        listPaths(TimingGroup.CLE_OUT, tg, Direction.VERTICAL,
+                                i, Math.min(minDetour, maxVerDetourDist), verbose, plot));
+                System.out.println("F i " + i + " " + tg.name());
+                HorizontalTGToSitePin .get(i).put(tg,
+                        listPaths(tg, TimingGroup.CLE_IN, Direction.VERTICAL,
+                                i, Math.min(i, maxVerDetourDist), verbose, plot));
+            }
+        }
     }
-
 
     // Declare using implementation type ArrayList because random indexing is needed.
 
     // index by distance from sitePin
-    private ArrayList<List<DelayGraphEntry>> SitePinToSitePinVertically;
-    private ArrayList<List<DelayGraphEntry>> SitePinToSitePinHorizontally;
+    private ArrayList<DelayGraphEntry> SitePinToSitePinVertically;
+    private ArrayList<DelayGraphEntry> SitePinToSitePinHorizontally;
 
     // index by distance from sitePin, then VertTG index
     // does the list include the Vertical TG ?
-    private ArrayList<ArrayList<List<DelayGraphEntry>>> sitePinToVerticalTG;
-    private ArrayList<ArrayList<List<DelayGraphEntry>>> sitePinToHorizontalTG;
-    private ArrayList<ArrayList<List<DelayGraphEntry>>> VerticalTGToSitePin;
-    private ArrayList<ArrayList<List<DelayGraphEntry>>> HorizontalTGToSitePin;
+
+    Map<TimingGroup, Object> typeNodeMap = new EnumMap<>(TimingGroup.class);
+    private ArrayList<Map<TimingGroup,DelayGraphEntry>> sitePinToVerticalTG; // go horizontally
+    private ArrayList<Map<TimingGroup,DelayGraphEntry>> sitePinToHorizontalTG; // go vertically
+    private ArrayList<Map<TimingGroup,DelayGraphEntry>> VerticalTGToSitePin; // go horizontally
+    private ArrayList<Map<TimingGroup,DelayGraphEntry>> HorizontalTGToSitePin; // go vertically
 
 
 
@@ -462,7 +550,11 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
         }
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo,0,0);
+
+        int width  = TimingGroup.HORT_LONG.length() + TimingGroup.HORT_QUAD.length() + TimingGroup.HORT_DOUBLE.length() + 1;
+        int height = TimingGroup.VERT_LONG.length() + TimingGroup.VERT_QUAD.length() + TimingGroup.VERT_DOUBLE.length() + 1;
+        System.out.println("width " + width + " height " + height);
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo,width,height);
         if (false) {
             //ictInfo.dumpInterconnectHier();
 //            for (DelayEstimatorBase.TimingGroup i : (DelayEstimatorBase.TimingGroup[]) ictInfo.nextTimingGroups(TimingGroup.CLE_OUT)) {
@@ -549,11 +641,11 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
             System.out.println("minDel " + minDel);
             System.out.println("end test delayGraph");
         }
-        if (true) {
+        if (false) {
             double dAtSource = 3.0d;
-            short  dist      = 11;
-            short  detour    = 5;
-            DelayGraphEntry sentry = est.listPaths(TimingGroup.CLE_OUT, TimingGroup.CLE_IN, Direction.HORIZONTAL, dist, dist + detour);
+            short  dist      = 0;
+            short  detour    = 0;
+            DelayGraphEntry sentry = est.listPaths(TimingGroup.CLE_OUT, TimingGroup.CLE_IN, Direction.HORIZONTAL, dist, detour, true, true);
             Double minDel = DijkstraWithCallbacks.findMinWeightBetween(sentry.g, sentry.src, sentry.dst, dAtSource,
 //                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v) -> {g.setEdgeWeight(e,1);},
                     (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v)
@@ -577,6 +669,9 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
             System.out.println("\nPath with min delay: " + ((int)minPath.getWeight())+ " ps");
             System.out.println("\nPath details:");
             System.out.println(minPath.toString().replace(",", ",\n")+"\n");
+        }
+        if (true) {
+            est.buildTables();
         }
     }
 
