@@ -1,8 +1,6 @@
 package com.xilinx.rapidwright.timing.delayestimator;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -12,6 +10,10 @@ import java.util.function.Predicate;
 /**
  * Encapsulate interconnect information for a device family.
  * This is for Ultrascale+.
+ * The routing fabric just need to be captured to provide accurate for estimating the min delay.
+ * In US+, LONG can drive SINGLE, DOUBLE or QUAD. But, to get to a site pin it must go through SINGLE or DOUBLE.
+ * Connection from LONG to QUAD does not need to be captured because if QUAD is really needed it can be before LONG.
+ * This omission allows simpler data structure because we don't need to capture both incompatible requirements of LONG.
  */
 public class InterconnectInfo {
 
@@ -29,8 +31,6 @@ public class InterconnectInfo {
         tempList.removeIf(filter.negate());
         return Collections.unmodifiableList(tempList);
     }
-
-
 
     /**
      * List possible TG types that can be driven by a TG type.
@@ -57,7 +57,7 @@ public class InterconnectInfo {
             add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_SINGLE, new ArrayList<>() {{
+        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_SINGLE, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
             add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
             add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
@@ -67,7 +67,7 @@ public class InterconnectInfo {
             add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
             add(DelayEstimatorBase.TimingGroup.BOUNCE);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_DOUBLE, new ArrayList<>() {{
+        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_DOUBLE, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
             add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
             add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
@@ -77,7 +77,7 @@ public class InterconnectInfo {
             add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
             add(DelayEstimatorBase.TimingGroup.BOUNCE);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_QUAD, new ArrayList<>() {{
+        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_QUAD, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
             add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
             add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
@@ -88,7 +88,7 @@ public class InterconnectInfo {
             add(DelayEstimatorBase.TimingGroup.VERT_LONG);
         }});
         // TODO: CHeck if Long can drive quad
-        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_LONG, new ArrayList<>() {{
+        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_LONG, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
             add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
             add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.HORT_LONG);
@@ -98,7 +98,7 @@ public class InterconnectInfo {
         }});
 
 
-        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_SINGLE, new ArrayList<>() {{
+        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_SINGLE, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
             add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
             add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
@@ -108,7 +108,7 @@ public class InterconnectInfo {
             add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
             add(DelayEstimatorBase.TimingGroup.BOUNCE);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_DOUBLE, new ArrayList<>() {{
+        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_DOUBLE, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
             add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
             add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
@@ -118,7 +118,7 @@ public class InterconnectInfo {
             add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
             add(DelayEstimatorBase.TimingGroup.BOUNCE);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_QUAD, new ArrayList<>() {{
+        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_QUAD, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
             add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
             add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
@@ -129,7 +129,7 @@ public class InterconnectInfo {
             add(DelayEstimatorBase.TimingGroup.VERT_LONG);
         }});
         // TODO: CHeck if Long can drive quad
-        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_LONG, new ArrayList<>() {{
+        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_LONG, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
             add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
             add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
             add(DelayEstimatorBase.TimingGroup.HORT_LONG);

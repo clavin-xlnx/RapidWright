@@ -48,12 +48,20 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
     // Not all type has dist arrays. The arrays will never be addressed by those types.
     // distArrays are cumulative. It is also inclusive, ie.,
     // for segment spaning x-y,  d[y] is  included d of the segment.
-    protected static Map<Direction,Map<GroupDelayType, List<Short>>> distArrays;
+    protected static Map<Direction,Map<Orientation,Map<GroupDelayType, List<Short>>>> distArrays;
     protected static Map<Direction,Map<GroupDelayType, Short>> K0;
     protected static Map<Direction,Map<GroupDelayType, Short>> K1;
     protected static Map<Direction,Map<GroupDelayType, Short>> K2;
     protected static Map<Direction,Map<GroupDelayType, Short>> L;
 
+    enum TileSide {
+        E,
+        W
+    };
+    enum Orientation {
+        FORWARD,
+        BACKWARD
+    };
 
     enum Direction {
         VERTICAL,
@@ -65,6 +73,7 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
 
     // Enum ensure there is no duplication of each type stored in the tables.
     // Break these up if they are never used together to avoid filtering.
+    // Need to distinguish between ver and hor. Thus can't use GroupDelayType.
     // TODO: should be move to InterconnectInfo
     enum TimingGroup {
         // direction, length and index (to lookup d)
@@ -145,47 +154,55 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
     private void buildDistanceArrays(TimingModel tm) {
 
 //        // TODO: convert from timingModel
-        distArrays = new EnumMap<Direction,Map<GroupDelayType, List<Short>>>(Direction.class);
 
-        Map<GroupDelayType, List<Short>> thor = new EnumMap<GroupDelayType, List<Short>>(GroupDelayType.class);
+        distArrays = new EnumMap<Direction,Map<Orientation,Map<GroupDelayType, List<Short>>>> (Direction.class);
+        Map<Orientation,Map<GroupDelayType, List<Short>>> orientationMap = new EnumMap<>(Orientation.class);
 
-        thor.put(GroupDelayType.PINFEED, new ArrayList<Short>());
-        thor.get(GroupDelayType.PINFEED).add((short) 0);
-        thor.get(GroupDelayType.PINFEED).add((short) 0);
-        thor.get(GroupDelayType.PINFEED).add((short) 0);
-        for (int i = 0; i < 20; i++)
+        {
+            Map<GroupDelayType, List<Short>> thor = new EnumMap<GroupDelayType, List<Short>>(GroupDelayType.class);
+
+            thor.put(GroupDelayType.SINGLE, new ArrayList<Short>());
+            thor.get(GroupDelayType.SINGLE).add((short) 0);
+            thor.get(GroupDelayType.SINGLE).add((short) 0);
+            thor.get(GroupDelayType.SINGLE).add((short) 0);
+            for (int i = 0; i < 20; i++)
+                thor.get(GroupDelayType.SINGLE).add((short) 3);
+
+            thor.put(GroupDelayType.DOUBLE, new ArrayList<Short>());
+            thor.get(GroupDelayType.DOUBLE).add((short) 0);
+            thor.get(GroupDelayType.DOUBLE).add((short) 0);
+            thor.get(GroupDelayType.DOUBLE).add((short) 0);
+            for (int i = 0; i < 20; i++)
+                thor.get(GroupDelayType.DOUBLE).add((short) 3);
+
+            thor.put(GroupDelayType.QUAD, new ArrayList<Short>());
+            thor.get(GroupDelayType.QUAD).add((short) 0);
+            thor.get(GroupDelayType.QUAD).add((short) 0);
+            thor.get(GroupDelayType.QUAD).add((short) 0);
+            for (int i = 0; i < 20; i++)
+                thor.get(GroupDelayType.QUAD).add((short) 90);
+
+            thor.put(GroupDelayType.LONG, new ArrayList<Short>());
+            thor.get(GroupDelayType.LONG).add((short) 0);
+            thor.get(GroupDelayType.LONG).add((short) 0);
+            thor.get(GroupDelayType.LONG).add((short) 0);
+            for (int i = 0; i < 20; i++)
+                thor.get(GroupDelayType.LONG).add((short) 3);
+
+            orientationMap.put(Orientation.FORWARD, thor);
+            distArrays.put(Direction.HORIZONTAL, orientationMap);
+        }
+        {
+            Map<GroupDelayType, List<Short>> thor = new EnumMap<GroupDelayType, List<Short>>(GroupDelayType.class);
+            thor.put(GroupDelayType.PINFEED, new ArrayList<Short>());
             thor.get(GroupDelayType.PINFEED).add((short) 0);
-
-        thor.put(GroupDelayType.SINGLE, new ArrayList<Short>());
-        thor.get(GroupDelayType.SINGLE).add((short) 0);
-        thor.get(GroupDelayType.SINGLE).add((short) 0);
-        thor.get(GroupDelayType.SINGLE).add((short) 0);
-        for (int i = 0; i < 20; i++)
-            thor.get(GroupDelayType.SINGLE).add((short) 3);
-
-        thor.put(GroupDelayType.DOUBLE, new ArrayList<Short>());
-        thor.get(GroupDelayType.DOUBLE).add((short) 0);
-        thor.get(GroupDelayType.DOUBLE).add((short) 0);
-        thor.get(GroupDelayType.DOUBLE).add((short) 0);
-        for (int i = 0; i < 20; i++)
-            thor.get(GroupDelayType.DOUBLE).add((short) 3);
-
-        thor.put(GroupDelayType.QUAD, new ArrayList<Short>());
-        thor.get(GroupDelayType.QUAD).add((short) 0);
-        thor.get(GroupDelayType.QUAD).add((short) 0);
-        thor.get(GroupDelayType.QUAD).add((short) 0);
-        for (int i = 0; i < 20; i++)
-            thor.get(GroupDelayType.QUAD).add((short) 90);
-
-        thor.put(GroupDelayType.LONG, new ArrayList<Short>());
-        thor.get(GroupDelayType.LONG).add((short) 0);
-        thor.get(GroupDelayType.LONG).add((short) 0);
-        thor.get(GroupDelayType.LONG).add((short) 0);
-        for (int i = 0; i < 20; i++)
-            thor.get(GroupDelayType.LONG).add((short) 3);
-
-        distArrays.put(Direction.HORIZONTAL, thor);
-
+            thor.get(GroupDelayType.PINFEED).add((short) 0);
+            thor.get(GroupDelayType.PINFEED).add((short) 0);
+            for (int i = 0; i < 20; i++)
+                thor.get(GroupDelayType.PINFEED).add((short) 0);
+            orientationMap.put(Orientation.FORWARD, thor);
+            distArrays.put(Direction.INPUT, orientationMap);
+        }
 
         // TODO: move it to interconectInfo
 
@@ -199,7 +216,6 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
         // TG delay = k0 + k1 * L + k2 * d;
         {
             Map<GroupDelayType, Short> tk0 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
-            tk0.put(GroupDelayType.PINFEED, (short) 0);
             tk0.put(GroupDelayType.SINGLE, (short) 43);
             tk0.put(GroupDelayType.DOUBLE, (short) 43);
             tk0.put(GroupDelayType.QUAD, (short) 43);
@@ -207,7 +223,6 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             K0.put(Direction.HORIZONTAL, tk0);
 
             Map<GroupDelayType, Short> tk1 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
-            tk1.put(GroupDelayType.PINFEED, (short) 0);
             tk1.put(GroupDelayType.SINGLE, (short) 4);
             tk1.put(GroupDelayType.DOUBLE, (short) 4);
             tk1.put(GroupDelayType.QUAD, (short) 4);
@@ -215,7 +230,6 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             K1.put(Direction.HORIZONTAL, tk1);
 
             Map<GroupDelayType, Short> tk2 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
-            tk2.put(GroupDelayType.PINFEED, (short) 0);
             tk2.put(GroupDelayType.SINGLE, (short) 2);
             tk2.put(GroupDelayType.DOUBLE, (short) 2);
             tk2.put(GroupDelayType.QUAD, (short) 2);
@@ -223,7 +237,6 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             K2.put(Direction.HORIZONTAL, tk2);
 
             Map<GroupDelayType, Short> tl = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
-            tl.put(GroupDelayType.PINFEED, (short) 0);
             tl.put(GroupDelayType.SINGLE, (short) 1);
             tl.put(GroupDelayType.DOUBLE, (short) 5);
             tl.put(GroupDelayType.QUAD, (short) 10);
@@ -233,7 +246,6 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
 
         {
             Map<GroupDelayType, Short> tk0 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
-            tk0.put(GroupDelayType.PINFEED, (short) 0);
             tk0.put(GroupDelayType.SINGLE, (short) 43);
             tk0.put(GroupDelayType.DOUBLE, (short) 43);
             tk0.put(GroupDelayType.QUAD, (short) 43);
@@ -241,7 +253,6 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             K0.put(Direction.VERTICAL, tk0);
 
             Map<GroupDelayType, Short> tk1 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
-            tk1.put(GroupDelayType.PINFEED, (short) 0);
             tk1.put(GroupDelayType.SINGLE, (short) 4);
             tk1.put(GroupDelayType.DOUBLE, (short) 4);
             tk1.put(GroupDelayType.QUAD, (short) 4);
@@ -249,7 +260,6 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             K1.put(Direction.VERTICAL, tk1);
 
             Map<GroupDelayType, Short> tk2 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
-            tk2.put(GroupDelayType.PINFEED, (short) 0);
             tk2.put(GroupDelayType.SINGLE, (short) 14);
             tk2.put(GroupDelayType.DOUBLE, (short) 6);
             tk2.put(GroupDelayType.QUAD, (short) 10);
@@ -257,12 +267,28 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             K2.put(Direction.VERTICAL, tk2);
 
             Map<GroupDelayType, Short> tl = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
-            tl.put(GroupDelayType.PINFEED, (short) 0);
             tl.put(GroupDelayType.SINGLE, (short) 1);
             tl.put(GroupDelayType.DOUBLE, (short) 3);
             tl.put(GroupDelayType.QUAD, (short) 5);
             tl.put(GroupDelayType.LONG, (short) 12);
             L.put(Direction.VERTICAL, tl);
+        }
+        {
+            Map<GroupDelayType, Short> tk0 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
+            tk0.put(GroupDelayType.PINFEED, (short) 43);
+            K0.put(Direction.INPUT, tk0);
+
+            Map<GroupDelayType, Short> tk1 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
+            tk1.put(GroupDelayType.PINFEED, (short) 0);
+            K1.put(Direction.INPUT, tk1);
+
+            Map<GroupDelayType, Short> tk2 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
+            tk2.put(GroupDelayType.PINFEED, (short) 0);
+            K2.put(Direction.INPUT, tk2);
+
+            Map<GroupDelayType, Short> tl = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
+            tl.put(GroupDelayType.PINFEED, (short) 0);
+            L.put(Direction.INPUT, tl);
         }
     }
 
@@ -272,15 +298,16 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
      * @param v The INT tile index at the beginning of the timing group.
      * @return  The delay of this timing group.
      */
-    protected static double calcTimingGroupDelay(TimingGroupEdge e, Double v) {
+    protected static double calcTimingGroupDelay(TimingGroupEdge e, Double v, Orientation orientation) {
         TimingGroup tg = e.getTimingGroup();
+        System.out.println("calcTimingGroupDelay " + tg.name() + " " + v );
         short k0 = K0.get(tg.direction()).get(tg.type);
         short k1 = K1.get(tg.direction()).get(tg.type);
         short k2 = K2.get(tg.direction()).get(tg.type);
         short l  = L .get(tg.direction()).get(tg.type);
 
-        short st  = distArrays.get(tg.direction()).get(tg.type).get(v.shortValue());
-        short sp  = distArrays.get(tg.direction()).get(tg.type).get(v.shortValue() + tg.length());
+        short st  = distArrays.get(tg.direction()).get(orientation).get(tg.type).get(v.shortValue());
+        short sp  = distArrays.get(tg.direction()).get(orientation).get(tg.type).get(v.shortValue() + tg.length());
 
         // need abs in case the tg is going to the left.
         short del  = (short) (k0 + k1 * l + k2 * Math.abs(sp-st));
