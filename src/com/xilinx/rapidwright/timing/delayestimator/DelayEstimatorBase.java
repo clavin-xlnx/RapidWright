@@ -23,6 +23,7 @@
 
 package com.xilinx.rapidwright.timing.delayestimator;
 
+
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.TimingModel;
@@ -31,13 +32,12 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Predicate;
 
 /**
  * The base class to implement a delay estimator.
  * Provide basic methods to build a customized estimator.
  */
-public abstract class DelayEstimatorBase  implements DelayEstimator {
+public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements DelayEstimator {
 
     // Consider moving DelayEstimator as a member of TimingManager.
     // Until then, keep timingModel here for testing.
@@ -48,11 +48,11 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
     // Not all type has dist arrays. The arrays will never be addressed by those types.
     // distArrays are cumulative. It is also inclusive, ie.,
     // for segment spaning x-y,  d[y] is  included d of the segment.
-    protected static Map<Direction,Map<Orientation,Map<GroupDelayType, List<Short>>>> distArrays;
-    protected static Map<Direction,Map<GroupDelayType, Short>> K0;
-    protected static Map<Direction,Map<GroupDelayType, Short>> K1;
-    protected static Map<Direction,Map<GroupDelayType, Short>> K2;
-    protected static Map<Direction,Map<GroupDelayType, Short>> L;
+    protected Map<T.Direction,Map<Orientation,Map<GroupDelayType, List<Short>>>> distArrays;
+    protected Map<T.Direction,Map<GroupDelayType, Short>> K0;
+    protected Map<T.Direction,Map<GroupDelayType, Short>> K1;
+    protected Map<T.Direction,Map<GroupDelayType, Short>> K2;
+    protected Map<T.Direction,Map<GroupDelayType, Short>> L;
 
     enum TileSide {
         E,
@@ -62,67 +62,6 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
         FORWARD,
         BACKWARD
     };
-
-    enum Direction {
-        VERTICAL,
-        HORIZONTAL,
-        INPUT,
-        OUTPUT,
-        LOCAL
-    };
-
-    // Enum ensure there is no duplication of each type stored in the tables.
-    // Break these up if they are never used together to avoid filtering.
-    // Need to distinguish between ver and hor. Thus can't use GroupDelayType.
-    // TODO: should be move to InterconnectInfo
-    enum TimingGroup {
-        // direction, length and index (to lookup d)
-        VERT_SINGLE (Direction.VERTICAL, GroupDelayType.SINGLE,(short) 1,(short) 0),
-        VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 2,(short) 0),
-        VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 4,(short) 1),
-        VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 12,(short) 2),
-
-        HORT_SINGLE  (Direction.HORIZONTAL, GroupDelayType.SINGLE,(short) 1,(short) 0),
-        HORT_DOUBLE  (Direction.HORIZONTAL, GroupDelayType.DOUBLE,(short) 1,(short) 0),
-        HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 2,(short) 1),
-        HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 6,(short) 2),
-
-        CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0,(short) -1),
-        CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0,(short) -1),
-        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0,(short) -1);
-
-
-        private final Direction direction;
-        private final GroupDelayType type;
-        private final short length;
-        private final short index;
-
-
-        TimingGroup(DelayEstimatorBase.Direction direction, GroupDelayType type, short length, short index) {
-            this.direction = direction;
-            this.type      = type;
-            this.length    = length;
-            this.index     = index;
-        }
-
-        public Direction direction() {
-            return direction;
-        }
-
-        public short length() {
-            return length;
-        }
-    }
-
-    List<TimingGroup> getTimingGroup(Predicate<? super TimingGroup> predicate) {
-        List <TimingGroup> res = new ArrayList<>();
-        for (TimingGroup tg : TimingGroup.values()) {
-            if (predicate.test(tg)) {
-                res.add(tg);
-            }
-        }
-        return res;
-    }
 
 
         /**
@@ -155,7 +94,7 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
 
 //        // TODO: convert from timingModel
 
-        distArrays = new EnumMap<Direction,Map<Orientation,Map<GroupDelayType, List<Short>>>> (Direction.class);
+        distArrays = new EnumMap<> (InterconnectInfo.Direction.class);
         Map<Orientation,Map<GroupDelayType, List<Short>>> orientationMap = new EnumMap<>(Orientation.class);
 
         {
@@ -190,7 +129,7 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
                 thor.get(GroupDelayType.LONG).add((short) 3);
 
             orientationMap.put(Orientation.FORWARD, thor);
-            distArrays.put(Direction.HORIZONTAL, orientationMap);
+            distArrays.put(InterconnectInfo.Direction.HORIZONTAL, orientationMap);
         }
         {
             Map<GroupDelayType, List<Short>> thor = new EnumMap<GroupDelayType, List<Short>>(GroupDelayType.class);
@@ -201,15 +140,15 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             for (int i = 0; i < 20; i++)
                 thor.get(GroupDelayType.PINFEED).add((short) 0);
             orientationMap.put(Orientation.FORWARD, thor);
-            distArrays.put(Direction.INPUT, orientationMap);
+            distArrays.put(InterconnectInfo.Direction.INPUT, orientationMap);
         }
 
         // TODO: move it to interconectInfo
 
-        K0 = new EnumMap<Direction,Map<GroupDelayType, Short>>(Direction.class);
-        K1 = new EnumMap<Direction,Map<GroupDelayType, Short>>(Direction.class);
-        K2 = new EnumMap<Direction,Map<GroupDelayType, Short>>(Direction.class);
-        L  = new EnumMap<Direction,Map<GroupDelayType, Short>>(Direction.class);
+        K0 = new EnumMap<T.Direction,Map<GroupDelayType, Short>>(T.Direction.class);
+        K1 = new EnumMap<T.Direction,Map<GroupDelayType, Short>>(T.Direction.class);
+        K2 = new EnumMap<T.Direction,Map<GroupDelayType, Short>>(T.Direction.class);
+        L  = new EnumMap<T.Direction,Map<GroupDelayType, Short>>(T.Direction.class);
 
         // TODO: convert from TimingModel
         // I could read it from files, but want to not diverge over time.
@@ -220,28 +159,28 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             tk0.put(GroupDelayType.DOUBLE, (short) 43);
             tk0.put(GroupDelayType.QUAD, (short) 43);
             tk0.put(GroupDelayType.LONG, (short) 43);
-            K0.put(Direction.HORIZONTAL, tk0);
+            K0.put(T.Direction.HORIZONTAL, tk0);
 
             Map<GroupDelayType, Short> tk1 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tk1.put(GroupDelayType.SINGLE, (short) 4);
             tk1.put(GroupDelayType.DOUBLE, (short) 4);
             tk1.put(GroupDelayType.QUAD, (short) 4);
             tk1.put(GroupDelayType.LONG, (short) 4);
-            K1.put(Direction.HORIZONTAL, tk1);
+            K1.put(T.Direction.HORIZONTAL, tk1);
 
             Map<GroupDelayType, Short> tk2 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tk2.put(GroupDelayType.SINGLE, (short) 2);
             tk2.put(GroupDelayType.DOUBLE, (short) 2);
             tk2.put(GroupDelayType.QUAD, (short) 2);
             tk2.put(GroupDelayType.LONG, (short) 1);
-            K2.put(Direction.HORIZONTAL, tk2);
+            K2.put(T.Direction.HORIZONTAL, tk2);
 
             Map<GroupDelayType, Short> tl = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tl.put(GroupDelayType.SINGLE, (short) 1);
             tl.put(GroupDelayType.DOUBLE, (short) 5);
             tl.put(GroupDelayType.QUAD, (short) 10);
             tl.put(GroupDelayType.LONG, (short) 14);
-            L.put(Direction.HORIZONTAL, tl);
+            L.put(T.Direction.HORIZONTAL, tl);
         }
 
         {
@@ -250,45 +189,45 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
             tk0.put(GroupDelayType.DOUBLE, (short) 43);
             tk0.put(GroupDelayType.QUAD, (short) 43);
             tk0.put(GroupDelayType.LONG, (short) 43);
-            K0.put(Direction.VERTICAL, tk0);
+            K0.put(T.Direction.VERTICAL, tk0);
 
             Map<GroupDelayType, Short> tk1 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tk1.put(GroupDelayType.SINGLE, (short) 4);
             tk1.put(GroupDelayType.DOUBLE, (short) 4);
             tk1.put(GroupDelayType.QUAD, (short) 4);
             tk1.put(GroupDelayType.LONG, (short) 4);
-            K1.put(Direction.VERTICAL, tk1);
+            K1.put(T.Direction.VERTICAL, tk1);
 
             Map<GroupDelayType, Short> tk2 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tk2.put(GroupDelayType.SINGLE, (short) 14);
             tk2.put(GroupDelayType.DOUBLE, (short) 6);
             tk2.put(GroupDelayType.QUAD, (short) 10);
             tk2.put(GroupDelayType.LONG, (short) 4);
-            K2.put(Direction.VERTICAL, tk2);
+            K2.put(T.Direction.VERTICAL, tk2);
 
             Map<GroupDelayType, Short> tl = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tl.put(GroupDelayType.SINGLE, (short) 1);
             tl.put(GroupDelayType.DOUBLE, (short) 3);
             tl.put(GroupDelayType.QUAD, (short) 5);
             tl.put(GroupDelayType.LONG, (short) 12);
-            L.put(Direction.VERTICAL, tl);
+            L.put(T.Direction.VERTICAL, tl);
         }
         {
             Map<GroupDelayType, Short> tk0 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tk0.put(GroupDelayType.PINFEED, (short) 43);
-            K0.put(Direction.INPUT, tk0);
+            K0.put(T.Direction.INPUT, tk0);
 
             Map<GroupDelayType, Short> tk1 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tk1.put(GroupDelayType.PINFEED, (short) 0);
-            K1.put(Direction.INPUT, tk1);
+            K1.put(T.Direction.INPUT, tk1);
 
             Map<GroupDelayType, Short> tk2 = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tk2.put(GroupDelayType.PINFEED, (short) 0);
-            K2.put(Direction.INPUT, tk2);
+            K2.put(T.Direction.INPUT, tk2);
 
             Map<GroupDelayType, Short> tl = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
             tl.put(GroupDelayType.PINFEED, (short) 0);
-            L.put(Direction.INPUT, tl);
+            L.put(T.Direction.INPUT, tl);
         }
     }
 
@@ -298,16 +237,16 @@ public abstract class DelayEstimatorBase  implements DelayEstimator {
      * @param v The INT tile index at the beginning of the timing group.
      * @return  The delay of this timing group.
      */
-    protected static double calcTimingGroupDelay(TimingGroupEdge e, Double v, Orientation orientation) {
-        TimingGroup tg = e.getTimingGroup();
+    protected double calcTimingGroupDelay(TimingGroupEdge e, Double v, Orientation orientation) {
+        T.TimingGroup tg = e.getTimingGroup();
         System.out.println("calcTimingGroupDelay " + tg.name() + " " + v );
-        short k0 = K0.get(tg.direction()).get(tg.type);
-        short k1 = K1.get(tg.direction()).get(tg.type);
-        short k2 = K2.get(tg.direction()).get(tg.type);
-        short l  = L .get(tg.direction()).get(tg.type);
+        short k0 = K0.get(tg.direction()).get(tg.type());
+        short k1 = K1.get(tg.direction()).get(tg.type());
+        short k2 = K2.get(tg.direction()).get(tg.type());
+        short l  = L .get(tg.direction()).get(tg.type());
 
-        short st  = distArrays.get(tg.direction()).get(orientation).get(tg.type).get(v.shortValue());
-        short sp  = distArrays.get(tg.direction()).get(orientation).get(tg.type).get(v.shortValue() + tg.length());
+        short st  = distArrays.get(tg.direction()).get(orientation).get(tg.type()).get(v.shortValue());
+        short sp  = distArrays.get(tg.direction()).get(orientation).get(tg.type()).get(v.shortValue() + tg.length());
 
         // need abs in case the tg is going to the left.
         short del  = (short) (k0 + k1 * l + k2 * Math.abs(sp-st));

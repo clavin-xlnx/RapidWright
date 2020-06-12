@@ -21,7 +21,12 @@ import java.util.Objects;
  * DijkstraClosestFirstIterator in this package is used instead of the one from jgrapht.
  */
 public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> {
-
+    public static interface ExamineEdge<V,E> {
+        void apply(Graph<V,E> g, V v, E e, Double val);
+    }
+    public static interface DiscoverVertex<V, E> {
+        double apply(Graph<V,E> g, V v, E e, Double d);
+    }
     protected ExamineEdge<V,E> examineEdge;
     protected DiscoverVertex<V,E> discoverVertex;
     protected Double dAtSource;
@@ -97,19 +102,4 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
         this.discoverVertex = discoverVertex;
         this.dAtSource = dAtSource;
     }
-
-    // Represent each TG as an edge because jgraphT don't support vertex weight.
-    // A node represents an INT tile. There can be multiple node for an INT tile, ie.,
-    // one for Quad to drive Long, another for Double to drive
-    /**
-     * edge in the delay graph
-     */
-    class Segment {
-        short start; // begin index of the INT tile. X or Y depending on the direction of TG
-        DelayEstimatorBase.TimingGroup TG;
-    }
-
-    static public int findMinDelayFromLocation() {
-        return 0;
-    };
 }

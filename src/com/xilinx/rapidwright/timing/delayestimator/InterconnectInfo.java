@@ -1,5 +1,7 @@
 package com.xilinx.rapidwright.timing.delayestimator;
 
+import com.xilinx.rapidwright.timing.GroupDelayType;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -18,22 +20,99 @@ import java.util.function.Predicate;
  */
 public class InterconnectInfo {
 
+    // override must be a superset
+    public static enum Direction {
+        VERTICAL,
+        HORIZONTAL,
+        INPUT,
+        OUTPUT,
+        LOCAL
+    };
+
+    // Enum ensure there is no duplication of each type stored in the tables.
+    // Break these up if they are never used together to avoid filtering.
+    // Need to distinguish between ver and hor. Thus can't use GroupDelayType.
+    //
+    // override must be a superset. length and index can be changed.
+    public static enum TimingGroup {
+        // direction, length and index (to lookup d)
+        VERT_SINGLE (Direction.VERTICAL, GroupDelayType.SINGLE,(short) 1,(short) 0),
+        VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 2,(short) 0),
+        VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 4,(short) 1),
+        VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 12,(short) 2),
+
+        HORT_SINGLE  (Direction.HORIZONTAL, GroupDelayType.SINGLE,(short) 1,(short) 0),
+        HORT_DOUBLE  (Direction.HORIZONTAL, GroupDelayType.DOUBLE,(short) 1,(short) 0),
+        HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 2,(short) 1),
+        HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 6,(short) 2),
+
+        CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0,(short) -1),
+        CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0,(short) -1),
+        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0,(short) -1);
+
+
+        private final Direction direction;
+        private final GroupDelayType type;
+        private final short length;
+        private final short index;
+
+
+        TimingGroup(Direction direction, GroupDelayType type, short length, short index) {
+            this.direction = direction;
+            this.type      = type;
+            this.length    = length;
+            this.index     = index;
+        }
+
+        public Direction direction() {
+            return direction;
+        }
+        public short length() {
+            return length;
+        }
+        public GroupDelayType type() {
+            return type;
+        }
+    }
+
+    public short minTableWidth() {
+        return  (short) (TimingGroup.HORT_LONG.length() + TimingGroup.HORT_QUAD.length() +
+                TimingGroup.HORT_DOUBLE.length() + 1);
+
+    }
+
+    public short minTableHeight() {
+        return (short) (TimingGroup.VERT_LONG.length() + TimingGroup.VERT_QUAD.length() +
+                TimingGroup.VERT_DOUBLE.length() + 1);
+    }
+
+    protected static List<TimingGroup> getTimingGroup(Predicate<? super TimingGroup> predicate) {
+        List <TimingGroup> res = new ArrayList<>();
+        for (TimingGroup tg : TimingGroup.values()) {
+            if (predicate.test(tg)) {
+                res.add(tg);
+            }
+        }
+        return res;
+    }
+
+
     /**
      * Return a list of timingGroup driven by the fromTimingGroup.
      */
-    public List<DelayEstimatorBase.TimingGroup> nextTimingGroups(DelayEstimatorBase.TimingGroup fromTimingGroup) {
+    public List<TimingGroup> nextTimingGroups(TimingGroup fromTimingGroup) {
         return interconnectHier.get(fromTimingGroup);
     }
 
-    public List<DelayEstimatorBase.TimingGroup> nextTimingGroups(DelayEstimatorBase.TimingGroup fromTimingGroup,
-                                                Predicate<? super DelayEstimatorBase.TimingGroup> filter) {
+    public List<TimingGroup> nextTimingGroups(TimingGroup fromTimingGroup,
+                                                Predicate<? super TimingGroup> filter) {
 
-        List<DelayEstimatorBase.TimingGroup> tempList  =  new ArrayList<>(interconnectHier.get(fromTimingGroup));
+        List<TimingGroup> tempList  =  new ArrayList<>(interconnectHier.get(fromTimingGroup));
         tempList.removeIf(filter.negate());
         return Collections.unmodifiableList(tempList);
     }
 
-    public short minDetour(DelayEstimatorBase.TimingGroup tg) {
+    public short minDetour(TimingGroup tg) {
         return minDetourMap.get(tg);
     }
 
@@ -41,8 +120,8 @@ public class InterconnectInfo {
      * List possible TG types that can be driven by a TG type.
      * It is immutable.
      */
-    private Map<DelayEstimatorBase.TimingGroup, List<DelayEstimatorBase.TimingGroup>> interconnectHier;
-    private Map<DelayEstimatorBase.TimingGroup, Short> minDetourMap;
+    private Map<TimingGroup, List<TimingGroup>> interconnectHier;
+    private Map<TimingGroup, Short> minDetourMap;
 
     InterconnectInfo() {
         buildInterconnectHier();
@@ -51,107 +130,105 @@ public class InterconnectInfo {
     private void buildInterconnectHier() {
 
 
-        minDetourMap = new EnumMap<>(DelayEstimatorBase.TimingGroup.class);
-        for (DelayEstimatorBase.TimingGroup tg : DelayEstimatorBase.TimingGroup.values()) {
+        minDetourMap = new EnumMap<>(TimingGroup.class);
+        for (TimingGroup tg : TimingGroup.values()) {
             minDetourMap.put(tg, (short) 0);
         }
-        minDetourMap.put(DelayEstimatorBase.TimingGroup.VERT_LONG, DelayEstimatorBase.TimingGroup.VERT_QUAD.length());
+        minDetourMap.put(TimingGroup.VERT_LONG, TimingGroup.VERT_QUAD.length());
         // TODO: investigate why using HORT_QUAD crate unreachable
-        minDetourMap.put(DelayEstimatorBase.TimingGroup.HORT_LONG, DelayEstimatorBase.TimingGroup.VERT_QUAD.length());
+        minDetourMap.put(TimingGroup.HORT_LONG, TimingGroup.VERT_QUAD.length());
 
 
-        Map<DelayEstimatorBase.TimingGroup, List<DelayEstimatorBase.TimingGroup>> ictHier = new HashMap();
+        Map<TimingGroup, List<TimingGroup>> ictHier = new HashMap();
 
         // UltraScale+
-        ictHier.put(DelayEstimatorBase.TimingGroup.CLE_IN, new ArrayList<DelayEstimatorBase.TimingGroup>());
-        ictHier.put(DelayEstimatorBase.TimingGroup.CLE_OUT, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.CLE_IN);
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
+        ictHier.put(TimingGroup.CLE_IN, new ArrayList<TimingGroup>());
+        ictHier.put(TimingGroup.CLE_OUT, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.CLE_IN);
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_SINGLE, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.CLE_IN);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.BOUNCE);
+        ictHier.put(TimingGroup.HORT_SINGLE, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
+            add(TimingGroup.CLE_IN);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
+            add(TimingGroup.BOUNCE);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_DOUBLE, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.CLE_IN);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.BOUNCE);
+        ictHier.put(TimingGroup.HORT_DOUBLE, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
+            add(TimingGroup.CLE_IN);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
+            add(TimingGroup.BOUNCE);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_QUAD, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.HORT_LONG);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.VERT_LONG);
+        ictHier.put(TimingGroup.HORT_QUAD, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
+            add(TimingGroup.HORT_LONG);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
+            add(TimingGroup.VERT_LONG);
         }});
-        // TODO: CHeck if Long can drive quad
-        ictHier.put(DelayEstimatorBase.TimingGroup.HORT_LONG, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_LONG);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_LONG);
+        // LONG can drive quad, but that is incompatible with that LONG must go to SINGLE/DOUBLE to get to CLE_IN.
+        // To keep simple data structure, don't allow LONG -> QUAD
+        ictHier.put(TimingGroup.HORT_LONG, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_LONG);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_LONG);
         }});
-
-
-        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_SINGLE, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.CLE_IN);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.BOUNCE);
+        ictHier.put(TimingGroup.VERT_SINGLE, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
+            add(TimingGroup.CLE_IN);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
+            add(TimingGroup.BOUNCE);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_DOUBLE, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.CLE_IN);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.BOUNCE);
+        ictHier.put(TimingGroup.VERT_DOUBLE, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
+            add(TimingGroup.CLE_IN);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
+            add(TimingGroup.BOUNCE);
         }});
-        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_QUAD, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.HORT_LONG);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_QUAD);
-            add(DelayEstimatorBase.TimingGroup.VERT_LONG);
+        ictHier.put(TimingGroup.VERT_QUAD, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
+            add(TimingGroup.HORT_LONG);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
+            add(TimingGroup.VERT_LONG);
         }});
-        // TODO: CHeck if Long can drive quad
-        ictHier.put(DelayEstimatorBase.TimingGroup.VERT_LONG, new ArrayList<DelayEstimatorBase.TimingGroup>() {{
-            add(DelayEstimatorBase.TimingGroup.HORT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.HORT_LONG);
-            add(DelayEstimatorBase.TimingGroup.VERT_SINGLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_DOUBLE);
-            add(DelayEstimatorBase.TimingGroup.VERT_LONG);
+        ictHier.put(TimingGroup.VERT_LONG, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_LONG);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_LONG);
         }});
 
         // TODO: What's about bounce?
@@ -167,7 +244,7 @@ public class InterconnectInfo {
     void dumpInterconnectHier() {
         for (Map.Entry me : interconnectHier.entrySet()) {
             System.out.println(me.getKey().toString());
-            for (DelayEstimatorBase.TimingGroup i : (DelayEstimatorBase.TimingGroup[]) me.getValue()) {
+            for (TimingGroup i : (TimingGroup[]) me.getValue()) {
                 System.out.printf("    ");
                 System.out.println(i.toString());
             }

@@ -18,8 +18,8 @@ import org.jgrapht.util.FibonacciHeap;
 import org.jgrapht.util.FibonacciHeapNode;
 
 class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
-    private DiscoverVertex<V,E> discoverVertex;
-    private ExamineEdge<V,E> examineEdge;
+    private DijkstraWithCallbacks.DiscoverVertex<V,E> discoverVertex;
+    private DijkstraWithCallbacks.ExamineEdge<V,E> examineEdge;
     private final Graph<V, E> graph;
     private final V source;
     private final double radius;
@@ -27,12 +27,12 @@ class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
     private final Map<V, FibonacciHeapNode<DijkstraClosestFirstIterator<V, E>.QueueEntry>> seen;
 
     public DijkstraClosestFirstIterator(Graph<V, E> graph, V source, double dAtSource,
-                                        ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex) {
+                                        DijkstraWithCallbacks.ExamineEdge<V,E> examineEdge, DijkstraWithCallbacks.DiscoverVertex<V,E> discoverVertex) {
         this(graph, source, 1.0D / 0.0, dAtSource, examineEdge, discoverVertex);
     }
 
     public DijkstraClosestFirstIterator(Graph<V, E> graph, V source, double radius, double dAtSource,
-                                        ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex) {
+                                        DijkstraWithCallbacks.ExamineEdge<V,E> examineEdge, DijkstraWithCallbacks.DiscoverVertex<V,E> discoverVertex) {
         this.graph = (Graph) Objects.requireNonNull(graph, "Graph cannot be null");
         this.source = Objects.requireNonNull(source, "Sourve vertex cannot be null");
         this.examineEdge = examineEdge;

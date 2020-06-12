@@ -1,8 +1,7 @@
 package com.xilinx.rapidwright.timing.delayestimator;
 
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo.TimingGroup;
 
-import com.xilinx.rapidwright.timing.GroupDelayType;
-import com.xilinx.rapidwright.timing.TimingModel;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
 /**
@@ -10,13 +9,13 @@ import org.jgrapht.graph.DefaultWeightedEdge;
  */
 public class TimingGroupEdge extends DefaultWeightedEdge {
 
-    private DelayEstimatorBase.TimingGroup tg;
+    private TimingGroup tg;
 
-    public DelayEstimatorBase.TimingGroup getTimingGroup() {
+    public TimingGroup getTimingGroup() {
         return tg;
     }
 
-    TimingGroupEdge(DelayEstimatorBase.TimingGroup tg) {
+    TimingGroupEdge(TimingGroup tg) {
         this.tg = tg;
     }
 
