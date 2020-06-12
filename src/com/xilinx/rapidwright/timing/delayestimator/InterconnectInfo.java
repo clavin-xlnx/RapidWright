@@ -2,6 +2,7 @@ package com.xilinx.rapidwright.timing.delayestimator;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,17 +33,32 @@ public class InterconnectInfo {
         return Collections.unmodifiableList(tempList);
     }
 
+    public short minDetour(DelayEstimatorBase.TimingGroup tg) {
+        return minDetourMap.get(tg);
+    }
+
     /**
      * List possible TG types that can be driven by a TG type.
      * It is immutable.
      */
     private Map<DelayEstimatorBase.TimingGroup, List<DelayEstimatorBase.TimingGroup>> interconnectHier;
+    private Map<DelayEstimatorBase.TimingGroup, Short> minDetourMap;
 
     InterconnectInfo() {
         buildInterconnectHier();
     }
 
     private void buildInterconnectHier() {
+
+
+        minDetourMap = new EnumMap<>(DelayEstimatorBase.TimingGroup.class);
+        for (DelayEstimatorBase.TimingGroup tg : DelayEstimatorBase.TimingGroup.values()) {
+            minDetourMap.put(tg, (short) 0);
+        }
+        minDetourMap.put(DelayEstimatorBase.TimingGroup.VERT_LONG, DelayEstimatorBase.TimingGroup.VERT_QUAD.length());
+        // TODO: investigate why using HORT_QUAD crate unreachable
+        minDetourMap.put(DelayEstimatorBase.TimingGroup.HORT_LONG, DelayEstimatorBase.TimingGroup.VERT_QUAD.length());
+
 
         Map<DelayEstimatorBase.TimingGroup, List<DelayEstimatorBase.TimingGroup>> ictHier = new HashMap();
 

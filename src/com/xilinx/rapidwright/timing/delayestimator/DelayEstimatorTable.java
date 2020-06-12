@@ -39,6 +39,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+// Conventions:
+// 1) Each graph represent all possible path from between 2 TGs. The delay of the beginning TG is not included.
+//    But, that of the ending TG is.
+
+
 
 /**
  *
@@ -343,100 +348,91 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
         return listPaths(from, to, dir, dist, detourDist, false, false);
     }
 
+
+
+    private void iniTables() {
+        TgToTgVertically = new ArrayList<>();
+        for (int i = 0; i < height; i++) {
+            Map<TimingGroup,Map<TimingGroup,DelayGraphEntry>> srcMap = new EnumMap<>(TimingGroup.class);
+            for (TimingGroup tg : TimingGroup.values()) {
+                srcMap.put(tg,new EnumMap<>(TimingGroup.class));
+            }
+            TgToTgVertically.add(srcMap);
+        }
+
+        TgToTgHorizontally = new ArrayList<>();
+        for (int i = 0; i < width; i++) {
+            Map<TimingGroup,Map<TimingGroup,DelayGraphEntry>> srcMap = new EnumMap<>(TimingGroup.class);
+            for (TimingGroup tg : TimingGroup.values()) {
+                srcMap.put(tg,new EnumMap<>(TimingGroup.class));
+            }
+            TgToTgHorizontally.add(srcMap);
+        }
+    }
+
     private void buildTables() {
+        int verbose = 1;
+        boolean plot    = true;
+
         int maxHorDetourDist = TimingGroup.HORT_LONG.length()-1;
         int maxVerDetourDist = TimingGroup.VERT_LONG.length()-1;
 
-        boolean verbose = false;
-        boolean plot    = true;
-
-        // For SitePinToSitePinHorizontally
-        // Detour horizontally may cross hard-block column. Allow vertical detour to.
-        SitePinToSitePinHorizontally = new ArrayList<>();
-        for (int i = 0; i < width; i++) {
-            System.out.println("build hor " + i);
-            SitePinToSitePinHorizontally.add(
-                listPaths(TimingGroup.CLE_OUT, TimingGroup.CLE_IN, Direction.HORIZONTAL,
-                        i, Math.min(i,maxHorDetourDist), verbose, plot));
-        }
-
-        SitePinToSitePinVertically = new ArrayList<>();
-        for (int i = 0; i < height; i++) {
-            System.out.println("build ver " + i);
-            SitePinToSitePinVertically.add(
-                    listPaths(TimingGroup.CLE_OUT, TimingGroup.CLE_IN, Direction.VERTICAL,
-                            i, Math.min(i,maxVerDetourDist), verbose, plot));
-        }
+        iniTables();
 
 
-        sitePinToVerticalTG = new ArrayList<>();
-        VerticalTGToSitePin = new ArrayList<>();
-        List<TimingGroup> vertTgs = getTimingGroup((TimingGroup e) -> (e.direction() == Direction.VERTICAL));
+
+
+
         // There is no need to turn for dist 0, add a dummy to keep using index as distance
-        sitePinToVerticalTG.add(new EnumMap<>(TimingGroup.class));
-        VerticalTGToSitePin.add(new EnumMap<>(TimingGroup.class));
-        for (int i = 1; i < width; i++) {
-            sitePinToVerticalTG.add(new EnumMap<>(TimingGroup.class));
-            VerticalTGToSitePin.add(new EnumMap<>(TimingGroup.class));
-            for (TimingGroup tg : vertTgs) {
-                System.out.println("C i " + i + " " + tg.name());
-                int minDetour = i;
-                if (tg == TimingGroup.VERT_LONG)
-                    // TODO: this should come from interconnectInfo somehow
-                    minDetour = Math.max(i, TimingGroup.HORT_QUAD.length()); // LONG must be driven by QUAD, it need at least detour 4
-                sitePinToVerticalTG.get(i).put(tg,
-                        listPaths(TimingGroup.CLE_OUT, tg, Direction.HORIZONTAL,
-                                i, Math.min(minDetour, maxHorDetourDist), verbose, plot));
-                System.out.println("D i " + i + " " + tg.name());
-                VerticalTGToSitePin.get(i).put(tg,
-                        listPaths(tg, TimingGroup.CLE_IN, Direction.HORIZONTAL,
-                                i, Math.min(i, maxHorDetourDist), verbose, plot));
+        if (true) {
+            List<TimingGroup> frTgs = getTimingGroup((TimingGroup e) -> (e.direction() == Direction.HORIZONTAL));
+            List<TimingGroup> toTgs = getTimingGroup((TimingGroup e) -> (e.direction() == Direction.VERTICAL));
+            frTgs.add(TimingGroup.CLE_OUT);
+            toTgs.add(TimingGroup.CLE_IN);
+            // TODO how about bounce
+            for (int i = 1; i < width; i++) {
+                for (TimingGroup frTg : frTgs) {
+                    for (TimingGroup toTg : toTgs) {
+
+                        int minDetour = Math.max(i, ictInfo.minDetour(toTg));
+                        int detourDist = Math.min(minDetour, maxVerDetourDist);
+
+                        if (verbose > 0)
+                            System.out.println("build hor  dist " + i + " det " + detourDist + " " + frTg.name() + " " + toTg.name());
+
+                        TgToTgHorizontally.get(i).get(frTg).put(toTg, listPaths(frTg, toTg,
+                                Direction.HORIZONTAL, i, detourDist, verbose > 1, plot));
+                    }
+                }
             }
         }
 
-        sitePinToHorizontalTG = new ArrayList<>();
-        HorizontalTGToSitePin = new ArrayList<>();
-        List<TimingGroup> hortTgs = getTimingGroup((TimingGroup e) -> (e.direction() == Direction.HORIZONTAL));
-        // There is no need to turn for dist 0, add a dummy to keep using index as distance
-        sitePinToHorizontalTG.add(new EnumMap<>(TimingGroup.class));
-        HorizontalTGToSitePin .add(new EnumMap<>(TimingGroup.class));
-        for (int i = 1; i < height; i++) {
-            sitePinToHorizontalTG.add(new EnumMap<>(TimingGroup.class));
-            HorizontalTGToSitePin .add(new EnumMap<>(TimingGroup.class));
-            for (TimingGroup tg : hortTgs) {
-                System.out.println("E i " + i + " " + tg.name());
-                int minDetour = i;
-                if (tg == TimingGroup.HORT_LONG)
-                    // TODO: this should come from interconnectInfo somehow
-                    minDetour = Math.max(i, TimingGroup.VERT_QUAD.length()); // LONG must be driven by QUAD, it need at least detour 4
-                sitePinToHorizontalTG.get(i).put(tg,
-                        listPaths(TimingGroup.CLE_OUT, tg, Direction.VERTICAL,
-                                i, Math.min(minDetour, maxVerDetourDist), verbose, plot));
-                System.out.println("F i " + i + " " + tg.name());
-                HorizontalTGToSitePin .get(i).put(tg,
-                        listPaths(tg, TimingGroup.CLE_IN, Direction.VERTICAL,
-                                i, Math.min(i, maxVerDetourDist), verbose, plot));
+        {
+            List<TimingGroup> frTgs = getTimingGroup((TimingGroup e) -> (e.direction() == Direction.VERTICAL));
+            List<TimingGroup> toTgs = getTimingGroup((TimingGroup e) -> (e.direction() == Direction.HORIZONTAL));
+            frTgs.add(TimingGroup.CLE_OUT);
+            toTgs.add(TimingGroup.CLE_IN);
+            for (int i = 1; i < height; i++) {
+                for (TimingGroup frTg : frTgs) {
+                    for (TimingGroup toTg : toTgs) {
+
+                        int minDetour = Math.max(i, ictInfo.minDetour(toTg));
+                        int detourDist = Math.min(minDetour, maxVerDetourDist);
+
+                        if (verbose > 0)
+                            System.out.println("build ver  dist " + i + " det " + detourDist + " " + frTg.name() + " " + toTg.name());
+
+                        TgToTgVertically.get(i).get(frTg).put(toTg, listPaths(frTg, toTg,
+                                Direction.VERTICAL, i, detourDist, verbose > 1, plot));
+                    }
+                }
             }
         }
     }
 
+
     // Declare using implementation type ArrayList because random indexing is needed.
-
-    // index by distance from sitePin
-    private ArrayList<DelayGraphEntry> SitePinToSitePinVertically;
-    private ArrayList<DelayGraphEntry> SitePinToSitePinHorizontally;
-
-    // index by distance from sitePin, then VertTG index
-    // does the list include the Vertical TG ?
-
-    Map<TimingGroup, Object> typeNodeMap = new EnumMap<>(TimingGroup.class);
-    // TODO change to sitePinToTgVerically and use vertical TG as the end
-    private ArrayList<Map<TimingGroup,DelayGraphEntry>> sitePinToVerticalTG; // go horizontally
-    private ArrayList<Map<TimingGroup,DelayGraphEntry>> sitePinToHorizontalTG; // go vertically
-    private ArrayList<Map<TimingGroup,DelayGraphEntry>> VerticalTGToSitePin; // go horizontally
-    private ArrayList<Map<TimingGroup,DelayGraphEntry>> HorizontalTGToSitePin; // go vertically
-
-    // todo: populate these. will be combined with sitePinToHorizontalTG, HorizontalTGToSitePin and  SitePinToSitePinVertically
+    // index by distance, from TG and to TG
     private ArrayList<Map<TimingGroup,Map<TimingGroup,DelayGraphEntry>>> TgToTgVertically;
     private ArrayList<Map<TimingGroup,Map<TimingGroup,DelayGraphEntry>>> TgToTgHorizontally;
 
@@ -444,7 +440,8 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
 
 
     @Override
-    public short getMinDelayToSinkPin(com.xilinx.rapidwright.timing.TimingGroup timingGroup, com.xilinx.rapidwright.timing.TimingGroup sinkPin) {
+    public short getMinDelayToSinkPin(com.xilinx.rapidwright.timing.TimingGroup timingGroup,
+                                      com.xilinx.rapidwright.timing.TimingGroup sinkPin) {
 
         boolean dumpPath = true;
         // 1) look up min paths from table. broken the path up if necessary.
@@ -671,6 +668,7 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
 
     //  for testing -------------------------------------------------------------------------------------------------
 
+
     private static Graph<String, DefaultWeightedEdge> createStringGraph() {
         Graph<String, DefaultWeightedEdge> g = new SimpleDirectedWeightedGraph<>(DefaultWeightedEdge.class);
 
@@ -855,7 +853,7 @@ public class DelayEstimatorTable extends DelayEstimatorBase {
             System.out.println("minDel " + minDel);
             System.out.println("end test delayGraph");
         }
-        if (true) {
+        if (false) {
             double dAtSource = 3.0d;
             short  dist      = 0;
             short  detour    = 0;
