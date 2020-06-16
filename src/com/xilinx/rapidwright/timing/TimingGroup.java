@@ -84,6 +84,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
 
     /**
      * Constructor used for Router example to create a TimingGroup, starting at a given SitePinInst.
+     * @param index A unique index
      * @param startPin Starting SitePinInst for the TimingGroup.
      * @param timingModel Reference to the current TimingModel.
      */

@@ -50,7 +50,7 @@ public class PFRouterWireBased {
 		//initialize router
 		router.initializeRouter();
 		
-		childRNodeGeneration expan = new childRNodeGeneration(this.rnodesCreated);
+		ChildRNodeGeneration expan = new ChildRNodeGeneration(this.rnodesCreated);
 		
 		//do routing
 		t.start("Route Design");
@@ -109,7 +109,7 @@ public class PFRouterWireBased {
 		return;
 	}
 	
-	public void routeACon(PFRouter<Wire> router, childRNodeGeneration expan, Connection<Wire> con){
+	public void routeACon(PFRouter<Wire> router, ChildRNodeGeneration expan, Connection<Wire> con){
 		router.ripup(con);
 		
 		router.prepareForRoutingACon(con);

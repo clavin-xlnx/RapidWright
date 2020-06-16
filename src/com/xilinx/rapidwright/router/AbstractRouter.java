@@ -96,11 +96,11 @@ public abstract class AbstractRouter{
 	/** Total number of connections in design */
 	protected int totalConnections;
 	/** Counts the total number of nodes that were examined in routing */
-	protected int totalNodesProcessed;
+	public int totalNodesProcessed;
 	/** Counts number of nodes processed during a route */
 	protected int nodesProcessed;
 	/** Counts the number of times the router failed to route a connection */
-	protected int failedConnections;
+	public int failedConnections;
 	
 	public AbstractRouter() {
 		// Initialize variables
@@ -298,7 +298,7 @@ public abstract class AbstractRouter{
 			y = currSink.getTile().getTileYCoordinate() - routeNode.getTile().getTileYCoordinate();
 		}else{
 			x = switchMatrixSink.getTile().getTileXCoordinate() - routeNode.getTile().getTileXCoordinate();
-			y = switchMatrixSink.getTile().getTileYCoordinate() - routeNode.getTile().getTileYCoordinate();			
+			y = switchMatrixSink.getTile().getTileYCoordinate() - routeNode.getTile().getTileYCoordinate();
 		}
 		
 		// ABS
