@@ -82,11 +82,7 @@ class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
             while(var5.hasNext()) {
                 E e = (E) var5.next();
                 V u = Graphs.getOppositeVertex(this.graph, e, v);
-//
                 examineEdge.apply(this.graph, v, e, d);
-//                this.graph.setEdgeWeight(e,1);
-//              call e with vDistance
-                //
                 double eWeight = this.graph.getEdgeWeight(e);
                 if (eWeight < 0.0D) {
                     throw new IllegalArgumentException("Negative edge weight not allowed");

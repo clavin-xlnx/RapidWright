@@ -10,13 +10,16 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 public class TimingGroupEdge extends DefaultWeightedEdge {
 
     private TimingGroup tg;
+    private boolean     reverseDirection;
 
     public TimingGroup getTimingGroup() {
         return tg;
     }
+    public boolean isReverseDirection() { return reverseDirection; }
 
-    TimingGroupEdge(TimingGroup tg) {
+    TimingGroupEdge(TimingGroup tg, boolean reverseDirection) {
         this.tg = tg;
+        this.reverseDirection = reverseDirection;
     }
 
     @Override
