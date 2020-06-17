@@ -8,7 +8,7 @@ public class Main {
 	String toWriteDCPfileName;
 	CodePerfTracker t;
 	
-	boolean timing_driven = true;
+	boolean pfRouterNew = true;
 	ExpanGranularityOpt opt = ExpanGranularityOpt.WIRE;
 	
 	//allowed number of routing iterations
@@ -32,7 +32,7 @@ public class Main {
 	}
 	
 	public void processing(){
-		if(!this.timing_driven){
+		if(!this.pfRouterNew){
 			RWRouter router = new RWRouter(this.design);
 			this.t.start("Route Design");
 			router.routeDesign();

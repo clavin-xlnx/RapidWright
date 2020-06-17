@@ -2,6 +2,7 @@ package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,11 +39,11 @@ public class PFRouterWireBased {
 		//sorted nets and connections
 		List<Connection<Wire>> sortedListOfConnection = new ArrayList<>();
 		sortedListOfConnection.addAll(router.getConnections());
-//		Collections.sort(sortedListOfConnection, Comparators.FanoutBBConnection);
+		Collections.sort(sortedListOfConnection, Comparators.FanoutBBConnection);
 		
 		List<Netplus<Wire>> sortedListOfNetplus = new ArrayList<>();		
 		sortedListOfNetplus.addAll(router.getNets());
-//		Collections.sort(sortedListOfNetplus, Comparators.FanoutNet);
+		Collections.sort(sortedListOfNetplus, Comparators.FanoutNet);
 		
 		//unroute nets except GND VCC and clocK
 		router.unrouteNetsReserveGndVccClock();

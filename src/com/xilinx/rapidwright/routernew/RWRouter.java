@@ -450,7 +450,7 @@ public class RWRouter extends AbstractRouter {
 		}
 		int x = end.getTile().getTileXCoordinate() - snk.getTile().getTileXCoordinate();
 		int y = end.getTile().getTileYCoordinate() - snk.getTile().getTileYCoordinate();
-		int watchDog = 100; // TODO - change later
+		int watchDog = 100;
 		RouteNode tmp = new RouteNode();
 		HashSet<RouteNode> visited = new HashSet<RouteNode>();
 		RouteNode closest = new RouteNode();
@@ -575,11 +575,14 @@ public class RWRouter extends AbstractRouter {
 			RouteNode currNode = queue.remove();
 			if(debug) System.out.println(MessageGenerator.makeWhiteSpace(currNode.getLevel()) + currNode.toString() + " " + currNode.getIntentCode() + " *DQ*");
 			nodesProcessed++;
-			System.out.printf("tile: " + currNode.tile.getName() + " wire: " + currNode.wire);
-			System.out.println(" child wire size = " + currNode.getConnections().size());
+			
+			if(currNode.getConnections().size() == 0){
+				System.out.printf("tile = " + currNode.tile.getName() + ", wire = " + currNode.getWireName());
+				System.out.println(" child wire size = " + currNode.getConnections().size());
+			}
 			
 			nextNode: for(Wire w : currNode.getConnections()){
-				System.out.println("\tchild wire tile: " + w.getTile().getName());
+//				System.out.println("\tchild wire tile: " + w.getTile().getName());
 				//node: w.getNode().getAllDownhillNodes();
 				//TIMINGGROUP tg.getNextTimingGroups()
 //				System.out.println("wire name: " + w.getWireName() 
