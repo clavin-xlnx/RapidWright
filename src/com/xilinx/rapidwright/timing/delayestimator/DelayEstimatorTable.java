@@ -208,6 +208,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * set of TGs. However, we keep them separate because it is more flexible and simpler to implement, while the
      * runtime and memory overhead is very small. Furthermore, it is applicable to any device families.
      *
+     * Assumption: "to" is either CLE_IN or TG in the other direction.
+     *
      * TODO: prunning the graph because
      * 1) Required. it might not be valid. Need to verify and eliminate from the graph. L,S,Q,L
      * 2) Optional. Dominated paths (paths always with higher delay then others.)
@@ -263,8 +265,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     System.out.println("wave " + frEntry.toString() + "\n");
 
                 // don't filter with length because need to handle detour
-                List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir) || (e == to));
+                List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir));
+                if (frEntry.loc == dist)
+                    nxtTgs.add(to);
                 for (T.TimingGroup toTg : nxtTgs) {
+
+//                    boolean dbg = false;
+//                    if (dir == T.Direction.VERTICAL && toTg == T.TimingGroup.HORT_LONG)
+//                        dbg = true;
 
                     if (verbose)
                         System.out.println("  toTg " + toTg.name());
@@ -303,7 +311,6 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         if (!distTypeNodemap.containsKey(loc)) {
                             Map<T.TimingGroup, Object> typeNodeMap = new EnumMap<>(T.TimingGroup.class);
                             distTypeNodemap.put(loc, typeNodeMap);
-//                            System.out.println("  new loc " );
                         }
 
                         if (!distTypeNodemap.get(loc).containsKey(toTg)) {
@@ -351,11 +358,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
         GetTermNodes<Graph<Object, TimingGroupEdge>,Object, List<Object>> getTermNodes =
-        (ig, in) -> {
+        (ig, dstNode) -> {
             List<Object> termNodes = new ArrayList<>();
             for (Object n : ig.vertexSet()) {
                 // node with no fanout
-                if ((ig.outDegreeOf(n) <= 0) && (n != in)) {
+                if ((ig.outDegreeOf(n) <= 0) && (n != dstNode)) {
                     termNodes.add(n);
                 }
                 // node with an inedge and outedge to another node
@@ -374,7 +381,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         };
 
 
-        // Trim out dangling vertices
+        // Trim out dangling vertices that is not the destination
         List<Object> termNodes = getTermNodes.apply(g, dst);
         if (verbose)
             System.out.println("Number of termNodes " + termNodes.size());
@@ -414,6 +421,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 String dstName = nodeNames.get(g.getEdgeTarget(e));
                 graphVizPrintStream.println("  " + srcName + " -> " + dstName + " [ label=\"" + e.toGraphvizDotString() + "\" ];");
             }
+            // to make the end node visible in a large graph
+            graphVizPrintStream.println("  " + to + "_" + dist +"[shape=box,style=filled,color=\".7 .3 1.0\"];");
             graphVizPrintStream.println("}");
             graphVizPrintStream.close();
         }
@@ -595,8 +604,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @return Delay of the route in ps
      */
     private short findMinDelay(
-            ArrayList<Map<T.TimingGroup, Map<T.TimingGroup, DelayGraphEntry>>> table, short limit, T.TimingGroup extendingTg,
-            T.TimingGroup s, T.TimingGroup t, short loc, short dist) {
+            ArrayList<Map<T.TimingGroup, Map<T.TimingGroup, DelayGraphEntry>>> table, short limit,
+            T.TimingGroup extendingTg, T.TimingGroup s, T.TimingGroup t, short loc, short dist) {
 
         if (verbose > 2)
             System.out.println("      findMinDelay from " + s.name() + " to " + t.name() + " loc " + loc + " dist " + dist);
@@ -611,45 +620,54 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             // table is stored with TG going the other direction, need to get the equivalent of extendingTg
 
             List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup((T.TimingGroup e) ->
-                    (e.direction() != extendingTg.direction()) && (e.type() == extendingTg.type())
-            );
+                    (e.direction() != extendingTg.direction()) && (e.type() == extendingTg.type()));
             T.TimingGroup equivTg = keyTgs.get(0);
 
             // width and height must cover distance that use at least one long.
-            // break at long
             List<Short> pathDelays = new ArrayList<>();
             int gap = dist - 2 * (limit-1);
             double k = (int) Math.ceil(1.0*gap / extendingTg.length());
             // start : i + k*L = h+g => i = h+g-k*l
             // last  : i = height
             for (int i = (int) (limit-1 + gap - k * extendingTg.length()); i < limit; i++) {
+
                 if (verbose > 2)
-                    System.out.println("      lookup begin dist " + i + " at " + loc);
-                short delayBeginning = LookupDelay(table.get(i).get(s).get(equivTg),
-                        loc, isBackward);
+                    System.out.println("      consider extension at " + i);
+
+                short delayBeginning = LookupDelay(table.get(i).get(s).get(equivTg), loc, isBackward);
 
                 if (verbose > 3)
-                    System.out.println("        lookup for dummy extention at " + i);
-                // delay of the ending was included in delayBeginning. subtract it out.
-                delayBeginning -= (short) calcTimingGroupDelay(equivTg, (double) i, isBackward);
+                    System.out.println("      lookup begin dist " + i + " at " + loc + " del " + delayBeginning);
 
                 short distForEnding = (short) (2*(limit-1) + gap - (i + k*extendingTg.length()));
                 short locForEnding  = (short) (i+k*extendingTg.length());
-                if (verbose > 2)
-                    System.out.println("      lookup end dist " + distForEnding + " at " + locForEnding);
                 short delayEnding = LookupDelay(table.get(distForEnding).get(extendingTg).get(t),
                         locForEnding, isBackward);
-                // delay of each extending tg is location dependent. Thus, need to recompute.
-                short extendingDelay = 0;
-                for (int j = 0; j < k; j++) {
-                    double beginTg = j * extendingTg.length();
-                    if (verbose > 3)
-                        System.out.println("        lookup for extention at " + beginTg);
-                    extendingDelay += (short) calcTimingGroupDelay(extendingTg, (double) beginTg, isBackward);
-                }
-                pathDelays.add((short) (delayBeginning + delayEnding + extendingDelay));
 
-                break; // TODO: TBD
+                if (verbose > 3)
+                    System.out.println("      lookup end dist " + distForEnding + " at " + locForEnding + " del " + delayEnding);
+
+                // delay of each extending tg is location dependent. Thus, need to recompute.
+                short extendingDelayTotal = 0;
+                for (int j = 0; j < k; j++) {
+                    short begLoc = (short) (i + j * extendingTg.length());
+                    short endLoc = (short) (begLoc + extendingTg.length());
+                    if (verbose > 4)
+                        System.out.print("        lookup for extention from " + begLoc + " to " + endLoc);
+
+                    short extendingDelay = (short) calcTimingGroupDelay(extendingTg, begLoc, endLoc);
+                    extendingDelayTotal += extendingDelay;
+
+                    if (verbose > 4 && verbose < 6)
+                        System.out.println("  del " + extendingDelay);
+                }
+
+                short dlyTotal = (short) (delayBeginning + delayEnding + extendingDelayTotal);
+                pathDelays.add(dlyTotal);
+                if (verbose > 3) {
+                    System.out.println("        lookup for extention del " + extendingDelayTotal);
+                    System.out.println("        lookup total del " + dlyTotal);
+                }
             }
             delay = Collections.min(pathDelays);
         }
@@ -671,14 +689,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         Double minDel = DijkstraWithCallbacks.findMinWeightBetween(sentry.g, sentry.src, sentry.dst, dAtSource,
                 // ExamineEdge. To update edge weight which depend on the beginning loc, length and direction
                 // of the timing group edge.
-                (g, u, e, loc) -> {g.setEdgeWeight(e,calcTimingGroupDelay(e,loc, isBackward));},
+                (g, u, e, loc) -> {g.setEdgeWeight(e,calcTimingGroupDelayOnEdge(e, u, sentry.dst, loc, isBackward));},
                 // DiscoverVertex. To propagate location at the beginning loc of a timing group edge.
                 (g, u, e, loc) -> {return updateLoc(e, loc, isBackward);}
         );
 
         if (verbose > 5) {
             org.jgrapht.GraphPath<Object, TimingGroupEdge> minPath = DijkstraWithCallbacks.findPathBetween(sentry.g, sentry.src, sentry.dst, dAtSource,
-                    (g, u, e, loc) -> {g.setEdgeWeight(e,calcTimingGroupDelay(e,loc, isBackward));},
+                    (g, u, e, loc) -> {g.setEdgeWeight(e,calcTimingGroupDelayOnEdge(e,u, sentry.dst, loc, isBackward));},
                     (g, u, e, loc) -> {return updateLoc(e, loc, isBackward);}
 //                    (g, u, e, v) -> {  g.setEdgeWeight(e, calcTimingGroupDelay(e, v, isBackward)); },
 //                    (g, u, e, v) -> { return v + e.getTimingGroup().length(); }
@@ -696,63 +714,75 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     void testLookup() {
         // This is don't to allow automatic check for forward delay == backward delay
         zeroDistArrays();
-//        testLookupHorInTable();
-//        testLookupVerInTable();
-//        testLookupHorOutTable();
+        testLookupHorInTable();
+        testLookupVerInTable();
+        testLookupHorOutTable();
         testLookupVerOutTable();
     }
 
     void testLookupHorInTable() {
+        System.out.println("testLookupHorInTable");
         short y = 0;
         for (int i = 1; i < width; i++) {
-            System.out.print("testLookupHorInTable " + i + " " );
             short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, (short) 0, y, (short) i, y);
             short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, (short) i, y, (short) 0, y);
-            System.out.println(delay_1 + " " + delay_2);
-            assert delay_1 == delay_2;
+            System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
+            if (delay_1 == delay_2)
+                System.out.println();
+            else
+                System.out.println(" ****** differ *******");
         }
     }
     void testLookupVerInTable() {
+        System.out.println("testLookupVerInTable");
         short x = 0;
         for (int i = 1; i < height; i++) {
-            System.out.print("testLookupVerInTable " + i + " " );
             short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) 0, x, (short) i);
             short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) i, x, (short) 0);
-            System.out.println(delay_1 + " " + delay_2);
-            assert delay_1 == delay_2;
+            System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
+            if (delay_1 == delay_2)
+                System.out.println();
+            else
+                System.out.println(" ****** differ *******");
         }
     }
 
     void testLookupHorOutTable() {
+        System.out.println("testLookupHorOutTableForward ");
         int numCol = distArrays.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE).size();
         short y = 0;
         for (int i = 2*(width -1); i < numCol; i++) {
-//        for (int i = 2; i < 3; i++) {
 //            System.out.println("testLookupHorOutTable Forward " + i);
             short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, (short) 0, y, (short) i, y);
 //            System.out.println("testLookupHorOutTable Backward " + i);
             short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, (short) i, y, (short) 0, y);
-            System.out.print("compare forward and backward " + i + " " );
-            System.out.println(delay_1 + " " + delay_2);
+            System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
+            if (delay_1 == delay_2)
+                System.out.println();
+            else
+                System.out.println(" ****** differ *******");
+//            System.out.println(delay_1 + " " + delay_2);
+//            System.out.println(delay_1 + " " + delay_2);
 //            assert delay_1 == delay_2 : "Forward and backward delays differ";
         }
     }
     void testLookupVerOutTable() {
+        System.out.println("testLookupVerOutTable");
+        int numCol = distArrays.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE).size();
         int numRow = distArrays.get(T.Direction.VERTICAL).get(GroupDelayType.SINGLE).size();
         short x = 0;
-//        for (int i = 2*(height-1); i < numRow; i++) {
-//            System.out.print("testLookupVerOutTable " + i + " " );
-//            short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) 0, x, (short) i);
-//            short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) i, x, (short) 0);
-//            System.out.println(delay_1 + " " + delay_2);
-//            assert delay_1 == delay_2;
-        for (int i = 112; i < numRow; i++) {
-//            System.out.println("testLookupHorOutTable Forward " + i);
+        for (int i = 2*(height-1); i < numRow; i++) {
+//            System.out.println("testLookupVerOutTable Forward " + i);
             short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) 0, x, (short) i);
-//            System.out.println("testLookupHorOutTable Backward " + i);
+//            System.out.println("testLookupVerOutTable Backward " + i);
             short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) i, x, (short) 0);
-            System.out.print("compare forward and backward " + i + " " );
-            System.out.println(delay_1 + " " + delay_2);
+            System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
+            if (delay_1 == delay_2)
+                System.out.println();
+            else
+                System.out.println(" ****** differ *******");
+//            System.out.println(delay_1 + " " + delay_2);
+//            System.out.println(delay_1 + " " + delay_2);
 //            assert delay_1 == delay_2 : "Forward and backward delays differ";
         }
     }
@@ -761,7 +791,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 6);
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 2);
 
         est.testLookup();
 

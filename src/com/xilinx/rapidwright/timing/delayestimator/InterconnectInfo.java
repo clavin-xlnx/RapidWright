@@ -109,7 +109,8 @@ public class InterconnectInfo {
 
         List<TimingGroup> tempList  =  new ArrayList<>(interconnectHier.get(fromTimingGroup));
         tempList.removeIf(filter.negate());
-        return Collections.unmodifiableList(tempList);
+        return tempList;
+//        return Collections.unmodifiableList(tempList);
     }
 
     public short minDetour(TimingGroup tg) {

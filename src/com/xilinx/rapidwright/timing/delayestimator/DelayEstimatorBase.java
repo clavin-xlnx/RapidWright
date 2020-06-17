@@ -305,11 +305,78 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @param loc The INT tile index at the beginning of the timing group.
      * @return  The delay of this timing group.
      */
-    protected double calcTimingGroupDelay(TimingGroupEdge e, Double loc, boolean isBackward) {
-        return calcTimingGroupDelay(e.getTimingGroup(),loc, e.isReverseDirection() ^ isBackward);
+    protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, Double loc, boolean isBackward) {
+//        boolean dbg = false;
+//        if (e.getTimingGroup() == InterconnectInfo.TimingGroup.HORT_LONG)
+//            dbg = true;
+
+        if (u == dst)
+            return 0;
+        else {
+           // return calcTimingGroupDelay(e.getTimingGroup(), loc.shortValue(), e.isReverseDirection() ^ isBackward);
+            T.TimingGroup tg = e.getTimingGroup();
+            short begLoc = loc.shortValue();
+            boolean isReverseDirection = e.isReverseDirection() ^ isBackward;
+
+            int limit = 0;
+            if (tg.direction() == InterconnectInfo.Direction.VERTICAL) {
+                limit = numRow;
+            } else {
+                limit = numCol;
+            }
+
+            short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
+            if ((endLoc >= limit) || (endLoc < 0)) {
+                // Can't do MAX_VALUE as adding that to other value will become negative.
+                // TODO: consider using INT as intemediate computation
+                return Short.MAX_VALUE/2;
+            }
+
+            if (verbose > 4) {
+                System.out.printf("          OnEdge %11s  loc %3d  rev %5s bwd %5s                  ",
+                        tg.name(), begLoc, e.isReverseDirection(), isBackward);
+            }
+
+            return calcTimingGroupDelay(tg, begLoc, endLoc);
+        }
     }
 
-    protected double calcTimingGroupDelay(T.TimingGroup tg, Double loc, boolean isReverseDirection) {
+    /**
+     *
+     * @param tg
+     * @param begLoc
+     * @param endLoc
+     * @return
+     */
+    protected double calcTimingGroupDelay(T.TimingGroup tg, short begLoc, short endLoc) {
+
+        float k0 = K0.get(tg.direction()).get(tg.type());
+        float k1 = K1.get(tg.direction()).get(tg.type());
+        float k2 = K2.get(tg.direction()).get(tg.type());
+        short l  = L .get(tg.direction()).get(tg.type());
+
+        short st  = distArrays.get(tg.direction()).get(tg.type()).get(begLoc);
+        short sp  = distArrays.get(tg.direction()).get(tg.type()).get(endLoc);
+
+        // need abs in case the tg is going to the left.
+        short del  = (short) (k0 + k1 * l + k2 * Math.abs(sp-st));
+        if (verbose > 5) {
+            System.out.printf("          calTiming %11s   len %2d  begLoc %3d  endLoc %3d  ",
+                    tg.name(), tg.length(), begLoc, endLoc);
+            System.out.printf(" k0 %3.1f k1 %3.1f k2 %3.1f   l %2d   d %3d   dst %3d   dsp %3d    del %4d\n",
+                    k0, k1, k2, l, (sp - st), st, sp, del);
+        }
+        return del;
+    }
+
+    /**
+     * Compute delay of a timing group based on its type and location
+     * @param tg Compute delay of this timing group
+     * @param begLoc Starting location of the timing group
+     * @param isReverseDirection Is timing group going left or down?
+     * @return Delay in ps
+     */
+    protected double calcTimingGroupDelay(T.TimingGroup tg, short begLoc, boolean isReverseDirection) {
 
         int limit = 0;
         if (tg.direction() == InterconnectInfo.Direction.VERTICAL) {
@@ -318,41 +385,19 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             limit = numCol;
         }
 
-        short endLoc = (short) (loc.shortValue() + (isReverseDirection ? -tg.length() : tg.length()));
+        short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
         if ((endLoc >= limit) || (endLoc < 0)) {
             // Can't do MAX_VALUE as adding that to other value will become negative.
             // TODO: consider using INT as intemediate computation
             return Short.MAX_VALUE/2;
         }
 
-//        // TODO: don't do this if detour
-//        if ((tg.length() + loc >= limit) || ( (tg.length() + loc) < 0)){
-//            // Can't do MAX_VALUE as adding that to other value will become negative.
-//            // TODO: consider using INT as intemediate computation
-//            return Short.MAX_VALUE/2;
-//        }
         if (verbose > 4) {
             System.out.printf("          calTiming %11s   loc %3d  rev %5s             len %2d   newLoc %3d  ",
-                    tg.name(), loc.shortValue(), isReverseDirection, tg.length(), endLoc);
+                    tg.name(), begLoc, isReverseDirection, tg.length(), endLoc);
         }
 
-        float k0 = K0.get(tg.direction()).get(tg.type());
-        float k1 = K1.get(tg.direction()).get(tg.type());
-        float k2 = K2.get(tg.direction()).get(tg.type());
-        short l  = L .get(tg.direction()).get(tg.type());
-
-        short st  = distArrays.get(tg.direction()).get(tg.type()).get(loc.shortValue());
-        short sp  = distArrays.get(tg.direction()).get(tg.type()).get(endLoc);
-
-        // need abs in case the tg is going to the left.
-        short del  = (short) (k0 + k1 * l + k2 * Math.abs(sp-st));
-        if (verbose > 4) {
-            System.out.printf("          calTiming %11s   loc %3d  rev %5s           len %2d   newLoc %3d  ",
-                    tg.name(), loc.shortValue(), isReverseDirection, tg.length(), endLoc);
-            System.out.printf(" k0 %3.1f k1 %3.1f k2 %3.1f   l %2d   d %3d   dst %3d   dsp %3d    del %4d\n",
-                    k0, k1, k2, l, (sp-st), st, sp, del);
-        }
-        return del;
+        return calcTimingGroupDelay(tg, begLoc, endLoc);
     }
 
 
