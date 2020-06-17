@@ -135,10 +135,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         } else {
             // The key TimingGroups are used to connect between vertical and horizontal sections.
             // The direction of the key TimingGroup is not used.
-            List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL));
 
             List<Short> pathDelays = new ArrayList<>();
             {
+                if (verbose > 0)
+                    System.out.println("getMinDelayToSinkPin hor->ver");
+                List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
+                        (T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL));
                 Map<T.TimingGroup,Map<T.TimingGroup,Short>> delay1 =
                         findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, keyTgs, begX, endX);
                 Map<T.TimingGroup,Map<T.TimingGroup,Short>> delay2 =
@@ -150,6 +153,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             }
 
             {
+                if (verbose > 0)
+                    System.out.println("getMinDelayToSinkPin ver->hor");
+                List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
+                        (T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL));
                 Map<T.TimingGroup,Map<T.TimingGroup,Short>> delay1 =
                         findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, keyTgs, begY, endY);
                 Map<T.TimingGroup,Map<T.TimingGroup,Short>> delay2 =
@@ -714,84 +721,51 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     void testLookup() {
         // This is don't to allow automatic check for forward delay == backward delay
         zeroDistArrays();
-        testLookupHorInTable();
-        testLookupVerInTable();
-        testLookupHorOutTable();
-        testLookupVerOutTable();
+        int cnt = 0;
+
+        // lookup hor in table
+        cnt = testLookup(1,width,0,1, cnt);
+        // lookup hor out table
+        cnt = testLookup(2*(width -1),numCol,0,1, cnt);
+        // lookup ver in table
+        cnt = testLookup(0,1,1,height, cnt);
+        // lookup ver out table
+        cnt = testLookup(0,1,2*(height-1), numRow, cnt);
+        // lookup angle in table
+        cnt = testLookup(1,width,1,height,cnt);
+        // lookup angle out table
+        cnt = testLookup(2*(width-1), numCol,2*(height-1), numRow,cnt);
+
+        System.out.println("\n---------------------------------\n");
+        System.out.println("The total number of tests are " + cnt);
     }
 
-    void testLookupHorInTable() {
-        System.out.println("testLookupHorInTable");
+    int  testLookup (int begWidth, int endWidth, int begHeight, int endHeight, int cnt) {
+        System.out.println("\n**************************************************\n");
+        System.out.println("testLookupAngleInTable " + begWidth + " " + endWidth + " " + begHeight + " " + endHeight);
+
         short y = 0;
-        for (int i = 1; i < width; i++) {
-            short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, (short) 0, y, (short) i, y);
-            short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, (short) i, y, (short) 0, y);
-            System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
-            if (delay_1 == delay_2)
-                System.out.println();
-            else
-                System.out.println(" ****** differ *******");
-        }
-    }
-    void testLookupVerInTable() {
-        System.out.println("testLookupVerInTable");
-        short x = 0;
-        for (int i = 1; i < height; i++) {
-            short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) 0, x, (short) i);
-            short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) i, x, (short) 0);
-            System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
-            if (delay_1 == delay_2)
-                System.out.println();
-            else
-                System.out.println(" ****** differ *******");
-        }
-    }
-
-    void testLookupHorOutTable() {
-        System.out.println("testLookupHorOutTableForward ");
-        int numCol = distArrays.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE).size();
-        short y = 0;
-        for (int i = 2*(width -1); i < numCol; i++) {
-//            System.out.println("testLookupHorOutTable Forward " + i);
-            short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, (short) 0, y, (short) i, y);
-//            System.out.println("testLookupHorOutTable Backward " + i);
-            short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, (short) i, y, (short) 0, y);
-            System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
-            if (delay_1 == delay_2)
-                System.out.println();
-            else
-                System.out.println(" ****** differ *******");
-//            System.out.println(delay_1 + " " + delay_2);
-//            System.out.println(delay_1 + " " + delay_2);
+        for (int i = begWidth; i < endWidth; i++) {
+            for (int j = begHeight; j < endHeight; j++, cnt += 2) {
+                if (verbose > 0) System.out.println("forward");
+                short delay_1 = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, (short) 0, (short) 0, (short) i, (short) j);
+                if (verbose > 0) System.out.println("backward");
+                short delay_2 = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, (short) i, (short) j, (short) 0, (short) 0);
+                System.out.print("compare forward and backward at dist "+i+" "+j+" : "+delay_1+" "+delay_2);
 //            assert delay_1 == delay_2 : "Forward and backward delays differ";
+                if (delay_1 == delay_2)
+                    System.out.println();
+                else
+                    System.out.println(" ****** differ *******");
+            }
         }
+        return cnt;
     }
-    void testLookupVerOutTable() {
-        System.out.println("testLookupVerOutTable");
-        int numCol = distArrays.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE).size();
-        int numRow = distArrays.get(T.Direction.VERTICAL).get(GroupDelayType.SINGLE).size();
-        short x = 0;
-        for (int i = 2*(height-1); i < numRow; i++) {
-//            System.out.println("testLookupVerOutTable Forward " + i);
-            short delay_1 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) 0, x, (short) i);
-//            System.out.println("testLookupVerOutTable Backward " + i);
-            short delay_2 = getMinDelayToSinkPin(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, x, (short) i, x, (short) 0);
-            System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
-            if (delay_1 == delay_2)
-                System.out.println();
-            else
-                System.out.println(" ****** differ *******");
-//            System.out.println(delay_1 + " " + delay_2);
-//            System.out.println(delay_1 + " " + delay_2);
-//            assert delay_1 == delay_2 : "Forward and backward delays differ";
-        }
-    }
-
     public static <GraphPath> void main(String args[]) {
 
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 2);
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 0);
 
         est.testLookup();
 
@@ -916,3 +890,16 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
