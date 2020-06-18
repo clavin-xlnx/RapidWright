@@ -252,22 +252,3 @@ public class InterconnectInfo {
         }
     }
 }
-/*
-    void  testLookupAngleInTable () {
-        System.out.println("testLookupAngleInTable");
-        short y = 0;
-        for (int i = 1; i < width; i++) {
-            for (int j = 1; i < height; i++) {
-
-                System.out.println("forward");
-                short delay_1 = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, (short) 0, (short) 0, (short) i, (short) j);
-                short delay_2 = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, (short) i, (short) j, (short) 0, (short) 0);
-                System.out.print("compare forward and backward at dist " + i + " " + delay_1 + " " + delay_2);
-                if (delay_1 == delay_2)
-                    System.out.println();
-                else
-                    System.out.println(" ****** differ *******");
-            }
-        }
-    }
-*/

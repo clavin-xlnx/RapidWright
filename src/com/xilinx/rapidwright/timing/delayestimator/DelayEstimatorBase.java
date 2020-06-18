@@ -67,7 +67,8 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 
     enum TileSide {
         E,
-        W
+        W,
+        M
     };
 
         /**
@@ -219,17 +220,17 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             K0.put(T.Direction.HORIZONTAL, tk0);
 
             Map<GroupDelayType, Float> tk1 = new EnumMap<>(GroupDelayType.class);
-            tk1.put(GroupDelayType.SINGLE, 4f);
-            tk1.put(GroupDelayType.DOUBLE, 4f);
-            tk1.put(GroupDelayType.QUAD, 4f);
-            tk1.put(GroupDelayType.LONG, 4f);
+            tk1.put(GroupDelayType.SINGLE, 3.5f);
+            tk1.put(GroupDelayType.DOUBLE, 3.5f);
+            tk1.put(GroupDelayType.QUAD, 3.5f);
+            tk1.put(GroupDelayType.LONG, 3.5f);
             K1.put(T.Direction.HORIZONTAL, tk1);
 
             Map<GroupDelayType, Float> tk2 = new EnumMap<>(GroupDelayType.class);
-            tk2.put(GroupDelayType.SINGLE, 2f);
-            tk2.put(GroupDelayType.DOUBLE, 2f);
-            tk2.put(GroupDelayType.QUAD, 2f);
-            tk2.put(GroupDelayType.LONG, 1f);
+            tk2.put(GroupDelayType.SINGLE, 2.3f);
+            tk2.put(GroupDelayType.DOUBLE, 2.3f);
+            tk2.put(GroupDelayType.QUAD, 2.4f);
+            tk2.put(GroupDelayType.LONG, 1.3f);
             K2.put(T.Direction.HORIZONTAL, tk2);
 
             Map<GroupDelayType, Short> tl = new EnumMap<>(GroupDelayType.class);
@@ -249,17 +250,17 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             K0.put(T.Direction.VERTICAL, tk0);
 
             Map<GroupDelayType, Float> tk1 = new EnumMap<>(GroupDelayType.class);
-            tk1.put(GroupDelayType.SINGLE, 4f);
-            tk1.put(GroupDelayType.DOUBLE, 4f);
-            tk1.put(GroupDelayType.QUAD, 4f);
-            tk1.put(GroupDelayType.LONG, 4f);
+            tk1.put(GroupDelayType.SINGLE, 3.6f);
+            tk1.put(GroupDelayType.DOUBLE, 3.6f);
+            tk1.put(GroupDelayType.QUAD, 3.6f);
+            tk1.put(GroupDelayType.LONG, 3.6f);
             K1.put(T.Direction.VERTICAL, tk1);
 
             Map<GroupDelayType, Float> tk2 = new EnumMap<>(GroupDelayType.class);
-            tk2.put(GroupDelayType.SINGLE, 14f);
-            tk2.put(GroupDelayType.DOUBLE, 6f);
-            tk2.put(GroupDelayType.QUAD, 10f);
-            tk2.put(GroupDelayType.LONG, 4f);
+            tk2.put(GroupDelayType.SINGLE, 13.5f);
+            tk2.put(GroupDelayType.DOUBLE, 5.5f);
+            tk2.put(GroupDelayType.QUAD, 9.5f);
+            tk2.put(GroupDelayType.LONG, 3.5f);
             K2.put(T.Direction.VERTICAL, tk2);
 
             Map<GroupDelayType, Short> tl = new EnumMap<GroupDelayType, Short>(GroupDelayType.class);
@@ -363,7 +364,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         if (verbose > 5) {
             System.out.printf("          calTiming %11s   len %2d  begLoc %3d  endLoc %3d  ",
                     tg.name(), tg.length(), begLoc, endLoc);
-            System.out.printf(" k0 %3.1f k1 %3.1f k2 %3.1f   l %2d   d %3d   dst %3d   dsp %3d    del %4d\n",
+            System.out.printf(" k0 %3.1f k1 %3.1f k2 %4.1f   l %2d   d %3d   dst %3d   dsp %3d    del %4d\n",
                     k0, k1, k2, l, (sp - st), st, sp, del);
         }
         return del;

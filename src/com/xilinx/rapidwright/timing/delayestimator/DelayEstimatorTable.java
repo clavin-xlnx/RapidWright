@@ -25,12 +25,18 @@ package com.xilinx.rapidwright.timing.delayestimator;
 
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.util.Pair;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 
+import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,6 +46,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 // Conventions:
 // 1) Each graph represent all possible path from between 2 TGs. The delay of the beginning TG is not included.
@@ -90,15 +98,23 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     DelayEstimatorTable(String partName, T ictInfo, int verbose) {
         this(Device.getDevice(partName), ictInfo, verbose);
     }
+    /**
+     * Get the min delay between two (com.xilinx.rapidwright.timing) timing groups.
+     */
+    /**
+     * Get the min estimated delay between two (com.xilinx.rapidwright.timing) timing groups.
+     * @param timingGroup Timing group at the beginning of the route
+     * @param sinkPin Timing group at the end. It must be a sinkPin
+     * @return
+     */
     @Override
     public short getMinDelayToSinkPin(com.xilinx.rapidwright.timing.TimingGroup timingGroup,
                                       com.xilinx.rapidwright.timing.TimingGroup sinkPin) {
 
-        boolean dumpPath = true;
-        // 1) look up min paths from table. broken the path up if necessary.
-        // 2) For each min path, apply location (from TG, sinkPin) to get d.
-        // 3) compute delay of each path
-        // 4) return the min among paths
+
+//        Node tgNode = timingGroup.getLastNode();
+// INT_X46Y110/IMUX_E17
+// INT_X45Y109/EE2_E_BEG6
 
 
         // TODO: need to populate these from TGs
@@ -112,7 +128,16 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         T.TimingGroup endTg = T.TimingGroup.CLE_IN;
         T.TimingGroup begTg = T.TimingGroup.CLE_OUT;
 
-        return getMinDelayToSinkPin(begTg, endTg, begX, begY, endX, endY);
+
+        short delay = getMinDelayToSinkPin(begTg, endTg, begX, begY, endX, endY);
+        // If we store both E and W sides, the size of each entry will be double.
+        // We also need 4x more entries. Storing only one side should produce a small difference
+        // because all TG but LONG can switch sides.
+        if ((begSide != TileSide.M) && (begSide != endSide)) {
+            delay += 0;
+        }
+
+        return delay;
     }
 
     private short getMinDelayToSinkPin(T.TimingGroup begTg, T.TimingGroup endTg,
@@ -124,14 +149,17 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         List<T.TimingGroup> begTgs = new ArrayList<T.TimingGroup>() {{add(begTg);}};
         List<T.TimingGroup> endTgs = new ArrayList<T.TimingGroup>() {{add(endTg);}};
 
-        if (begX == endX) {
+        short delay = 0;
+        if ((begX == endX) && (begY == endY)) {
+           // do nothing
+        } else if (begX == endX) {
             Map<T.TimingGroup,Map<T.TimingGroup,Short>> delayY =
                     findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, endTgs, begY, endY);
-            return delayY.get(begTg).get(endTg);
+            delay = delayY.get(begTg).get(endTg);
         } else if (begY == endY) {
             Map<T.TimingGroup,Map<T.TimingGroup,Short>> delayY =
                     findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, endTgs, begX, endX);
-            return delayY.get(begTg).get(endTg);
+            delay = delayY.get(begTg).get(endTg);
         } else {
             // The key TimingGroups are used to connect between vertical and horizontal sections.
             // The direction of the key TimingGroup is not used.
@@ -166,8 +194,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     pathDelays.add((short) (delay1.get(begTg).get(tg) + delay2.get(tg).get(endTg)));
                 }
             }
-            return Collections.min(pathDelays);
+            delay = Collections.min(pathDelays);
         }
+
+        // add delay of input sitepin
+        return (short) (delay + K0.get(InterconnectInfo.Direction.INPUT).get(GroupDelayType.PINFEED));
     }
 
     private short width;
@@ -718,6 +749,108 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     // -----------------------   Methods to help testing ------------------------
 
+    void testCases() {
+        short delay_1 = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, (short) 10, (short) 10, (short) 10, (short) 20);
+        System.out.println("delay " + delay_1);
+    }
+
+    void testOne( int sx, int sy, int tx, int ty) {
+        verbose = 6;
+        short est = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, (short) sx, (short) sy, (short) tx, (short) ty);
+        System.out.println(sx + " " + sy + " " + tx + " " + ty + " " + est);
+    }
+    void testCases(String fname) {
+        Pattern filename = Pattern.compile("^(\\w+)");
+        Matcher matchfn = filename.matcher(fname);
+        String oname = null;
+
+        int cnt = 0;
+        int minErr1 = Integer.MAX_VALUE;
+        int maxErr1 = 0;
+        int sumErr1 = 0;
+        int minErr2 = Integer.MAX_VALUE;
+        int maxErr2 = 0;
+        int sumErr2 = 0;
+
+        if (matchfn.find()) {
+            oname = matchfn.group(1) + ".out";
+        }
+
+        try {
+            FileWriter outfile = new FileWriter(oname);
+
+            Pattern pattern = Pattern.compile("^(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\\w+\\s+\\w+\\s+[0-9.%]+\\s+[0-9.]+\\s+([0-9.]+)\\s+([0-9.]+)");
+            try {
+                BufferedReader reader = new BufferedReader(new FileReader(fname));
+                String line = reader.readLine();
+                while (line != null) {
+                    System.out.println(line);
+                    Matcher matcher = pattern.matcher(line);
+                    short sx; short sy; short tx; short ty;
+                    short tgDelay; short rtDelay;
+                    if (matcher.find()) {
+                        sx = Short.parseShort(matcher.group(1));
+                        sy = Short.parseShort(matcher.group(2));
+                        tx = Short.parseShort(matcher.group(3));
+                        ty = Short.parseShort(matcher.group(4));
+
+                        tgDelay = (short) Float.parseFloat(matcher.group(5));
+                        rtDelay = (short) Float.parseFloat(matcher.group(6));
+
+                        short est = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, sx, sy, tx, ty);
+                        System.out.println(sx + " " + sy + " " + tx + " " + ty + " " + est + " " + tgDelay + " " + rtDelay);
+
+                        outfile.write(sx + " " + sy + " " + tx + " " + ty);
+                        outfile.write("   " + est + " " + tgDelay + " " + rtDelay);
+
+                        // error compare to tgDelay
+                        int   err1 = est - tgDelay;
+                        float ept1 = 100*err1/tgDelay;
+                        outfile.write("   " + err1 + " " + ept1 +"%");
+                        // error compare to rtDelay
+                        int   err2 = est - rtDelay;
+                        float ept2 = 100*err2/rtDelay;
+                        outfile.write("   " + err2 + " " + ept2 +"%");
+                        outfile.write(System.lineSeparator());
+
+                        minErr1 = Math.min(minErr1, err1);
+                        maxErr1 = Math.max(maxErr1, err1);
+                        sumErr1 += err1;
+                        minErr2 = Math.min(minErr2, err2);
+                        maxErr2 = Math.max(maxErr2, err2);
+                        sumErr2 += err2;
+
+                        cnt++;
+                    }
+                    line = reader.readLine();
+                }
+
+                // print summary
+                outfile.write(System.lineSeparator());
+                outfile.write(System.lineSeparator());
+                // compare to tgDelay
+                float avgErr1 = sumErr1/cnt;
+                outfile.write("Compare to tgDelay   " + minErr1 + " " + maxErr1 + " " + avgErr1);
+                outfile.write(System.lineSeparator());
+                // compare to rtDelay
+                float avgErr2 = sumErr2/cnt;
+                outfile.write("Compare to tgDelay   " + minErr2 + " " + maxErr2 + " " + avgErr2);
+                outfile.write(System.lineSeparator());
+
+            } catch (IOException e) {
+                System.out.println("Can't open file " + fname + " for read.");
+                e.printStackTrace();
+            }
+
+            outfile.close();
+        } catch (IOException e) {
+            System.out.println("Can't open file " + oname + " for write.");
+            e.printStackTrace();
+        }
+
+
+
+    }
     void testLookup() {
         // This is don't to allow automatic check for forward delay == backward delay
         zeroDistArrays();
@@ -761,13 +894,25 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         }
         return cnt;
     }
+
+    // 5 OnEdge/updateLoc
+
     public static <GraphPath> void main(String args[]) {
 
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 0);
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 6);
 
-        est.testLookup();
+        //est.testLookup();
+        //est.testCases();
+        // warmup test
+        //est.testCases("est_dly_ref_0_1_1_3.txt");
+        // vert in table
+        //est.testCases("est_dly_ref_0_1_1_19.txt");
+        est.testOne(0, 1, 0, 5);
+        // hor in table
+//        est.testCases("est_dly_ref_0_9_0_1.txt");
+
 
         if (false) {
             //ictInfo.dumpInterconnectHier();
@@ -891,6 +1036,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 }
 
+//TODO: 1) E/W,  2) test form non CLE_out.
 
 
 
