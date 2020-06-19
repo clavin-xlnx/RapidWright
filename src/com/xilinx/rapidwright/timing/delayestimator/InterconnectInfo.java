@@ -197,6 +197,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_LONG);
+            add(TimingGroup.BOUNCE);
         }});
         ictHier.put(TimingGroup.VERT_SINGLE, new ArrayList<TimingGroup>() {{
             add(TimingGroup.HORT_SINGLE);
@@ -235,10 +236,13 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_LONG);
+            add(TimingGroup.BOUNCE);
         }});
 
         // TODO: What's about bounce?
-
+        ictHier.put(TimingGroup.BOUNCE, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.CLE_IN);
+        }});
         // No one has access to the modifiable version, ictHier.
         // Thus, the content of interconnectHier never changes.
         interconnectHier = Collections.unmodifiableMap(ictHier);

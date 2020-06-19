@@ -148,6 +148,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         numCol = distArrays.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE).size();
         numRow = distArrays.get(T.Direction.VERTICAL).get(GroupDelayType.SINGLE).size();
         distArrays.get(T.Direction.INPUT).put(GroupDelayType.PINFEED, new ArrayList<Short>(Collections.nCopies(numCol, (short) 0)));
+        distArrays.get(T.Direction.LOCAL).put(GroupDelayType.PIN_BOUNCE, new ArrayList<Short>(Collections.nCopies(numCol, (short) 0)));
 
 
         if (false) {
@@ -286,6 +287,23 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             Map<GroupDelayType, Short> tl = new EnumMap<>(GroupDelayType.class);
             tl.put(GroupDelayType.PINFEED, (short) 0);
             L.put(T.Direction.INPUT, tl);
+        }
+        {
+            Map<GroupDelayType, Float> tk0 = new EnumMap<>(GroupDelayType.class);
+            tk0.put(GroupDelayType.PIN_BOUNCE, 43f);
+            K0.put(T.Direction.LOCAL, tk0);
+
+            Map<GroupDelayType, Float> tk1 = new EnumMap<>(GroupDelayType.class);
+            tk1.put(GroupDelayType.PIN_BOUNCE, 0f);
+            K1.put(T.Direction.LOCAL, tk1);
+
+            Map<GroupDelayType, Float> tk2 = new EnumMap<>(GroupDelayType.class);
+            tk2.put(GroupDelayType.PIN_BOUNCE, 0f);
+            K2.put(T.Direction.LOCAL, tk2);
+
+            Map<GroupDelayType, Short> tl = new EnumMap<>(GroupDelayType.class);
+            tl.put(GroupDelayType.PIN_BOUNCE, (short) 0);
+            L.put(T.Direction.LOCAL, tl);
         }
     }
 

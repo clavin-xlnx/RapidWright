@@ -312,7 +312,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 // don't filter with length because need to handle detour
                 List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir));
                 if (frEntry.loc == dist) {
-                    List<T.TimingGroup> reachableTo = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e == to));
+                    List<T.TimingGroup> reachableTo = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) ->
+                            (e == to) || (e.direction() == InterconnectInfo.Direction.LOCAL));
                     for (T.TimingGroup tg : reachableTo)
                         nxtTgs.add(tg);
                 }
@@ -1021,8 +1022,6 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         //est.testCases("est_dly_ref_0_1_1_3.txt");
         // vert in table
         est.testCases("est_dly_ref_0_1_1_19.txt");
-//        est.testOne(0, 1, 0, 6);
-//        est.testOne(0, 18, 0, 2);
         // hor in table
 //        est.testCases("est_dly_ref_0_9_0_1.txt");
 
