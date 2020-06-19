@@ -36,32 +36,34 @@ public class InterconnectInfo {
     // override must be a superset. length and index can be changed.
     public static enum TimingGroup {
         // direction, length and index (to lookup d)
-        VERT_SINGLE (Direction.VERTICAL, GroupDelayType.SINGLE,(short) 1,(short) 0),
-        VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 2,(short) 0),
-        VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 4,(short) 1),
-        VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 12,(short) 2),
+        VERT_SINGLE (Direction.VERTICAL, GroupDelayType.SINGLE,(short) 1,(short) 0,'S'),
+        VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 2,(short) 0,'D'),
+        VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 4,(short) 1,'Q'),
+        VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 12,(short) 2,'L'),
 
-        HORT_SINGLE  (Direction.HORIZONTAL, GroupDelayType.SINGLE,(short) 1,(short) 0),
-        HORT_DOUBLE  (Direction.HORIZONTAL, GroupDelayType.DOUBLE,(short) 1,(short) 0),
-        HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 2,(short) 1),
-        HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 6,(short) 2),
+        HORT_SINGLE  (Direction.HORIZONTAL, GroupDelayType.SINGLE,(short) 1,(short) 0,'s'),
+        HORT_DOUBLE  (Direction.HORIZONTAL, GroupDelayType.DOUBLE,(short) 1,(short) 0,'d'),
+        HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 2,(short) 1,'q'),
+        HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 6,(short) 2,'l'),
 
-        CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0,(short) -1),
-        CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0,(short) -1),
-        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0,(short) -1);
+        CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0,(short) -1,'-'),
+        CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0,(short) -1,'-'),
+        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0,(short) -1,'-');
 
 
         private final Direction direction;
         private final GroupDelayType type;
         private final short length;
         private final short index;
+        private final char  abbr;
 
 
-        TimingGroup(Direction direction, GroupDelayType type, short length, short index) {
+        TimingGroup(Direction direction, GroupDelayType type, short length, short index, char abbr) {
             this.direction = direction;
             this.type      = type;
             this.length    = length;
             this.index     = index;
+            this.abbr      = abbr;
         }
 
         public Direction direction() {
@@ -72,6 +74,9 @@ public class InterconnectInfo {
         }
         public GroupDelayType type() {
             return type;
+        }
+        public char abbr() {
+            return abbr;
         }
     }
 

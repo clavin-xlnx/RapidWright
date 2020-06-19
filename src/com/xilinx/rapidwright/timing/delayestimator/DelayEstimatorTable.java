@@ -145,6 +145,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         assert endTg == T.TimingGroup.CLE_IN : "getMinDelayToSinkPin expects CLE_IN as the target timing group.";
 
+        route = "";
+
 
         List<T.TimingGroup> begTgs = new ArrayList<T.TimingGroup>() {{add(begTg);}};
         List<T.TimingGroup> endTgs = new ArrayList<T.TimingGroup>() {{add(endTg);}};
@@ -219,6 +221,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     // index by distance, from TG and to TG
     private ArrayList<Map<T.TimingGroup,Map<T.TimingGroup,DelayGraphEntry>>> TgToTgVertically;
     private ArrayList<Map<T.TimingGroup,Map<T.TimingGroup,DelayGraphEntry>>> TgToTgHorizontally;
+
+    // Store list of resource use by one call to getMinDelayToSinkPin.
+    // This is used for testing only. Thus, it is not returned through the normal calling stack.
+    // each resource is denoted by one letter. A capital letter is for vertical.
+    private String route;
 
 
     // -----------------------   Methods for builing tabels ------------------------
@@ -304,8 +311,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
                 // don't filter with length because need to handle detour
                 List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir));
-                if (frEntry.loc == dist)
-                    nxtTgs.add(to);
+                if (frEntry.loc == dist) {
+                    List<T.TimingGroup> reachableTo = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e == to));
+                    for (T.TimingGroup tg : reachableTo)
+                        nxtTgs.add(tg);
+                }
                 for (T.TimingGroup toTg : nxtTgs) {
 
 //                    boolean dbg = false;
@@ -732,16 +742,22 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 (g, u, e, loc) -> {return updateLoc(e, loc, isBackward);}
         );
 
-        if (verbose > 5) {
+        if (verbose > 5 || verbose == -1) {
             org.jgrapht.GraphPath<Object, TimingGroupEdge> minPath = DijkstraWithCallbacks.findPathBetween(sentry.g, sentry.src, sentry.dst, dAtSource,
                     (g, u, e, loc) -> {g.setEdgeWeight(e,calcTimingGroupDelayOnEdge(e,u, sentry.dst, loc, isBackward));},
                     (g, u, e, loc) -> {return updateLoc(e, loc, isBackward);}
 //                    (g, u, e, v) -> {  g.setEdgeWeight(e, calcTimingGroupDelay(e, v, isBackward)); },
 //                    (g, u, e, v) -> { return v + e.getTimingGroup().length(); }
             );
-            System.out.println("\nPath with min delay: " + ((short) minPath.getWeight()) + " ps");
-            System.out.println("\nPath details:");
-            System.out.println(minPath.toString().replace(",", ",\n") + "\n");
+            if (verbose == -1) {
+                for (TimingGroupEdge e : minPath.getEdgeList()) {
+                   route += e.getTimingGroup().abbr();
+                }
+            } else {
+                System.out.println("\nPath with min delay: " + ((short) minPath.getWeight()) + " ps");
+                System.out.println("\nPath details:");
+                System.out.println(minPath.toString().replace(",", ",\n") + "\n");
+            }
         }
         return minDel.shortValue();
     }
@@ -755,72 +771,154 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     }
 
     void testOne( int sx, int sy, int tx, int ty) {
-        verbose = 6;
+        verbose = -1;
         short est = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, (short) sx, (short) sy, (short) tx, (short) ty);
         System.out.println(sx + " " + sy + " " + tx + " " + ty + " " + est);
+
+        System.out.println("path " + route);
     }
+
     void testCases(String fname) {
+        verbose = -1; // -1 for testing
+
+        class ErrorComputer {
+
+            private int cnt;
+            private int minErr;
+            private int maxErr;
+            private int sumErr;
+
+            ErrorComputer() {
+                cnt = 0;
+                minErr = 0;
+                cnt = 0;
+                minErr = Integer.MAX_VALUE;
+                maxErr = 0;
+                sumErr = 0;
+            }
+
+
+            void insert(int err) {
+                minErr = Math.min(minErr, err);
+                maxErr = Math.max(maxErr, err);
+                sumErr += err;
+                cnt++;
+            }
+
+            String report(String prefix) {
+                float avgErr = sumErr/cnt;
+                return prefix + " min " + minErr + " max " + maxErr + " avg " + avgErr + " cnt " + cnt;
+            }
+        }
+
         Pattern filename = Pattern.compile("^(\\w+)");
         Matcher matchfn = filename.matcher(fname);
         String oname = null;
-
-        int cnt = 0;
-        int minErr1 = Integer.MAX_VALUE;
-        int maxErr1 = 0;
-        int sumErr1 = 0;
-        int minErr2 = Integer.MAX_VALUE;
-        int maxErr2 = 0;
-        int sumErr2 = 0;
-
+        String ename = null;
         if (matchfn.find()) {
             oname = matchfn.group(1) + ".out";
+            ename = matchfn.group(1) + ".exc";
         }
+        System.out.println("Running test cases from " + fname);
+        System.out.println("Write output to " + oname);
+
+
+        Map<String,Map<String,Short>> exceptionMap = new HashMap<>();
+        try {
+            Pattern pattern = Pattern.compile("^([\\w-]+)\\s+([\\w-]+)");
+            BufferedReader reader = new BufferedReader(new FileReader(ename));
+            String line = reader.readLine();
+            while (line != null) {
+                if ((line.indexOf("#") == -1) && (line.length() > 0)) {
+                    Matcher matcher = pattern.matcher(line);
+
+                    if (matcher.find()) {
+                        String estRoute = matcher.group(1);
+                        String refRoute = matcher.group(2);
+//                        System.out.println(estRoute + " " + refRoute);
+                        if (!exceptionMap.containsKey(estRoute)) {
+                            exceptionMap.put(estRoute, new HashMap<>());
+                        }
+                        exceptionMap.get(estRoute).put(refRoute, (short) 0);
+                    }
+                }
+                line = reader.readLine();
+            }
+        } catch (IOException e) {
+            System.out.println("Can't open file " + ename + " for read.");
+            e.printStackTrace();
+        }
+
+
+        ErrorComputer errToTg     = new ErrorComputer();
+        ErrorComputer errToTgExc  = new ErrorComputer();
+        ErrorComputer errToRt     = new ErrorComputer();
+        ErrorComputer errToRtExc  = new ErrorComputer();
 
         try {
             FileWriter outfile = new FileWriter(oname);
 
-            Pattern pattern = Pattern.compile("^(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\\w+\\s+\\w+\\s+[0-9.%]+\\s+[0-9.]+\\s+([0-9.]+)\\s+([0-9.]+)");
+            Pattern pattern = Pattern.compile("^(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\\w+\\s+(\\w+)\\s+\\w+\\s+(\\w+)\\s+[0-9.%]+\\s+[0-9.]+\\s+([0-9.]+)\\s+([0-9.]+)\\s+(\\w+)");
+//            Pattern pattern = Pattern.compile("^(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\\w+\\s+\\w+\\s+[0-9.%]+\\s+[0-9.]+\\s+([0-9.]+)\\s+([0-9.]+)");
             try {
                 BufferedReader reader = new BufferedReader(new FileReader(fname));
                 String line = reader.readLine();
                 while (line != null) {
-                    System.out.println(line);
                     Matcher matcher = pattern.matcher(line);
-                    short sx; short sy; short tx; short ty;
-                    short tgDelay; short rtDelay;
+                    short sx, sy, tx, ty;
+                    short tgDelay, rtDelay;
+                    String sSide, tSide,refRoute;
                     if (matcher.find()) {
                         sx = Short.parseShort(matcher.group(1));
-                        sy = Short.parseShort(matcher.group(2));
-                        tx = Short.parseShort(matcher.group(3));
+                        tx = Short.parseShort(matcher.group(2));
+                        sy = Short.parseShort(matcher.group(3));
                         ty = Short.parseShort(matcher.group(4));
 
-                        tgDelay = (short) Float.parseFloat(matcher.group(5));
-                        rtDelay = (short) Float.parseFloat(matcher.group(6));
+                        sSide = matcher.group(5);
+                        tSide = matcher.group(6);
+
+                        tgDelay = (short) Float.parseFloat(matcher.group(7));
+                        rtDelay = (short) Float.parseFloat(matcher.group(8));
+                        refRoute = matcher.group(9);
 
                         short est = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, sx, sy, tx, ty);
-                        System.out.println(sx + " " + sy + " " + tx + " " + ty + " " + est + " " + tgDelay + " " + rtDelay);
 
-                        outfile.write(sx + " " + sy + " " + tx + " " + ty);
-                        outfile.write("   " + est + " " + tgDelay + " " + rtDelay);
+
+                        boolean exceptionCase = false;
+                        if (exceptionMap.containsKey(route)) {
+                            if (exceptionMap.get(route).containsKey(refRoute)) {
+                                exceptionCase = true;
+                            }
+                        }
+
+                        String note = " ";
+                        if (exceptionCase)
+                            note = "*";
+
+                        String delayResult = String.format("%s %3d %3d %3d %3d   %4d %4d %4d", note, sx, tx, sy, ty, est, tgDelay, rtDelay);
+                        System.out.println(delayResult);
+                        outfile.write(delayResult);
 
                         // error compare to tgDelay
                         int   err1 = est - tgDelay;
                         float ept1 = 100*err1/tgDelay;
-                        outfile.write("   " + err1 + " " + ept1 +"%");
+                        String errTgDelay = String.format("%4d %5.1f%s", err1, ept1, "%");
+                        outfile.write(errTgDelay);
                         // error compare to rtDelay
                         int   err2 = est - rtDelay;
                         float ept2 = 100*err2/rtDelay;
-                        outfile.write("   " + err2 + " " + ept2 +"%");
+                        String errRtDelay = String.format("%4d %5.1f%s", err2, ept2, "%");
+                        outfile.write(errRtDelay);
+                        outfile.write("  " + route + "                   : " + line);
                         outfile.write(System.lineSeparator());
 
-                        minErr1 = Math.min(minErr1, err1);
-                        maxErr1 = Math.max(maxErr1, err1);
-                        sumErr1 += err1;
-                        minErr2 = Math.min(minErr2, err2);
-                        maxErr2 = Math.max(maxErr2, err2);
-                        sumErr2 += err2;
 
-                        cnt++;
+                        if (!exceptionCase) {
+                            errToTgExc.insert(err1);
+                            errToRtExc.insert(err2);
+                        }
+                        errToTg.insert(err1);
+                        errToRt.insert(err2);
                     }
                     line = reader.readLine();
                 }
@@ -828,15 +926,26 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 // print summary
                 outfile.write(System.lineSeparator());
                 outfile.write(System.lineSeparator());
+
                 // compare to tgDelay
-                float avgErr1 = sumErr1/cnt;
-                outfile.write("Compare to tgDelay   " + minErr1 + " " + maxErr1 + " " + avgErr1);
+                System.out.println(errToTg.report("Compare to tgDelay"));
+                outfile.write(errToTg.report("Compare to tgDelay"));
                 outfile.write(System.lineSeparator());
                 // compare to rtDelay
-                float avgErr2 = sumErr2/cnt;
-                outfile.write("Compare to tgDelay   " + minErr2 + " " + maxErr2 + " " + avgErr2);
+                System.out.println(errToRt.report("Compare to rtDelay"));
+                outfile.write(errToRt.report("Compare to rtDelay"));
                 outfile.write(System.lineSeparator());
 
+
+                // exclude exception cases
+                // compare to tgDelay
+                System.out.println(errToTgExc.report("Compare to tgDelay exc "));
+                outfile.write(errToTgExc.report("Compare to tgDelay exc "));
+                outfile.write(System.lineSeparator());
+                // compare to rtDelay
+                System.out.println(errToRtExc.report("Compare to rtDelay exc "));
+                outfile.write(errToRtExc.report("Compare to rtDelay exc "));
+                outfile.write(System.lineSeparator());
             } catch (IOException e) {
                 System.out.println("Can't open file " + fname + " for read.");
                 e.printStackTrace();
@@ -850,7 +959,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
 
+
+
     }
+
     void testLookup() {
         // This is don't to allow automatic check for forward delay == backward delay
         zeroDistArrays();
@@ -901,15 +1013,16 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 6);
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 0);
 
         //est.testLookup();
         //est.testCases();
         // warmup test
         //est.testCases("est_dly_ref_0_1_1_3.txt");
         // vert in table
-        //est.testCases("est_dly_ref_0_1_1_19.txt");
-        est.testOne(0, 1, 0, 5);
+        est.testCases("est_dly_ref_0_1_1_19.txt");
+//        est.testOne(0, 1, 0, 6);
+//        est.testOne(0, 18, 0, 2);
         // hor in table
 //        est.testCases("est_dly_ref_0_9_0_1.txt");
 
