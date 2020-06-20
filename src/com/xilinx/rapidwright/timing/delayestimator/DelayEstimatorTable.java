@@ -25,14 +25,12 @@ package com.xilinx.rapidwright.timing.delayestimator;
 
 
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.util.Pair;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -780,6 +778,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     }
 
     void testCases(String fname) {
+
+        zeroDistArrays();
         verbose = -1; // -1 for testing
 
         class ErrorComputer {
@@ -903,12 +903,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         // error compare to tgDelay
                         int   err1 = est - tgDelay;
                         float ept1 = 100*err1/tgDelay;
-                        String errTgDelay = String.format("%4d %5.1f%s", err1, ept1, "%");
+                        String errTgDelay = String.format("%5d %5.1f%s", err1, ept1, "%");
                         outfile.write(errTgDelay);
                         // error compare to rtDelay
                         int   err2 = est - rtDelay;
                         float ept2 = 100*err2/rtDelay;
-                        String errRtDelay = String.format("%4d %5.1f%s", err2, ept2, "%");
+                        String errRtDelay = String.format("%5d %5.1f%s", err2, ept2, "%");
                         outfile.write(errRtDelay);
                         outfile.write("  " + route + "                   : " + line);
                         outfile.write(System.lineSeparator());
@@ -1008,6 +1008,24 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return cnt;
     }
 
+    void test2sinks() {
+
+//        Graph<String, DefaultEdge> g = new SimpleDirectedWeightedGraph<>(DefaultEdge.class);
+//        g.addVertex("v1");
+//        g.addVertex("v2");
+//        g.addVertex("v3");
+//        g.addVertex("v4");
+//        g.addEdge("v1", "v2");
+//        g.addEdge("v2", "v3");
+//        g.addEdge("v2", "v4");
+//
+//        DijkstraShortestPath dijkstraShortestPath
+//                = new DijkstraShortestPath(g);
+//        List<String> shortestPath = dijkstraShortestPath
+//                .getPath("v1","v3").getVertexList();
+//        System.out.println(shortestPath);
+    }
+
     // 5 OnEdge/updateLoc
 
     public static <GraphPath> void main(String args[]) {
@@ -1021,9 +1039,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         // warmup test
         //est.testCases("est_dly_ref_0_1_1_3.txt");
         // vert in table
-        est.testCases("est_dly_ref_0_1_1_19.txt");
+//        est.testCases("est_dly_ref_0_1_1_19.txt");
         // hor in table
+        //  the end cross PCI
 //        est.testCases("est_dly_ref_0_9_0_1.txt");
+        est.testCases("est_dly_ref_44_53_80_80.txt");
 
 
         if (false) {

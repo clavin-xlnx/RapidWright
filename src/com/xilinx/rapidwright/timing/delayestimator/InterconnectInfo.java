@@ -158,8 +158,8 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
         }});
+        // HORT_SINGLE can't to another HORT_SINGLE
         ictHier.put(TimingGroup.HORT_SINGLE, new ArrayList<TimingGroup>() {{
-            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
             add(TimingGroup.CLE_IN);
@@ -242,6 +242,10 @@ public class InterconnectInfo {
         // TODO: What's about bounce?
         ictHier.put(TimingGroup.BOUNCE, new ArrayList<TimingGroup>() {{
             add(TimingGroup.CLE_IN);
+            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.VERT_SINGLE);
+            add(TimingGroup.VERT_DOUBLE);
         }});
         // No one has access to the modifiable version, ictHier.
         // Thus, the content of interconnectHier never changes.
