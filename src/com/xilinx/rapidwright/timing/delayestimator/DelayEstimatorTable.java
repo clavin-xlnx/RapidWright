@@ -297,7 +297,52 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         int maxDist = dist + detourDist;
 
-        Map<Short, Map<T.TimingGroup,Object>> distTypeNodemap = new HashMap();
+        class NodeManager {
+
+            private
+            Map<Short, Map<T.TimingGroup, Object>> distTypeNodemap;
+
+            NodeManager() {
+                distTypeNodemap = new HashMap();
+            }
+
+            Object getOrCreateNode (short loc, T.TimingGroup tg) {
+                if (!distTypeNodemap.containsKey(loc)) {
+                    Map<T.TimingGroup, Object> typeNodeMap = new EnumMap<>(T.TimingGroup.class);
+                    distTypeNodemap.put(loc, typeNodeMap);
+                }
+                // create node for the expanding toTg if doesn't exist.
+                if (!distTypeNodemap.get(loc).containsKey(tg)) {
+                    // I can't use generic type for Object because I need to new it here.
+                    Object newObj = new Object();
+                    distTypeNodemap.get(loc).put(tg, newObj);
+                    return newObj;
+                } else {
+                    return distTypeNodemap.get(loc).get(tg);
+                }
+            }
+
+            // Don't check. If the entry exists, this call will overwrite that.
+            // To avoid overwriting, guard this call with isNodeExists.
+            void insertNode(short loc, T.TimingGroup tg, Object obj) {
+                if (!distTypeNodemap.containsKey(loc)) {
+                    Map<T.TimingGroup, Object> typeNodeMap = new EnumMap<>(T.TimingGroup.class);
+                    distTypeNodemap.put(loc, typeNodeMap);
+                }
+                distTypeNodemap.get((short) loc).put(tg, obj);
+            }
+
+            boolean isNodeExists(short loc, T.TimingGroup tg) {
+                if (!distTypeNodemap.containsKey(loc) || !distTypeNodemap.get(loc).containsKey(tg))
+                    return false;
+                else
+                    return true;
+            }
+
+            Set<Map.Entry<Short,Map<T.TimingGroup,Object>>> getEntrySet() {
+                return distTypeNodemap.entrySet();
+            }
+        }
 
 
         // BFS, not DFS, because getting all sinks in one call to nextTimingGroups.
@@ -307,8 +352,25 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         Object dst = new Object();
         g.addVertex(src);
         g.addVertex(dst);
-        distTypeNodemap.put((short) dist, new EnumMap<>(T.TimingGroup.class));
-        distTypeNodemap.get((short) dist).put(to, dst);
+
+        NodeManager man = new NodeManager();
+        man.insertNode((short) dist, to, dst);
+
+
+        Object dstFarFar = null;
+        Object dstFarNear = null;
+        Object dstNearFar = null;
+        Object dstNearNear = null;
+        if (to == T.TimingGroup.CLE_IN) {
+            dstFarFar = new Object();
+            dstFarNear = new Object();
+            dstNearFar = new Object();
+            dstNearNear = new Object();
+            g.addVertex(dstFarFar);
+            g.addVertex(dstFarNear);
+            g.addVertex(dstNearFar);
+            g.addVertex(dstNearNear);
+        }
 
 
         List<WaveEntry> wave = new ArrayList<WaveEntry>() {{add(new WaveEntry(from, (short) 0, src, false));}};
@@ -323,18 +385,25 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 if (verbose)
                     System.out.println("wave " + frEntry.toString() + "\n");
 
-                // generate next possible TGs
+//                // generate next possible TGs
+//                // TODO: expand it to vertical too
+//                if ((Math.abs(frEntry.loc - dist) == 1) && (dir == InterconnectInfo.Direction.HORIZONTAL)) {
+//                    if (frEntry.tg == T.TimingGroup.CLE_IN) {
+//
+//
+//                        // build subgraph to all dst nodes
+//                        // getNode(loc,toTg) = distTypeNodemap.get(loc).get(toTg)
+//                        g.addEdge(frEntry.n, getNode(loc,toTg), new TimingGroupEdge(toTg, loc_pair.getSecond()));
+//                        continue;
+//                    }
+//                }
+
                 // don't filter with length because need to handle detour
                 List<T.TimingGroup> nxtTgs;
                 if (frEntry.loc == dist) {
                     nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) ->
                             (e.direction() == dir) || (e == to) || (e.direction() == InterconnectInfo.Direction.LOCAL));
-//                } else if (Math.abs(frEntry.loc - dist) == 1) {
-//                    nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) ->
-//                            (e.direction() == dir) && (e != T.TimingGroup.HORT_SINGLE));
-//                    if (to == T.TimingGroup.CLE_IN) {
-//
-//                    }
+
                 } else {
                     nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir));
                 }
@@ -385,33 +454,27 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     // add TG in locs to graph. set dst node if reachable during this expansion.
                     for (Pair<Short,Boolean> loc_pair : locs) {
                         short loc = loc_pair.getFirst();
-                        // create map for the distance if doesn't exist.
-                        if (!distTypeNodemap.containsKey(loc)) {
-                            Map<T.TimingGroup, Object> typeNodeMap = new EnumMap<>(T.TimingGroup.class);
-                            distTypeNodemap.put(loc, typeNodeMap);
-                        }
+
 
                         // create node for the expanding toTg if doesn't exist.
-                        if (!distTypeNodemap.get(loc).containsKey(toTg)) {
-                            Object newNode = new Object();
+                        if (!man.isNodeExists(loc,toTg)) {
+                            Object newNode = man.getOrCreateNode(loc, toTg);
                             g.addVertex(newNode);
-                            distTypeNodemap.get(loc).put(toTg, newNode);
-
-                            if (verbose)
-                                System.out.println("  new Tg " + toTg.name() + " at loc " + loc);
 
                             WaveEntry newEntry = new WaveEntry(toTg, loc, newNode, loc > dist);
                             nxtWave.add(new WaveEntry(toTg, loc, newNode, loc > dist));
 
-                            if (verbose)
+                            if (verbose) {
+                                System.out.println("  new Tg " + toTg.name() + " at loc " + loc);
                                 System.out.println("  Add node " + newEntry.toString());
+                            }
                         }
 
                         if ((toTg == to) && (loc == dist)) {
                             reachable = true;
                         }
 
-                        g.addEdge(frEntry.n, distTypeNodemap.get(loc).get(toTg), new TimingGroupEdge(toTg, loc_pair.getSecond()));
+                        g.addEdge(frEntry.n, man.getOrCreateNode(loc,toTg), new TimingGroupEdge(toTg, loc_pair.getSecond()));
 
                         if (verbose) {
                             System.out.println("  Add edge " + toTg.name());
@@ -485,7 +548,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             }
 
             Map<Object,String> nodeNames = new HashMap<>();
-            for (Map.Entry<Short, Map<T.TimingGroup,Object>> forLoc : distTypeNodemap.entrySet()) {
+            for (Map.Entry<Short, Map<T.TimingGroup,Object>> forLoc : man.getEntrySet()) {
                 for (Map.Entry<T.TimingGroup,Object> forTg : forLoc.getValue().entrySet()) {
                     String name = forTg.getKey().name() + "_" + forLoc.getKey();
                     nodeNames.put(forTg.getValue(),name);
@@ -510,8 +573,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         res.g = g;
         res.src = src;
         res.dst = dst;
+        res.dstFarFar = dstFarFar;
+        res.dstFarNear = dstFarNear;
+        res.dstNearFar = dstNearFar;
+        res.dstNearNear = dstNearNear;
         return res;
     }
+
     public DelayGraphEntry listPaths(T.TimingGroup from, T.TimingGroup to, T.Direction dir, int dist, int detourDist) {
         return listPaths(from, to, dir, dist, detourDist, false, false);
     }
