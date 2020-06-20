@@ -212,6 +212,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         public Graph<Object, TimingGroupEdge> g;
         public Object src;
         public Object dst;
+        // When the target is CLE_IN, there are 4 cases to reach CLE_IN.
+        // Each of these nodes has an edge to dst for consistency only.
+        public Object dstFarFar;
+        public Object dstFarNear;
+        public Object dstNearFar;
+        public Object dstNearNear;
         public short  fixedDelay;
     }
 
@@ -250,6 +256,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * one for Double, one for Quad and one for Long. For UltraScale+ device, Single and Double can drive the same
      * set of TGs. However, we keep them separate because it is more flexible and simpler to implement, while the
      * runtime and memory overhead is very small. Furthermore, it is applicable to any device families.
+     * To handle back-to-back tile, each graph have 4 sinks: far-far, far-near, near-far and near-near.
+     * The definition of near/far depends on which side the connection start/end and the direction of the connection.
+     * If a connection is to the E and starts from E, it is said to be near-.
+     * If the connection end at E side, it is said to be -far.  Overall, it is near-far.
      *
      * Assumption: "to" is either CLE_IN or TG in the other direction.
      *
@@ -294,11 +304,17 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         Graph<Object, TimingGroupEdge> g = new SimpleDirectedWeightedGraph<>(TimingGroupEdge.class);
         Object src = new Object();
-        Object dst = null;
+        Object dst = new Object();
         g.addVertex(src);
+        g.addVertex(dst);
+        distTypeNodemap.put((short) dist, new EnumMap<>(T.TimingGroup.class));
+        distTypeNodemap.get((short) dist).put(to, dst);
+
+
         List<WaveEntry> wave = new ArrayList<WaveEntry>() {{add(new WaveEntry(from, (short) 0, src, false));}};
 
         int count = 0;
+        boolean reachable = false;
 
         while (!wave.isEmpty()) {
             List<WaveEntry> nxtWave = new ArrayList<>();
@@ -307,25 +323,34 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 if (verbose)
                     System.out.println("wave " + frEntry.toString() + "\n");
 
+                // generate next possible TGs
                 // don't filter with length because need to handle detour
-                List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir));
+                List<T.TimingGroup> nxtTgs;
                 if (frEntry.loc == dist) {
-                    List<T.TimingGroup> reachableTo = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) ->
-                            (e == to) || (e.direction() == InterconnectInfo.Direction.LOCAL));
-                    for (T.TimingGroup tg : reachableTo)
-                        nxtTgs.add(tg);
+                    nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) ->
+                            (e.direction() == dir) || (e == to) || (e.direction() == InterconnectInfo.Direction.LOCAL));
+//                } else if (Math.abs(frEntry.loc - dist) == 1) {
+//                    nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) ->
+//                            (e.direction() == dir) && (e != T.TimingGroup.HORT_SINGLE));
+//                    if (to == T.TimingGroup.CLE_IN) {
+//
+//                    }
+                } else {
+                    nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir));
                 }
-                for (T.TimingGroup toTg : nxtTgs) {
 
-//                    boolean dbg = false;
-//                    if (dir == T.Direction.VERTICAL && toTg == T.TimingGroup.HORT_LONG)
-//                        dbg = true;
+                // Add TG to graph if it is not out of the detour limit. Need to handle when frEntry is a detour.
+                for (T.TimingGroup toTg : nxtTgs) {
 
                     if (verbose)
                         System.out.println("  toTg " + toTg.name());
 
+
+                    // List possible branching for the toTg. When extending a detour branch, toTg can continue
+                    // on the detour direction of revesing back.
                     List<Pair<Short,Boolean>> locs = new ArrayList<>();
 
+                    // add detour direction to locs
                     if (frEntry.detour) {
                         // TODO: consider both going forward and backward
                         short tloc = (short) (frEntry.loc - toTg.length());
@@ -337,29 +362,36 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         }
                     }
 
-                    short tloc = (short) (frEntry.loc + toTg.length());
-                    if ((toTg == to) && (frEntry.loc == dist) && (frEntry.tg.direction() != toTg.direction())) {
-                        locs.add(new Pair<>(frEntry.loc, false));
-                        if (verbose)
-                            System.out.println("    add to locs " + frEntry.loc + " : " + locs.size());
+                    // add non-detour direction to locs
+                    {
+                        short tloc = (short) (frEntry.loc + toTg.length());
+                        if ((toTg == to) && (frEntry.loc == dist) && (frEntry.tg.direction() != toTg.direction())) {
+                            locs.add(new Pair<>(frEntry.loc, false));
+                            if (verbose)
+                                System.out.println("    add to locs " + frEntry.loc + " : " + locs.size());
+                        }
+                        // Ignore too large overshoot
+                        else if (tloc <= maxDist) {
+                            locs.add(new Pair<>(tloc, false));
+                            if (verbose)
+                                System.out.println("    add to locs " + tloc + " : " + locs.size());
+                        }
                     }
-                    // Ignore too large overshoot
-                    else if (tloc <= maxDist) {
-                        locs.add(new Pair<>(tloc,false));
-                        if (verbose)
-                            System.out.println("    add to locs " + tloc + " : " + locs.size());
-                    }
+
 
                     if (verbose)
                         System.out.println("  locs " + locs.toString());
 
+                    // add TG in locs to graph. set dst node if reachable during this expansion.
                     for (Pair<Short,Boolean> loc_pair : locs) {
                         short loc = loc_pair.getFirst();
+                        // create map for the distance if doesn't exist.
                         if (!distTypeNodemap.containsKey(loc)) {
                             Map<T.TimingGroup, Object> typeNodeMap = new EnumMap<>(T.TimingGroup.class);
                             distTypeNodemap.put(loc, typeNodeMap);
                         }
 
+                        // create node for the expanding toTg if doesn't exist.
                         if (!distTypeNodemap.get(loc).containsKey(toTg)) {
                             Object newNode = new Object();
                             g.addVertex(newNode);
@@ -368,16 +400,15 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                             if (verbose)
                                 System.out.println("  new Tg " + toTg.name() + " at loc " + loc);
 
+                            WaveEntry newEntry = new WaveEntry(toTg, loc, newNode, loc > dist);
+                            nxtWave.add(new WaveEntry(toTg, loc, newNode, loc > dist));
 
-                            if ((toTg == to) && (loc == dist)) {
-                                dst = newNode;
-                            } else {
-                                WaveEntry newEntry = new WaveEntry(toTg, loc, newNode, loc > dist);
-                                nxtWave.add(new WaveEntry(toTg, loc, newNode, loc > dist));
+                            if (verbose)
+                                System.out.println("  Add node " + newEntry.toString());
+                        }
 
-                                if (verbose)
-                                    System.out.println("  Add node " + newEntry.toString());
-                            }
+                        if ((toTg == to) && (loc == dist)) {
+                            reachable = true;
                         }
 
                         g.addEdge(frEntry.n, distTypeNodemap.get(loc).get(toTg), new TimingGroupEdge(toTg, loc_pair.getSecond()));
@@ -399,7 +430,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             wave = nxtWave;
         }
 
-        if (dst == null)
+        if (!reachable)
             throw new RuntimeException("Error: Destination timing group is not reachable.");
 
 
@@ -1039,11 +1070,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         // warmup test
         //est.testCases("est_dly_ref_0_1_1_3.txt");
         // vert in table
-//        est.testCases("est_dly_ref_0_1_1_19.txt");
+        est.testCases("est_dly_ref_0_1_1_19.txt");
         // hor in table
         //  the end cross PCI
 //        est.testCases("est_dly_ref_0_9_0_1.txt");
-        est.testCases("est_dly_ref_44_53_80_80.txt");
+//        est.testCases("est_dly_ref_44_53_80_80.txt");
 
 
         if (false) {
