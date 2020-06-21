@@ -308,6 +308,11 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     }
 
     protected double updateLoc(TimingGroupEdge e, Double loc, boolean isBackward) {
+        // TRY
+        if (e.getTimingGroup() == null)
+            return loc;
+
+
         boolean isReverseDirection =  e.isReverseDirection() ^ isBackward;
         Double newLoc = loc + (isReverseDirection ? -e.getTimingGroup().length() : e.getTimingGroup().length());
         if (verbose > 4) {
@@ -334,6 +339,8 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         else {
            // return calcTimingGroupDelay(e.getTimingGroup(), loc.shortValue(), e.isReverseDirection() ^ isBackward);
             T.TimingGroup tg = e.getTimingGroup();
+            if (tg == null)
+                return 0;
             short begLoc = loc.shortValue();
             boolean isReverseDirection = e.isReverseDirection() ^ isBackward;
 
@@ -388,38 +395,10 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         return del;
     }
 
+
     /**
-     * Compute delay of a timing group based on its type and location
-     * @param tg Compute delay of this timing group
-     * @param begLoc Starting location of the timing group
-     * @param isReverseDirection Is timing group going left or down?
-     * @return Delay in ps
+     * To remove effect of distance during some part of the test.
      */
-    protected double calcTimingGroupDelay(T.TimingGroup tg, short begLoc, boolean isReverseDirection) {
-
-        int limit = 0;
-        if (tg.direction() == InterconnectInfo.Direction.VERTICAL) {
-            limit = numRow;
-        } else {
-            limit = numCol;
-        }
-
-        short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
-        if ((endLoc >= limit) || (endLoc < 0)) {
-            // Can't do MAX_VALUE as adding that to other value will become negative.
-            // TODO: consider using INT as intemediate computation
-            return Short.MAX_VALUE/2;
-        }
-
-        if (verbose > 4) {
-            System.out.printf("          calTiming %11s   loc %3d  rev %5s             len %2d   newLoc %3d  ",
-                    tg.name(), begLoc, isReverseDirection, tg.length(), endLoc);
-        }
-
-        return calcTimingGroupDelay(tg, begLoc, endLoc);
-    }
-
-
     protected void zeroDistArrays() {
         System.out.println("zeroDistArrays before");
         System.out.println(distArrays);

@@ -28,6 +28,9 @@ public class TimingGroupEdge extends DefaultWeightedEdge {
     }
 
     public String toGraphvizDotString() {
-       return tg.name();
+        if (tg==null)
+            return "null";
+        else
+            return tg.name();
     }
 }

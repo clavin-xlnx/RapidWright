@@ -48,7 +48,7 @@ public class InterconnectInfo {
 
         CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0,(short) -1,'-'),
         CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0,(short) -1,'-'),
-        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0,(short) -1,'-');
+        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0,(short) -1,'i');
 
 
         private final Direction direction;
@@ -151,7 +151,8 @@ public class InterconnectInfo {
         ictHier.put(TimingGroup.CLE_IN, new ArrayList<TimingGroup>());
         ictHier.put(TimingGroup.CLE_OUT, new ArrayList<TimingGroup>() {{
             add(TimingGroup.CLE_IN);
-            add(TimingGroup.HORT_SINGLE);
+//          Don't use single, in general, it will be added in listPaths when dist is 1
+//            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
             add(TimingGroup.VERT_SINGLE);
