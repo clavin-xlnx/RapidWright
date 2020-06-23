@@ -159,7 +159,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
         }});
-        // HORT_SINGLE can't to another HORT_SINGLE
+        // HORT_SINGLE can't to another HORT_SINGLE , why ?
         ictHier.put(TimingGroup.HORT_SINGLE, new ArrayList<TimingGroup>() {{
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
@@ -170,7 +170,8 @@ public class InterconnectInfo {
             add(TimingGroup.BOUNCE);
         }});
         ictHier.put(TimingGroup.HORT_DOUBLE, new ArrayList<TimingGroup>() {{
-            add(TimingGroup.HORT_SINGLE);
+//          Don't use single, in general, it will be added in listPaths when dist is 1
+//            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
             add(TimingGroup.CLE_IN);
@@ -180,7 +181,8 @@ public class InterconnectInfo {
             add(TimingGroup.BOUNCE);
         }});
         ictHier.put(TimingGroup.HORT_QUAD, new ArrayList<TimingGroup>() {{
-            add(TimingGroup.HORT_SINGLE);
+//          Don't use single, in general, it will be added in listPaths when dist is 1
+//            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
             add(TimingGroup.HORT_LONG);
@@ -192,7 +194,8 @@ public class InterconnectInfo {
         // LONG can drive quad, but that is incompatible with that LONG must go to SINGLE/DOUBLE to get to CLE_IN.
         // To keep simple data structure, don't allow LONG -> QUAD
         ictHier.put(TimingGroup.HORT_LONG, new ArrayList<TimingGroup>() {{
-            add(TimingGroup.HORT_SINGLE);
+//          Don't use single, in general, it will be added in listPaths when dist is 1
+//            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_LONG);
             add(TimingGroup.VERT_SINGLE);

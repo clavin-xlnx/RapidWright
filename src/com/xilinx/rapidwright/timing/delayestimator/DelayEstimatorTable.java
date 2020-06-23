@@ -422,13 +422,25 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 // generate next possible TGs
                 // TODO: expand it to vertical too, extend it to detour
                 if ((Math.abs(frEntry.loc - dist) == 1) && (dir == InterconnectInfo.Direction.HORIZONTAL)
-                     && !frEntry.detour) {
-                    if (to == T.TimingGroup.CLE_IN) {
+                     && (to == T.TimingGroup.CLE_IN)) {
 
                         // D,I to dstFarFar
-                        {
+                        if (frEntry.tg == T.TimingGroup.HORT_LONG) {
+                            // long in the middle, thus only d
                             T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
-                            short loc = (short) (frEntry.loc+toTg.length());
+                            // don't share this double node with other normal cases
+                            Object LDCleNode = new Object();
+                            nodeNames.put(LDCleNode, "LDCleNode_" + frEntry.loc);
+                            g.addVertex(LDCleNode);
+
+                            g.addEdge(frEntry.n, LDCleNode, new TimingGroupEdge(toTg, frEntry.detour));
+                            g.addEdge(LDCleNode , dstFarFar, new TimingGroupEdge(to, false));
+                            g.addEdge(LDCleNode , dstFarNear, new TimingGroupEdge(to, false));
+                            g.addEdge(LDCleNode , dstNearFar, new TimingGroupEdge(to, false));
+                            g.addEdge(LDCleNode , dstNearNear, new TimingGroupEdge(to, false));
+                        } else {
+                            T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
+                            short loc = (short) (frEntry.loc+(frEntry.detour ? -toTg.length():toTg.length()));
                             NodeManager.Entry manEntry = man.getOrCreateNode(loc, toTg);
                             if (manEntry.isJustCreated)
                                 g.addVertex(manEntry.node);
@@ -445,7 +457,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         // S to dstNearNear
                         {
                             T.TimingGroup toTg = T.TimingGroup.HORT_SINGLE;
-                            NodeManager.Entry manEntry = man.getOrCreateNode((short) (frEntry.loc+toTg.length()), toTg);
+                            NodeManager.Entry manEntry = man.getOrCreateNode(
+                                    (short) (frEntry.loc+(frEntry.detour ? -toTg.length():toTg.length())), toTg);
                             if (manEntry.isJustCreated)
                                 g.addVertex(manEntry.node);
                             g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
@@ -455,7 +468,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         // D to dstFarNear and dstNearFar
                         {
                             T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
-                            NodeManager.Entry manEntry = man.getOrCreateNode((short) (frEntry.loc+toTg.length()), toTg);
+                            NodeManager.Entry manEntry = man.getOrCreateNode(
+                                    (short) (frEntry.loc+(frEntry.detour ? -toTg.length():toTg.length())), toTg);
                             if (manEntry.isJustCreated)
                                 g.addVertex(manEntry.node);
                             g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
@@ -466,7 +480,20 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         reachable = true;
 
                         continue;
-                    }
+                } else if ((frEntry.loc == dist) && ((frEntry.tg == T.TimingGroup.HORT_LONG) || (frEntry.tg == T.TimingGroup.HORT_QUAD)) &&
+                        (dir == InterconnectInfo.Direction.HORIZONTAL) && (to == T.TimingGroup.CLE_IN)) {
+                    // l is in the center and can connect to either side
+                    T.TimingGroup toTg = T.TimingGroup.BOUNCE;
+                    NodeManager.Entry manEntry = man.getOrCreateNode((short) (frEntry.loc+toTg.length()), toTg);
+                    if (manEntry.isJustCreated)
+                        g.addVertex(manEntry.node);
+                    g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
+                    g.addEdge(manEntry.node, dstFarFar, new TimingGroupEdge(to, false));
+                    g.addEdge(manEntry.node, dstFarNear, new TimingGroupEdge(to, false));
+                    g.addEdge(manEntry.node, dstNearFar, new TimingGroupEdge(to, false));
+                    g.addEdge(manEntry.node, dstNearNear, new TimingGroupEdge(to, false));
+
+                    continue;
                 }
 
                 // don't filter with length because need to handle detour
@@ -592,20 +619,20 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         };
 
 
-//        // Trim out dangling vertices that is not the destination
-//        List<Object> termNodes = getTermNodes.apply(g, dst);
-//        if (verbose)
-//            System.out.println("Number of termNodes " + termNodes.size());
-//
-//        while (!termNodes.isEmpty()) {
-//            for (Object n : termNodes) {
-//                g.removeVertex(n);
-//            }
-//
-//            termNodes = getTermNodes.apply(g, dst);
-//            if (verbose)
-//                System.out.println("Number of termNodes " + termNodes.size());
-//        }
+        // Trim out dangling vertices that is not the destination
+        List<Object> termNodes = getTermNodes.apply(g, dst);
+        if (verbose)
+            System.out.println("Number of termNodes " + termNodes.size());
+
+        while (!termNodes.isEmpty()) {
+            for (Object n : termNodes) {
+                g.removeVertex(n);
+            }
+
+            termNodes = getTermNodes.apply(g, dst);
+            if (verbose)
+                System.out.println("Number of termNodes " + termNodes.size());
+        }
 
 
         if (plot) {
@@ -893,7 +920,18 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return delay;
     }
 
-
+    /**
+     * Call lookupDelay with correct dst node based on which side of the back-to-back tiles of src and dst.
+     * @param table
+     * @param s
+     * @param t
+     * @param dist
+     * @param dAtSource
+     * @param begSide
+     * @param endSide
+     * @param isBackward
+     * @return
+     */
     private short lookupDelayWrapper(ArrayList<Map<T.TimingGroup, Map<T.TimingGroup, DelayGraphEntry>>> table,
             T.TimingGroup s, T.TimingGroup t,short dist, double dAtSource,
             TileSide begSide, TileSide endSide, boolean isBackward) {
@@ -903,18 +941,24 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         if (t == InterconnectInfo.TimingGroup.CLE_IN) {
             if (begSide == TileSide.E && endSide == TileSide.E)
                 if (isBackward)
-                    dst = sentry.dstNearFar;
-                else
                     dst = sentry.dstFarNear;
+                else
+                    dst = sentry.dstNearFar;
             else if (begSide == TileSide.E && endSide == TileSide.W)
-                dst = sentry.dstNearNear;
+                if (isBackward)
+                    dst = sentry.dstFarFar;
+                else
+                    dst = sentry.dstNearNear;
             else if (begSide == TileSide.W && endSide == TileSide.E)
-                dst = sentry.dstFarFar;
+                if (isBackward)
+                    dst = sentry.dstNearNear;
+                else
+                    dst = sentry.dstFarFar;
             else if (begSide == TileSide.W && endSide == TileSide.W)
                 if (isBackward)
-                    dst = sentry.dstFarNear;
-                else
                     dst = sentry.dstNearFar;
+                else
+                    dst = sentry.dstFarNear;
             else
                 dst = sentry.dst;
         } else {
@@ -925,6 +969,15 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     }
 
 
+    /**
+     * Find the min delay among all paths within the given graph
+     * @param ig Graph representing all paths between src and dst
+     * @param src Source for the path
+     * @param dst Destination for th epath
+     * @param dAtSource Coordinate of the source to evaluate the delay
+     * @param isBackward Indicate that the direction of source to sink is going left or down
+     * @return Delay of the connection in ps
+     */
     private short lookupDelay(Graph<Object, TimingGroupEdge> ig, Object src, Object dst,
                               double dAtSource, boolean isBackward) {
 
@@ -1027,7 +1080,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     // use sx,tx,sy,ty order to match testcase
     void testOne( int sx, int tx, int sy, int ty, String sSide, String tSide) {
-        verbose = -1;
+        verbose = 6;
         short est = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN,
                 (short) sx, (short) sy, (short) tx, (short) ty, TileSide.valueOf(sSide), TileSide.valueOf(tSide));
         System.out.println(sx + " " + tx + " " + sy + " " + ty + " " + est);
@@ -1037,7 +1090,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     void testCases(String fname) {
 
-        zeroDistArrays();
+//        zeroDistArrays();
         verbose = -1; // -1 for testing
 
         class ErrorComputer {
@@ -1088,7 +1141,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             BufferedReader reader = new BufferedReader(new FileReader(ename));
             String line = reader.readLine();
             while (line != null) {
-                if ((line.indexOf("#") == -1) && (line.length() > 0)) {
+                if ((line.indexOf("#") > 0) && (line.length() > 0)) {
                     Matcher matcher = pattern.matcher(line);
 
                     if (matcher.find()) {
@@ -1117,72 +1170,78 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         try {
             FileWriter outfile = new FileWriter(oname);
 
-            Pattern pattern = Pattern.compile("^(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\\w+\\s+(\\w+)\\s+\\w+\\s+(\\w+)\\s+[0-9.%]+\\s+[0-9.]+\\s+([0-9.]+)\\s+([0-9.]+)\\s+(\\w+)");
+            Pattern pattern = Pattern.compile("^(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\\w+\\s+(\\w+)\\s+\\w+\\s+(\\w+)\\s+[-0-9.%]+\\s+[-0-9.]+\\s+([0-9.]+)\\s+([0-9.]+)\\s+(\\w+)");
 //            Pattern pattern = Pattern.compile("^(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+\\w+\\s+\\w+\\s+[0-9.%]+\\s+[0-9.]+\\s+([0-9.]+)\\s+([0-9.]+)");
             try {
                 BufferedReader reader = new BufferedReader(new FileReader(fname));
                 String line = reader.readLine();
+                int cnt = 1;
                 while (line != null) {
-                    Matcher matcher = pattern.matcher(line);
-                    short sx, sy, tx, ty;
-                    short tgDelay, rtDelay;
-                    String sSide, tSide,refRoute;
-                    if (matcher.find()) {
-                        sx = Short.parseShort(matcher.group(1));
-                        tx = Short.parseShort(matcher.group(2));
-                        sy = Short.parseShort(matcher.group(3));
-                        ty = Short.parseShort(matcher.group(4));
+                    if ((line.indexOf("#") == -1) && (line.length() > 0)) {
+                        Matcher matcher = pattern.matcher(line);
+                        short sx, sy, tx, ty;
+                        short tgDelay, rtDelay;
+                        String sSide, tSide, refRoute;
+                        if (matcher.find()) {
+                            sx = Short.parseShort(matcher.group(1));
+                            tx = Short.parseShort(matcher.group(2));
+                            sy = Short.parseShort(matcher.group(3));
+                            ty = Short.parseShort(matcher.group(4));
 
-                        sSide = matcher.group(5);
-                        tSide = matcher.group(6);
+                            sSide = matcher.group(5);
+                            tSide = matcher.group(6);
 
-                        tgDelay = (short) Float.parseFloat(matcher.group(7));
-                        rtDelay = (short) Float.parseFloat(matcher.group(8));
-                        refRoute = matcher.group(9);
+                            tgDelay = (short) Float.parseFloat(matcher.group(7));
+                            rtDelay = (short) Float.parseFloat(matcher.group(8));
+                            refRoute = matcher.group(9);
 
-                        // TBD
-                        System.out.println(String.format("%3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
+                            // TBD
+                            System.out.println(String.format("%3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
 
-                        short est = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, sx, sy, tx, ty,
-                                TileSide.valueOf(sSide), TileSide.valueOf(tSide));
+                            short est = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, sx, sy, tx, ty,
+                                    TileSide.valueOf(sSide), TileSide.valueOf(tSide));
 
 
-                        boolean exceptionCase = false;
-                        if (exceptionMap.containsKey(route)) {
-                            if (exceptionMap.get(route).containsKey(refRoute)) {
-                                exceptionCase = true;
+                            boolean exceptionCase = false;
+                            if (exceptionMap.containsKey(route)) {
+                                if (exceptionMap.get(route).containsKey(refRoute)) {
+                                    exceptionCase = true;
+                                }
                             }
+
+                            String note = " ";
+                            if (exceptionCase)
+                                note = "*";
+
+                            String delayResult = String.format("%s %3d %3d %3d %3d   %4d %4d %4d", note, sx, tx, sy, ty, est, tgDelay, rtDelay);
+                            System.out.println(delayResult);
+                            outfile.write(delayResult);
+
+                            // error compare to tgDelay
+                            int err1 = est - tgDelay;
+                            float ept1 = 100 * err1 / tgDelay;
+                            String errTgDelay = String.format("%5d %5.1f%s", err1, ept1, "%");
+                            outfile.write(errTgDelay);
+                            // error compare to rtDelay
+                            int err2 = est - rtDelay;
+                            float ept2 = 100 * err2 / rtDelay;
+                            String errRtDelay = String.format("%5d %5.1f%s", err2, ept2, "%");
+                            outfile.write(errRtDelay);
+                            outfile.write("  " + route + "                   : " + line);
+                            outfile.write(System.lineSeparator());
+
+
+                            if (!exceptionCase) {
+                                errToTgExc.insert(err1);
+                                errToRtExc.insert(err2);
+                            }
+                            errToTg.insert(err1);
+                            errToRt.insert(err2);
                         }
-
-                        String note = " ";
-                        if (exceptionCase)
-                            note = "*";
-
-                        String delayResult = String.format("%s %3d %3d %3d %3d   %4d %4d %4d", note, sx, tx, sy, ty, est, tgDelay, rtDelay);
-                        System.out.println(delayResult);
-                        outfile.write(delayResult);
-
-                        // error compare to tgDelay
-                        int   err1 = est - tgDelay;
-                        float ept1 = 100*err1/tgDelay;
-                        String errTgDelay = String.format("%5d %5.1f%s", err1, ept1, "%");
-                        outfile.write(errTgDelay);
-                        // error compare to rtDelay
-                        int   err2 = est - rtDelay;
-                        float ept2 = 100*err2/rtDelay;
-                        String errRtDelay = String.format("%5d %5.1f%s", err2, ept2, "%");
-                        outfile.write(errRtDelay);
-                        outfile.write("  " + route + "                   : " + line);
-                        outfile.write(System.lineSeparator());
-
-
-                        if (!exceptionCase) {
-                            errToTgExc.insert(err1);
-                            errToRtExc.insert(err2);
-                        }
-                        errToTg.insert(err1);
-                        errToRt.insert(err2);
+                    } else {
+                        System.out.println("Find comment at line " + cnt);
                     }
+                    cnt++;
                     line = reader.readLine();
                 }
 
@@ -1209,6 +1268,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 System.out.println(errToRtExc.report("Compare to rtDelay exc "));
                 outfile.write(errToRtExc.report("Compare to rtDelay exc "));
                 outfile.write(System.lineSeparator());
+
+                System.out.println("number test cases processed " + cnt);
             } catch (IOException e) {
                 System.out.println("Can't open file " + fname + " for read.");
                 e.printStackTrace();
@@ -1303,13 +1364,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         // warmup test
         //est.testCases("est_dly_ref_0_1_1_3.txt");
         // vert in table
-        est.testCases("est_dly_ref_0_1_1_19.txt");
+//        est.testCases("est_dly_ref_0_1_1_19.txt");
         // hor in table
         //  the end cross PCI
 //        est.testCases("est_dly_ref_0_9_0_1.txt");
-//        est.testCases("est_dly_ref_44_53_80_80.txt");
+        est.testCases("est_dly_ref_44_53_80_80.txt");
 
-//        est.testOne(51,49,80,80,"E","E");
+//        est.testOne(51,44,80,80,"W","E");
+//        est.testOne(52,53,80,80,"E","E");
 
         if (false) {
             //ictInfo.dumpInterconnectHier();
@@ -1320,88 +1382,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //            int result = est.getTimingModel().computeHorizontalDistFromArray(74,76, GroupDelayType.QUAD);
 //            System.out.println(result);
         }
-         if (false) {
-            System.out.println("Vert");
-            for (InterconnectInfo.TimingGroup i :
-                    ictInfo.nextTimingGroups(InterconnectInfo.TimingGroup.CLE_OUT, (InterconnectInfo.TimingGroup e) -> (e.direction() == InterconnectInfo.Direction.VERTICAL) && (e.length() <= 1))) {
-                System.out.printf("    ");
-                System.out.println(i.toString());
-            }
-            System.out.println("length 1");
-            for (InterconnectInfo.TimingGroup i :
-                    ictInfo.nextTimingGroups(InterconnectInfo.TimingGroup.CLE_OUT, (InterconnectInfo.TimingGroup e) -> e.length() <= 1)) {
-                System.out.printf("    ");
-                System.out.println(i.toString());
-            }
-        }
 
-        // test dijk
-        if (false) {
-//            Graph<String, DefaultWeightedEdge> tgraph = createStringGraph();
-//
-//
-//            // Find shortest paths
-//            String source = "v1";
-//            String destination = "v4";
-////        List<DefaultEdge> sp = DelayGraph.findPathBetween(tgraph, source, destination);
-//            org.jgrapht.GraphPath<String, DefaultWeightedEdge> gp =
-//                    DijkstraWithCallbacks.findPathBetween(tgraph, source, destination,
-////               (Graph<String, DefaultWeightedEdge> g, DefaultWeightedEdge e, Double v) -> {g.setEdgeWeight(e,1);});
-//                            (Graph<String, DefaultWeightedEdge> g, DefaultWeightedEdge e, Double v) -> {
-//                            });
-//
-//
-//            // Print results
-//            System.out.println(gp.toString().replace(",", ",\n") + "\n");
-////        System.out.println("Shortest path from " + source + " to " + destination + ":");
-////        for (DefaultEdge e : sp) {
-////            System.out.println(tgraph.getEdgeSource(e) + " -> " + tgraph.getEdgeTarget(e));
-////        }
-//
-//            Double minDel = DijkstraWithCallbacks.findMinWeightBetween(tgraph, source, destination,
-////                (Graph<String, DefaultWeightedEdge> g, DefaultWeightedEdge e, Double v) -> {g.setEdgeWeight(e,1);});
-//                    (Graph<String, DefaultWeightedEdge> g, DefaultWeightedEdge e, Double v) -> {
-//                    });
-//            System.out.println("minDel " + minDel);
-        }
 
-        // test simpledelayGraph
         if (false) {
-//            System.out.println("begin test simpledelayGraph");
-//            SimpleDelayGraphEntry sentry = createTestSimpleDelayGraph();
-//
-////            org.jgrapht.GraphPath<Object, DefaultWeightedEdge> gp =
-////                    DijkstraWithCallbacks.findPathBetween(sentry.g, sentry.src, sentry.dst,
-//            Double minDel = DijkstraWithCallbacks.findMinWeightBetween(sentry.g, sentry.src, sentry.dst,
-//                (Graph<Object, DefaultWeightedEdge> g, DefaultWeightedEdge e, Double v) -> {g.setEdgeWeight(e,1);});
-////                    (Graph<Object, DefaultWeightedEdge> g, DefaultWeightedEdge e, Double v) -> {});
-//            System.out.println("minDel " + minDel);
-//            System.out.println("end test simpledelayGraph");
-        }
-        // test delayGraph
-        if (false) {
-//            System.out.println("begin test delayGraph");
-//            DelayGraphEntry sentry = createTestDelayGraph();
-//
-////            org.jgrapht.GraphPath<Object, DefaultWeightedEdge> gp =
-////                    DijkstraWithCallbacks.findPathBetween(sentry.g, sentry.src, sentry.dst,
-//            Double minDel = DijkstraWithCallbacks.findMinWeightBetween(sentry.g, sentry.src, sentry.dst, 2.0d,
-////                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v) -> {g.setEdgeWeight(e,1);},
-//                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v)
-//                            -> {g.setEdgeWeight(e,calcTimingGroupDelay(e,v,Orientation.FORWARD));},
-////                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v) -> {return 0.0;}
-//                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v)
-////                            -> {System.out.println("*Dis " + e.getTimingGroup().name() + " v " + v + " len " + e.getTimingGroup().length());return v + e.getTimingGroup().length();}
-//                            -> {return v + e.getTimingGroup().length();}
-//                    );
-//            System.out.println("minDel " + minDel);
-//            System.out.println("end test delayGraph");
-        }
-        if (false) {
-//            double dAtSource = 3.0d;
-//            short  dist      = 0;
-//            short  detour    = 0;
-//            DelayGraphEntry sentry = est.listPaths(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, InterconnectInfo.Direction.HORIZONTAL, dist, detour, false, false);
+            double dAtSource = 3.0d;
+            short  dist      = 7;
+            short  detour    = 7;
+            DelayGraphEntry sentry = est.listPaths(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, InterconnectInfo.Direction.HORIZONTAL, dist, detour, true, true);
 //            Double minDel = DijkstraWithCallbacks.findMinWeightBetween(sentry.g, sentry.src, sentry.dst, dAtSource,
 ////                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v) -> {g.setEdgeWeight(e,1);},
 //                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v)
@@ -1426,15 +1413,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //            System.out.println("\nPath details:");
 //            System.out.println(minPath.toString().replace(",", ",\n")+"\n");
         }
-        if (false) {
-            est.buildTables();
-        }
+
     }
 
 }
 
 //TODO: 1) E/W,  2) test form non CLE_out.
-
 
 
 

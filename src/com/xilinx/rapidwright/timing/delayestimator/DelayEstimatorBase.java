@@ -27,14 +27,21 @@ package com.xilinx.rapidwright.timing.delayestimator;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.TimingModel;
+import com.xilinx.rapidwright.util.Pair;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.stream.Collectors;
 
 /**
  * The base class to implement a delay estimator.
@@ -111,6 +118,8 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      */
     private void buildDistanceArrays(TimingModel tm) {
 
+        boolean usePMTable = true;
+
         // TODO: somehow I cannot use Function<T,R>. I get "target method is generic" error.
         BuildAccumulativeList<Short> buildAccumulativeList = (list) ->
         {
@@ -132,15 +141,54 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             distArrays.get(d).put(GroupDelayType.LONG,   new ArrayList<Short>());
         }
 
+        if (usePMTable) {
+            String verFileName = "vertical_distance_array.txt";
+            String horFileName = "horizontal_distance_array.txt";
 
-        Map<GroupDelayType,List<Short>> verDistArray = tm.getVerDistArrayInIntTileGrid();
-        Map<GroupDelayType,List<Short>> horDistArray = tm.getHorDistArrayInIntTileGrid();
+            List<GroupDelayType> orderInFile = new ArrayList<GroupDelayType>() {{
+                add(GroupDelayType.SINGLE);
+                add(GroupDelayType.DOUBLE);
+                add(GroupDelayType.QUAD);
+                add(GroupDelayType.LONG);
+            }};
+            List<Pair<String,T.Direction>> ops = new ArrayList<Pair<String,T.Direction>>() {{
+                add(new Pair<>(verFileName,T.Direction.VERTICAL));
+                add(new Pair<>(horFileName,T.Direction.HORIZONTAL));
+            }};
 
-        for (GroupDelayType t : GroupDelayType.values()) {
-            distArrays.get(T.Direction.VERTICAL).put(t, buildAccumulativeList.apply(verDistArray.get(t)));
-        }
-        for (GroupDelayType t : GroupDelayType.values()) {
-            distArrays.get(T.Direction.HORIZONTAL).put(t, buildAccumulativeList.apply(horDistArray.get(t)));
+            for (int j = 0; j < 2; j++) {
+                try {
+                    BufferedReader reader = new BufferedReader(new FileReader(ops.get(j).getFirst()));
+                    String line = reader.readLine();
+                    int i = 0;
+                    while (line != null) {
+                        List<String> listOfString = Arrays.asList(line.split("\\s+"));
+                        List<Short> listOfShort = listOfString.stream()
+                                .map(s -> Short.parseShort(s))
+                                .collect(Collectors.toList());
+
+                        distArrays.get(ops.get(j).getSecond()).put(orderInFile.get(i), listOfShort);
+                        i++;
+                        line = reader.readLine();
+
+                        System.out.println(listOfShort);
+                    }
+                } catch (IOException e) {
+                    System.out.println("Can't open file " + verFileName + " for read.");
+                    e.printStackTrace();
+                }
+            }
+        } else {
+
+            Map<GroupDelayType, List<Short>> verDistArray = tm.getVerDistArrayInIntTileGrid();
+            Map<GroupDelayType, List<Short>> horDistArray = tm.getHorDistArrayInIntTileGrid();
+
+            for (GroupDelayType t : GroupDelayType.values()) {
+                distArrays.get(T.Direction.VERTICAL).put(t, buildAccumulativeList.apply(verDistArray.get(t)));
+            }
+            for (GroupDelayType t : GroupDelayType.values()) {
+                distArrays.get(T.Direction.HORIZONTAL).put(t, buildAccumulativeList.apply(horDistArray.get(t)));
+            }
         }
 
         // TODO: Do I need pinfeed ?
