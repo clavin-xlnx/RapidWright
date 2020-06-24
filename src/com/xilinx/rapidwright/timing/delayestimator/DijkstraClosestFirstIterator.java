@@ -18,6 +18,7 @@ import org.jgrapht.util.FibonacciHeap;
 import org.jgrapht.util.FibonacciHeapNode;
 
 class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
+    private DijkstraWithCallbacks.UpdateVertex<V,E> updateVertex;
     private DijkstraWithCallbacks.DiscoverVertex<V,E> discoverVertex;
     private DijkstraWithCallbacks.ExamineEdge<V,E> examineEdge;
     private final Graph<V, E> graph;
@@ -27,16 +28,21 @@ class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
     private final Map<V, FibonacciHeapNode<DijkstraClosestFirstIterator<V, E>.QueueEntry>> seen;
 
     public DijkstraClosestFirstIterator(Graph<V, E> graph, V source, double dAtSource,
-                                        DijkstraWithCallbacks.ExamineEdge<V,E> examineEdge, DijkstraWithCallbacks.DiscoverVertex<V,E> discoverVertex) {
-        this(graph, source, 1.0D / 0.0, dAtSource, examineEdge, discoverVertex);
+                                        DijkstraWithCallbacks.ExamineEdge<V,E> examineEdge,
+                                        DijkstraWithCallbacks.DiscoverVertex<V,E> discoverVertex,
+                                        DijkstraWithCallbacks.UpdateVertex<V,E> updateVertex) {
+            this(graph, source, 1.0D / 0.0, dAtSource, examineEdge, discoverVertex, updateVertex);
     }
 
     public DijkstraClosestFirstIterator(Graph<V, E> graph, V source, double radius, double dAtSource,
-                                        DijkstraWithCallbacks.ExamineEdge<V,E> examineEdge, DijkstraWithCallbacks.DiscoverVertex<V,E> discoverVertex) {
+                                        DijkstraWithCallbacks.ExamineEdge<V,E> examineEdge,
+                                        DijkstraWithCallbacks.DiscoverVertex<V,E> discoverVertex,
+                                        DijkstraWithCallbacks.UpdateVertex<V,E> updateVertex) {
         this.graph = (Graph) Objects.requireNonNull(graph, "Graph cannot be null");
         this.source = Objects.requireNonNull(source, "Sourve vertex cannot be null");
         this.examineEdge = examineEdge;
         this.discoverVertex = discoverVertex;
+        this.updateVertex = updateVertex;
         if (radius < 0.0D) {
             throw new IllegalArgumentException("Radius must be non-negative");
         } else {
@@ -82,7 +88,7 @@ class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
             while(var5.hasNext()) {
                 E e = (E) var5.next();
                 V u = Graphs.getOppositeVertex(this.graph, e, v);
-                examineEdge.apply(this.graph, u, e, d);
+                examineEdge.apply(this.graph, u, e, d, vDistance);
                 double eWeight = this.graph.getEdgeWeight(e);
                 if (eWeight < 0.0D) {
                     throw new IllegalArgumentException("Negative edge weight not allowed");
@@ -122,12 +128,15 @@ class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
             FibonacciHeapNode<DijkstraClosestFirstIterator<V, E>.QueueEntry> prevNode = (FibonacciHeapNode)this.seen.get(u);
             Double d = 0.0;
             if (discoverVertex != null) {
-                d = discoverVertex.apply(this.graph, u, e, prevNode.getData().d);
+                d = discoverVertex.apply(this.graph, u, e, prevNode.getData().d, distance);
             }
             node = new FibonacciHeapNode(new DijkstraClosestFirstIterator.QueueEntry(e, v, d));
             this.heap.insert(node, distance);
             this.seen.put(v, node);
         } else if (distance < node.getKey()) {
+            if (updateVertex != null) {
+                updateVertex.apply(this.graph, v, e, distance);
+            }
             this.heap.decreaseKey(node, distance);
             ((DijkstraClosestFirstIterator.QueueEntry)node.getData()).e = e;
         }

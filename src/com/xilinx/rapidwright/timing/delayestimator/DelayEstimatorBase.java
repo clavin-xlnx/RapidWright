@@ -195,8 +195,8 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 
         numCol = distArrays.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE).size();
         numRow = distArrays.get(T.Direction.VERTICAL).get(GroupDelayType.SINGLE).size();
-        distArrays.get(T.Direction.INPUT).put(GroupDelayType.PINFEED, new ArrayList<Short>(Collections.nCopies(numCol, (short) 0)));
-        distArrays.get(T.Direction.LOCAL).put(GroupDelayType.PIN_BOUNCE, new ArrayList<Short>(Collections.nCopies(numCol, (short) 0)));
+        distArrays.get(T.Direction.INPUT).put(GroupDelayType.PINFEED, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
+        distArrays.get(T.Direction.LOCAL).put(GroupDelayType.PIN_BOUNCE, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
 
 
         if (false) {
@@ -355,7 +355,45 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         }
     }
 
-    protected double updateLoc(TimingGroupEdge e, Double loc, boolean isBackward) {
+    protected boolean isLong(TimingGroupEdge e) {
+        T.TimingGroup tg = e.getTimingGroup();
+        if (tg != null && (tg == T.TimingGroup.HORT_LONG || tg == T.TimingGroup.VERT_LONG))
+            return true;
+        else
+            return false;
+    }
+
+    /**
+     * Print info when the delay at a node decreases
+     * @param e Edge that cause the decrement.
+     * @param dly The updated delay
+     * @param isBackward Direction of the edge
+     * @return
+     */
+    protected double updateVertex(TimingGroupEdge e, Double dly, boolean isBackward) {
+        // TRY
+        if (e.getTimingGroup() == null)
+            return 0f;
+
+
+        boolean isReverseDirection =  e.isReverseDirection() ^ isBackward;
+        if (verbose > 4) {
+            T.TimingGroup tg = e.getTimingGroup();
+
+            System.out.printf("          **updateVtx %11s   rev %5s  bwd %5s  len %2d dly %3d\n",
+                    tg.name(), e.isReverseDirection(), isBackward, tg.length(), dly.shortValue());
+        }
+        return 0f;
+    }
+
+    /**
+     * Compute the location of the target node of the edge. This is called once when the target node is first seen.
+     * @param e The edge
+     * @param loc Location at the source of the edge
+     * @param isBackward Direction of the edge
+     * @return Location at the targetof the edge
+     */
+    protected double discoverVertex(TimingGroupEdge e, Double loc, Double dly, boolean isBackward) {
         // TRY
         if (e.getTimingGroup() == null)
             return loc;
@@ -366,18 +404,31 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         if (verbose > 4) {
             T.TimingGroup tg = e.getTimingGroup();
 
-            System.out.printf("          updateLoc %11s   loc %3d  rev %5s  bwd %5s  len %2d newLoc %3d\n",
-                    tg.name(), loc.shortValue(), e.isReverseDirection(), isBackward, tg.length(), newLoc.shortValue());
+            System.out.printf("          discoverVtx %11s   rev %5s  bwd %5s" +
+                    "                                          len %2d  begLoc %3d  endLoc %3d   dly %4d\n",
+                    tg.name(),  e.isReverseDirection(), isBackward,
+                    tg.length(), loc.shortValue(), newLoc.shortValue(), dly.shortValue());
         }
         return newLoc;
     }
     /**
      * Compute delay of an edge
      * @param e The current timing group.
+     *
      * @param loc The INT tile index at the beginning of the timing group.
      * @return  The delay of this timing group.
      */
-    protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, Double loc, boolean isBackward) {
+
+    /**
+     * Compute delay of an edge
+     * @param e The edge
+     * @param u The target of this edge
+     * @param dst
+     * @param loc
+     * @param isBackward
+     * @return
+     */
+    protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, Double loc, Double dly, boolean isBackward) {
 //        boolean dbg = false;
 //        if (e.getTimingGroup() == InterconnectInfo.TimingGroup.HORT_LONG)
 //            dbg = true;
@@ -395,8 +446,10 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             int limit = 0;
             if (tg.direction() == InterconnectInfo.Direction.VERTICAL) {
                 limit = numRow;
-            } else {
+            } else if (tg.direction() == InterconnectInfo.Direction.HORIZONTAL) {
                 limit = numCol;
+            } else {
+                limit = Math.max(numRow,numCol);
             }
 
             short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
@@ -407,11 +460,11 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             }
 
             if (verbose > 4) {
-                System.out.printf("          OnEdge %11s  loc %3d  rev %5s bwd %5s                  ",
-                        tg.name(), begLoc, e.isReverseDirection(), isBackward);
+                System.out.printf("          examineEdge %11s   rev %5s  bwd %5s        ",
+                        tg.name(), e.isReverseDirection(), isBackward);
             }
 
-            return calcTimingGroupDelay(tg, begLoc, endLoc);
+            return calcTimingGroupDelay(tg, begLoc, endLoc, dly);
         }
     }
 
@@ -422,7 +475,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @param endLoc
      * @return
      */
-    protected double calcTimingGroupDelay(T.TimingGroup tg, short begLoc, short endLoc) {
+    protected double calcTimingGroupDelay(T.TimingGroup tg, short begLoc, short endLoc, Double dly) {
 
         float k0 = K0.get(tg.direction()).get(tg.type());
         float k1 = K1.get(tg.direction()).get(tg.type());
@@ -435,10 +488,11 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         // need abs in case the tg is going to the left.
         short del  = (short) (k0 + k1 * l + k2 * Math.abs(sp-st));
         if (verbose > 5) {
-            System.out.printf("          calTiming %11s   len %2d  begLoc %3d  endLoc %3d  ",
+            System.out.printf("calTiming %11s   len %2d  begLoc %3d  endLoc %3d  ",
                     tg.name(), tg.length(), begLoc, endLoc);
-            System.out.printf(" k0 %3.1f k1 %3.1f k2 %4.1f   l %2d   d %3d   dst %3d   dsp %3d    del %4d\n",
-                    k0, k1, k2, l, (sp - st), st, sp, del);
+            System.out.printf(" k0 %3.1f k1 %3.1f k2 %4.1f   l %2d   d %3d   dst %3d   dsp %3d" +
+                            "    del %4d   begDly %4d endDly %4d\n",
+                    k0, k1, k2, l, (sp - st), st, sp, del, dly.shortValue(), dly.shortValue()+del);
         }
         return del;
     }
