@@ -232,6 +232,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
             add(TimingGroup.VERT_LONG);
+            add(TimingGroup.BOUNCE);
         }});
         ictHier.put(TimingGroup.VERT_LONG, new ArrayList<TimingGroup>() {{
             add(TimingGroup.HORT_SINGLE);

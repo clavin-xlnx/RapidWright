@@ -355,9 +355,10 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         }
     }
 
-    protected boolean isLong(TimingGroupEdge e) {
+    protected boolean isSwitchingSide(TimingGroupEdge e) {
         T.TimingGroup tg = e.getTimingGroup();
-        if (tg != null && (tg == T.TimingGroup.HORT_LONG || tg == T.TimingGroup.VERT_LONG))
+        if (tg != null &&
+            (tg == T.TimingGroup.HORT_LONG || tg == T.TimingGroup.VERT_LONG || tg.type() == GroupDelayType.PIN_BOUNCE))
             return true;
         else
             return false;
