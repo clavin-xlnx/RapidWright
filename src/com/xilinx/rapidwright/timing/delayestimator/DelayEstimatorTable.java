@@ -293,9 +293,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             }
             public String toString() {
                 if (detour)
-                  return tg.name() + " " + loc + "  detour";
+                    return String.format("%-12s %3d  detour", tg.name(),loc);
+//                  return tg.name() + " " + loc + "  detour";
                 else
-                  return tg.name() + " " + loc;
+                    return String.format("%-12s %3d", tg.name(),loc);
+//                  return tg.name() + " " + loc;
             }
         }
 
@@ -421,7 +423,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             for (WaveEntry frEntry : wave) {
 
                 if (verbose)
-                    System.out.println("wave " + frEntry.toString() + "\n");
+                    System.out.println("wave         " + frEntry.toString());
 
 
                 // Handling Back-to-back tile.
@@ -437,69 +439,87 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 //      this should be done in lookupDelayBackToBackTile
 
                 // generate next possible TGs
-                // TODO: expand it to vertical too
-                if ((Math.abs(frEntry.loc - dist) == 1) && (dir == InterconnectInfo.Direction.HORIZONTAL)
-                     && (to == T.TimingGroup.CLE_IN)) {
+                if ((Math.abs(frEntry.loc - dist) == 1) && (dir == T.Direction.HORIZONTAL)
+                    && (to == T.TimingGroup.CLE_IN)) {
 
                         onlyOneDst = false;
 
                         // D,I to dstFarFar
                         if (frEntry.tg == T.TimingGroup.HORT_LONG) {
+                            String affix = "";
+                            if (frEntry.detour)
+                                affix += "detour_";
                             // long in the middle, thus only d
-                            T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
+                            T.TimingGroup toD = T.TimingGroup.HORT_DOUBLE;
                             // don't share this double node with other normal cases
                             Object LDCleNode = new Object();
-                            nodeNames.put(LDCleNode, "LDCleNode_" + frEntry.loc);
+                            nodeNames.put(LDCleNode, "LDCleNode_" + affix + frEntry.loc);
                             g.addVertex(LDCleNode);
+                            g.addEdge(frEntry.n, LDCleNode, new TimingGroupEdge(toD, frEntry.detour));
 
-                            g.addEdge(frEntry.n, LDCleNode, new TimingGroupEdge(toTg, frEntry.detour));
-                            g.addEdge(LDCleNode , dstFarFar, new TimingGroupEdge(to, false));
-                            g.addEdge(LDCleNode , dstFarNear, new TimingGroupEdge(to, false));
-                            g.addEdge(LDCleNode , dstNearFar, new TimingGroupEdge(to, false));
-                            g.addEdge(LDCleNode , dstNearNear, new TimingGroupEdge(to, false));
+                            T.TimingGroup toS = T.TimingGroup.HORT_SINGLE;
+                            // don't share this double node with other normal cases
+                            Object LSCleNode = new Object();
+                            nodeNames.put(LSCleNode, "LSCleNode_" + affix + frEntry.loc);
+                            g.addVertex(LSCleNode);
+                            g.addEdge(frEntry.n, LSCleNode, new TimingGroupEdge(toS, frEntry.detour));
+
+                            g.addEdge(LDCleNode, dstFarFar, new TimingGroupEdge(to, false));
+                            g.addEdge(LDCleNode, dstNearFar, new TimingGroupEdge(to, false));
+                            g.addEdge(LDCleNode, dstFarNear, new TimingGroupEdge(to, false));
+                            g.addEdge(LDCleNode, dstNearNear, new TimingGroupEdge(to, false));
+                            if (frEntry.detour) {
+                                g.addEdge(LSCleNode, dstFarFar, new TimingGroupEdge(to, false));
+                                // some how I don't see this in practice.
+                                //g.addEdge(LSCleNode, dstNearFar, new TimingGroupEdge(to, false));
+                            } else {
+                                // some how I don't see this in practice.
+                                //g.addEdge(LSCleNode, dstFarNear, new TimingGroupEdge(to, false));
+                                g.addEdge(LSCleNode, dstNearNear, new TimingGroupEdge(to, false));
+                            }
                         } else {
-                            T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
-                            short loc = (short) (frEntry.loc+(frEntry.detour ? -toTg.length():toTg.length()));
-                            NodeManager.Entry manEntry = man.getOrCreateNode(loc, toTg);
-                            if (manEntry.isJustCreated)
-                                g.addVertex(manEntry.node);
-                            g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
+                            {
+
+                                T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
+                                short loc = (short) (frEntry.loc + (frEntry.detour ? -toTg.length() : toTg.length()));
+                                NodeManager.Entry manEntry = man.getOrCreateNode(loc, toTg);
+                                if (manEntry.isJustCreated)
+                                    g.addVertex(manEntry.node);
+                                g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
 
 
-                            T.TimingGroup toTg1 = T.TimingGroup.BOUNCE;
-                            NodeManager.Entry manEntry1 = man.getOrCreateNode((short) (loc+toTg.length()), toTg1);
-                            if (manEntry1.isJustCreated)
-                                g.addVertex(manEntry1.node);
-                            g.addEdge(manEntry.node, manEntry1.node, new TimingGroupEdge(toTg1, false));
-                            g.addEdge(manEntry1.node, dstFarFar, new TimingGroupEdge(to, false));
-                        }
-                        // S to dstNearNear
-                        {
-                            T.TimingGroup toTg = T.TimingGroup.HORT_SINGLE;
-                            NodeManager.Entry manEntry = man.getOrCreateNode(
-                                    (short) (frEntry.loc+(frEntry.detour ? -toTg.length():toTg.length())), toTg);
-                            if (manEntry.isJustCreated)
-                                g.addVertex(manEntry.node);
-                            g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
-                            g.addEdge(manEntry.node, dstNearNear, new TimingGroupEdge(to, false));
-                        }
+                                T.TimingGroup toTg1 = T.TimingGroup.BOUNCE;
+                                NodeManager.Entry manEntry1 = man.getOrCreateNode((short) (loc + toTg.length()), toTg1);
+                                if (manEntry1.isJustCreated)
+                                    g.addVertex(manEntry1.node);
+                                g.addEdge(manEntry.node, manEntry1.node, new TimingGroupEdge(toTg1, false));
+                                g.addEdge(manEntry1.node, dstFarFar, new TimingGroupEdge(to, false));
+                            }
+                            // S to dstNearNear
+                            {
+                                T.TimingGroup toTg = T.TimingGroup.HORT_SINGLE;
+                                NodeManager.Entry manEntry = man.getOrCreateNode(
+                                        (short) (frEntry.loc + (frEntry.detour ? -toTg.length() : toTg.length())), toTg);
+                                if (manEntry.isJustCreated)
+                                    g.addVertex(manEntry.node);
+                                g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
+                                g.addEdge(manEntry.node, dstNearNear, new TimingGroupEdge(to, false));
+                            }
 
-                        // D to dstFarNear and dstNearFar
-                        {
-                            T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
-                            NodeManager.Entry manEntry = man.getOrCreateNode(
-                                    (short) (frEntry.loc+(frEntry.detour ? -toTg.length():toTg.length())), toTg);
-                            if (manEntry.isJustCreated)
-                                g.addVertex(manEntry.node);
-                            g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
-                            g.addEdge(manEntry.node, dstFarNear, new TimingGroupEdge(to, false));
-                            g.addEdge(manEntry.node, dstNearFar, new TimingGroupEdge(to, false));
+                            // D to dstFarNear and dstNearFar
+                            {
+                                T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
+                                NodeManager.Entry manEntry = man.getOrCreateNode(
+                                        (short) (frEntry.loc + (frEntry.detour ? -toTg.length() : toTg.length())), toTg);
+                                if (manEntry.isJustCreated)
+                                    g.addVertex(manEntry.node);
+                                g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, false));
+                                g.addEdge(manEntry.node, dstFarNear, new TimingGroupEdge(to, false));
+                                g.addEdge(manEntry.node, dstNearFar, new TimingGroupEdge(to, false));
+                            }
                         }
 
                         reachable = true;
-
-                        // TODO: consider remove continue, by make general case as else
-                        continue;
 
                 } else if ((frEntry.loc == dist) && ((frEntry.tg == T.TimingGroup.HORT_LONG) || (frEntry.tg == T.TimingGroup.HORT_QUAD)) &&
                         (dir == InterconnectInfo.Direction.HORIZONTAL) && (to == T.TimingGroup.CLE_IN)) {
@@ -519,91 +539,88 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
                     reachable = true;
 
-                    // TODO: consider remove continue, by make general case as else
-                    continue;
-                }
-
-
-                // don't filter with length because need to handle detour
-                List<T.TimingGroup> nxtTgs;
-                if (frEntry.loc == dist) {
-                    nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) ->
-                            (e.direction() == dir) || (e == to) || (e.direction() == InterconnectInfo.Direction.LOCAL));
                 } else {
-                    nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir));
-                }
-
-                // Add TG to graph if it is not out of the detour limit. Need to handle when frEntry is a detour.
-                for (T.TimingGroup toTg : nxtTgs) {
-
-                    if (verbose)
-                        System.out.println("  toTg " + toTg.name());
-
-
-                    // List possible branching for the toTg. When extending a detour branch, toTg can continue
-                    // on the detour direction of revesing back.
-                    List<Pair<Short,Boolean>> locs = new ArrayList<>();
-
-                    // add detour direction to locs
-                    if (frEntry.detour) {
-                        // TODO: consider both going forward and backward
-                        short tloc = (short) (frEntry.loc - toTg.length());
-                        // allow only one overshoot
-                        if (tloc >= dist) {
-                            locs.add(new Pair<>(tloc, true));
-                            if (verbose)
-                                System.out.println("    add to locs " + tloc + " : " + locs.size());
-                        }
+                    // don't filter with length because need to handle detour
+                    List<T.TimingGroup> nxtTgs;
+                    if (frEntry.loc == dist) {
+                        nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) ->
+                                (e.direction() == dir) || (e == to) || (e.direction() == InterconnectInfo.Direction.LOCAL));
+                    } else {
+                        nxtTgs = ictInfo.nextTimingGroups(frEntry.tg, (T.TimingGroup e) -> (e.direction() == dir));
                     }
 
-                    // add non-detour direction to locs
-                    {
-                        short tloc = (short) (frEntry.loc + toTg.length());
-                        if ((toTg == to) && (frEntry.loc == dist) && (frEntry.tg.direction() != toTg.direction())) {
-                            locs.add(new Pair<>(frEntry.loc, false));
-                            if (verbose)
-                                System.out.println("    add to locs " + frEntry.loc + " : " + locs.size());
-                        }
-                        // Ignore too large overshoot
-                        else if (tloc <= maxDist) {
-                            locs.add(new Pair<>(tloc, false));
-                            if (verbose)
-                                System.out.println("    add to locs " + tloc + " : " + locs.size());
-                        }
-                    }
+                    // Add TG to graph if it is not out of the detour limit. Need to handle when frEntry is a detour.
+                    for (T.TimingGroup toTg : nxtTgs) {
+
+                        if (verbose)
+                            System.out.print(String.format("  toTg       %-12s", toTg.name()));
 
 
-                    if (verbose)
-                        System.out.println("  locs " + locs.toString());
+                        // List possible branching for the toTg. When extending a detour branch, toTg can continue
+                        // on the detour direction of revesing back.
+                        List<Pair<Short, Boolean>> locs = new ArrayList<>();
 
-                    // add TG in locs to graph. set dst node if reachable during this expansion.
-                    for (Pair<Short,Boolean> loc_pair : locs) {
-                        short loc = loc_pair.getFirst();
-
-
-                        // create node for the expanding toTg if doesn't exist.
-                        NodeManager.Entry manEntry = man.getOrCreateNode(loc, toTg);
-                        if (manEntry.isJustCreated) {
-                            g.addVertex(manEntry.node);
-
-                            WaveEntry newEntry = new WaveEntry(toTg, loc, manEntry.node, loc > dist);
-                            nxtWave.add(new WaveEntry(toTg, loc, manEntry.node, loc > dist));
-
-                            if (verbose) {
-                                System.out.println("  new Tg " + toTg.name() + " at loc " + loc);
-                                System.out.println("  Add node " + newEntry.toString());
+                        // add detour direction to locs
+                        if (frEntry.detour) {
+                            // TODO: consider both going forward and backward
+                            short tloc = (short) (frEntry.loc - toTg.length());
+                            // allow only one overshoot
+                            if (tloc >= dist) {
+                                locs.add(new Pair<>(tloc, true));
+//                            if (verbose)
+//                                System.out.print("    add to locs " + tloc + " : " + locs.size());
                             }
                         }
 
-                        if ((toTg == to) && (loc == dist)) {
-                            reachable = true;
+                        // add non-detour direction to locs
+                        {
+                            short tloc = (short) (frEntry.loc + toTg.length());
+                            if ((toTg == to) && (frEntry.loc == dist) && (frEntry.tg.direction() != toTg.direction())) {
+                                locs.add(new Pair<>(frEntry.loc, false));
+//                            if (verbose)
+//                                System.out.print("    add to locs " + frEntry.loc + " : " + locs.size());
+                            }
+                            // Ignore too large overshoot
+                            else if (tloc <= maxDist) {
+                                locs.add(new Pair<>(tloc, false));
+//                            if (verbose)
+//                                System.out.print("    add to locs " + tloc + " : " + locs.size());
+                            }
                         }
 
-                        g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, loc_pair.getSecond()));
 
-                        if (verbose) {
-                            System.out.println("  Add edge " + toTg.name());
-                            System.out.println();
+                        if (verbose)
+                            System.out.println("  locs " + locs.toString());
+
+                        // add TG in locs to graph. set dst node if reachable during this expansion.
+                        for (Pair<Short, Boolean> loc_pair : locs) {
+                            short loc = loc_pair.getFirst();
+
+
+                            // create node for the expanding toTg if doesn't exist.
+                            NodeManager.Entry manEntry = man.getOrCreateNode(loc, toTg);
+                            if (manEntry.isJustCreated) {
+                                g.addVertex(manEntry.node);
+
+                                WaveEntry newEntry = new WaveEntry(toTg, loc, manEntry.node, loc > dist);
+                                nxtWave.add(new WaveEntry(toTg, loc, manEntry.node, loc > dist));
+
+                                if (verbose) {
+//                                System.out.println("  new Tg " + toTg.name() + " at loc " + loc);
+                                    System.out.println("    Add node " + newEntry.toString());
+                                }
+                            }
+
+                            if ((toTg == to) && (loc == dist)) {
+                                reachable = true;
+                            }
+
+                            g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(toTg, loc_pair.getSecond()));
+
+                            if (verbose) {
+//                            System.out.println("  Add edge " + toTg.name());
+//                            System.out.println();
+                            }
                         }
                     }
                 }
@@ -611,7 +628,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
             if (verbose) {
                 System.out.println(count + " nxtWave of size " + nxtWave.size());
-                System.out.println("****");
+                System.out.println("\n");
                 count++;
             }
 
@@ -1326,17 +1343,17 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         //est.testLookup();
         //est.testCases();
         // vert in table
-//        est.testCases("est_dly_ref_81_81_121_139_E_E.txt");
+        est.testCases("est_dly_ref_81_81_121_139_E_E.txt");
 //        est.testCases("est_dly_ref_81_81_121_139_E_W.txt");
         // hor in table
         //  the end cross PCI
 //        est.testCases("est_dly_ref_44_53_80_80_E_E.txt");
-        est.testCases("est_dly_ref_44_53_80_80_E_W.txt");//  2 left to do
+//        est.testCases("est_dly_ref_44_53_80_80_E_W.txt");
 //        est.testCases("est_dly_ref_44_53_80_80_W_E.txt");
 //        est.testCases("est_dly_ref_44_53_80_80_W_W.txt");
 
 //        est.testOne(44,44,80,80,"E","W");
-//        est.testOne(81,81,126,125,"W","E");
+//        est.testOne(53,44,80,80,"E","E");
 
         if (false) {
             //ictInfo.dumpInterconnectHier();
@@ -1351,9 +1368,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         if (false) {
             double dAtSource = 3.0d;
-            short  dist      = 4;
-            short  detour    = 4;
-            DelayGraphEntry sentry = est.listPaths(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, InterconnectInfo.Direction.VERTICAL, dist, detour, true, true);
+            short  dist      = 7;
+            short  detour    = 7;
+            DelayGraphEntry sentry = est.listPaths(InterconnectInfo.TimingGroup.CLE_OUT, InterconnectInfo.TimingGroup.CLE_IN, InterconnectInfo.Direction.HORIZONTAL, dist, detour, true, true);
 //            Double minDel = DijkstraWithCallbacks.findMinWeightBetween(sentry.g, sentry.src, sentry.dst, dAtSource,
 ////                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v) -> {g.setEdgeWeight(e,1);},
 //                    (Graph<Object, TimingGroupEdge> g, Object u, TimingGroupEdge e, Double v)

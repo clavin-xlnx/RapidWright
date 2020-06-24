@@ -372,10 +372,6 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @return
      */
     protected double updateVertex(TimingGroupEdge e, Double dly, boolean isBackward) {
-        // TRY
-        if (e.getTimingGroup() == null)
-            return 0f;
-
 
         boolean isReverseDirection =  e.isReverseDirection() ^ isBackward;
         if (verbose > 4) {
