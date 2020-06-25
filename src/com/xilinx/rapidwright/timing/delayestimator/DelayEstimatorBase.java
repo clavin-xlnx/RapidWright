@@ -425,7 +425,8 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @param isBackward
      * @return
      */
-    protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, Double loc, Double dly, boolean isBackward) {
+    protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, Double loc, Double dly,
+                                                boolean isBackward, InterconnectInfo.Direction dir) {
 //        boolean dbg = false;
 //        if (e.getTimingGroup() == InterconnectInfo.TimingGroup.HORT_LONG)
 //            dbg = true;
@@ -453,6 +454,11 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             if ((endLoc >= limit) || (endLoc < 0)) {
                 // Can't do MAX_VALUE as adding that to other value will become negative.
                 // TODO: consider using INT as intemediate computation
+                return Short.MAX_VALUE/2;
+            }
+
+            // Assume bounce happen only before CLE_IN
+            if (tg == InterconnectInfo.TimingGroup.BOUNCE && dir == InterconnectInfo.Direction.VERTICAL) {
                 return Short.MAX_VALUE/2;
             }
 

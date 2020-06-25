@@ -53,7 +53,7 @@ public class TimingManager {
      * want to build the TimingGraph yet.
      */
     public TimingManager(Design design, boolean doBuild) {
-        timingModel = new TimingModel(design);
+        timingModel = new TimingModel(design.getDevice());
         timingGraph = new TimingGraph(design);
         timingModel.setTimingManager(this);
         timingGraph.setTimingManager(this);
