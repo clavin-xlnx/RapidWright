@@ -5,29 +5,29 @@ import com.xilinx.rapidwright.design.SitePinInst;
 public class RNodeData<E> {
 //	public final int index;
 	
-	public float pres_cost;
-	public float acc_cost;
+	private float pres_cost;
+	private float acc_cost;
 	
-	public float partial_path_cost;
-	public float lower_bound_total_path_cost;
+	private float partial_path_cost;
+	private float lower_bound_total_path_cost;
 	
-	public boolean touched;
+	private boolean touched;
 	
-	public RNode<E> prev;
+	private RNode<E> prev;
 	
-	public int occupation;
-	public int level;
+	private int occupation;
+	private int level;
 	
 	//SitePinInst -> source and sink of the connection
-	private CountingSet<SitePinInst> sourcesSet;
-	private CountingSet<RNode<E>> parentsSet;//the drivers of the route node
+	public CountingSet<SitePinInst> sourcesSet;
+	public CountingSet<RNode<E>> parentsSet;//the drivers of the route node
 	
 	public RNodeData() {
 //    	this.index = index;
     	this.pres_cost = 1;
     	this.acc_cost = 1;
     	this.occupation = 0;
-    	this.touched = false;
+    	this.setTouched(false);
 
 		this.sourcesSet = null;
 		this.parentsSet = null;
@@ -45,7 +45,7 @@ public class RNodeData<E> {
 	
 	public void setLowerBoundTotalPathCost(float new_lower_bound_total_path_cost) {
 		this.lower_bound_total_path_cost = new_lower_bound_total_path_cost;
-		this.touched = true;
+		this.setTouched(true);
 	}
 	public void setPartialPathCost(float new_partial_path_cost) {
 		this.partial_path_cost = new_partial_path_cost;
@@ -107,6 +107,18 @@ public class RNodeData<E> {
 		}
 	}
 	
+	public int getOccupation() {
+		if(this.sourcesSet == null)
+			this.occupation = 0;
+		else
+			this.occupation = this.sourcesSet.uniqueSize();
+		return this.occupation;
+	}
+	
+	public void setOccupation(int occupation) {
+		this.occupation = occupation;
+	}
+	
 	public RNode<E> getPrev() {
 		return prev;
 	}
@@ -118,9 +130,33 @@ public class RNodeData<E> {
 	public int getLevel() {
 		return level;
 	}
+	
+	public float getPres_cost() {
+		return pres_cost;
+	}
+
+	public void setPres_cost(float pres_cost) {
+		this.pres_cost = pres_cost;
+	}
+
+	public float getAcc_cost() {
+		return acc_cost;
+	}
+
+	public void setAcc_cost(float acc_cost) {
+		this.acc_cost = acc_cost;
+	}
 
 	public void setLevel(int level) {
 		this.level = level;
+	}
+
+	public boolean isTouched() {
+		return touched;
+	}
+
+	public void setTouched(boolean touched) {
+		this.touched = touched;
 	}
 
 	/*@Override

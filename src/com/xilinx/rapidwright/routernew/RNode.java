@@ -11,7 +11,7 @@ import com.xilinx.rapidwright.device.Wire;
 public class RNode<E>{
 //	private int index;
 	
-	public final RNodeType type;
+	public RoutableType type;
 	private Tile tile;
 	private int wire;
 	public String name;
@@ -25,28 +25,24 @@ public class RNode<E>{
 	public final short capacity;
 	
 	public float delay;//TODO for timing-driven
-	
-//	public boolean isOpin;//finalize
-//	public boolean isWire;//finalize
-//	public int numChildren;//finalize
-	
+		
 	public float base_cost;
 	
 	public final RNodeData<E> rNodeData;
 	
 	public boolean target;
 	public List<RNode<E>> children;//populate the child rnodes of the current 
+	public boolean childrenSet;
 	
-	public RNode(SitePinInst sitePinInst, RNodeType type, int capacity){
+	public RNode(SitePinInst sitePinInst, RoutableType type, int capacity){
 //		this.index = index;
 		this.tile = sitePinInst.getSiteInst().getTile();
 		this.type = type;		
 		this.wire = sitePinInst.getSiteExternalWireIndex();
 		this.name = this.tile.getName() + "/" + this.wire;
 		this.capacity = (short)capacity;
-		
 		this.rNodeData = new RNodeData<E>();
-		this.children = new ArrayList<>();
+		this.childrenSet = false;
 		//different base cost for different routing resources
 		this.setBaseCost();
 		this.setCenterXY();
@@ -57,13 +53,14 @@ public class RNode<E>{
 		this.tile = tile;
 		this.wire = wire;
 		this.capacity = (short)capacity;
-		this.type = RNodeType.INTERWIRE;
+		this.type = RoutableType.INTERWIRE;
 		this.name = this.tile.getName() + "/" + this.wire;
 		this.rNodeData = new RNodeData<E>();
+		this.childrenSet = false;
 		//different base cost for different routing resources
 		this.setBaseCost();
 		this.setCenterXY();
-		this.children = new ArrayList<>();
+		
 	}
 	
 	/*public RNode(short capacity, TimingModel timingModel){
@@ -83,9 +80,9 @@ public class RNode<E>{
 	}
 	
 	public void setBaseCost(){
-		if(this.type == RNodeType.SOURCEPINWIRE || this.type == RNodeType.INTERWIRE){
+		if(this.type == RoutableType.SOURCEPINWIRE || this.type == RoutableType.INTERWIRE){
 			this.base_cost = 1;
-		}else if(this.type == RNodeType.SINKPINWIRE){
+		}else if(this.type == RoutableType.SINKPINWIRE){
 			this.base_cost = 0.95f;
 		}
 	}
@@ -99,11 +96,11 @@ public class RNode<E>{
 	}
 	
 	public boolean overUsed(){
-		return this.capacity < this.rNodeData.occupation;
+		return this.capacity < this.rNodeData.getOccupation();
 	}
 	
 	public boolean used(){
-		return this.rNodeData.occupation > 0;
+		return this.rNodeData.getOccupation() > 0;
 	}
 	
 	public boolean illegal(){
@@ -144,6 +141,7 @@ public class RNode<E>{
 
 	public void setChildren(List<RNode<E>> children) {
 		this.children = children;
+		this.childrenSet = true;
 	}
 
 	public int getWire() {
@@ -169,23 +167,15 @@ public class RNode<E>{
 		int cap = this.capacity;
 		
 		if (occ < cap) {
-			data.pres_cost = 1;
+			data.setPres_cost(1);
 		} else {
-			data.pres_cost = 1 + (occ - cap + 1) * pres_fac;
+			data.setPres_cost(1 + (occ - cap + 1) * pres_fac);
 		}
 
-		data.occupation = occ;
+		data.setOccupation(occ);
 	}
 	
-	/*@Override
-	public int hashCode() {
-		return this.index;
-	}*/
-	
-	public String toString() {
-		
-		String index = this.name;
-		
+	public String toString() {	
 		String coordinate = "";
 		if(this.xlow == this.xhigh && this.ylow == this.yhigh) {
 			coordinate = "(" + this.xlow + "," + this.ylow + ")";
@@ -194,13 +184,15 @@ public class RNode<E>{
 		}
 		
 		StringBuilder s = new StringBuilder();
-		s.append("RNode " + index + " ");
+		s.append("RNode " + this.name + " ");
 		s.append(String.format("%-11s", coordinate));
 		s.append(String.format("basecost = %.2e", this.base_cost));
 		s.append(", ");
 		s.append(String.format("capacity = %d", this.capacity));
+//		s.append(", ");
+//		s.append(String.format("children = %d", this.children.size()));
 		s.append(", ");
-		s.append(String.format("occupation = %d", this.rNodeData.occupation));
+		s.append(String.format("occupation = %d", this.rNodeData.getOccupation()));
 		s.append(", ");
 		s.append(String.format("num_unique_sources = %d", this.rNodeData.numUniqueSources()));
 		s.append(", ");

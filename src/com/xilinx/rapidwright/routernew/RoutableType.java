@@ -1,6 +1,6 @@
 package com.xilinx.rapidwright.routernew;
 
-public enum RNodeType {
+public enum RoutableType {
 	SOURCEPINWIRE, SINKPINWIRE,
 	INTERWIRE
 }

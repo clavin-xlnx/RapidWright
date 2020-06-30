@@ -22,7 +22,7 @@ public class PFRouter<E>{
 	private float initial_pres_fac;
 	private float pres_fac_mult;
 	private float acc_fac;
-	private float IPIN_BASE_COST = 0.95f;
+	private float IPIN_WIRE_BASE_COST = 0.95f;
 	private Design design;
 	private Device device;
 	
@@ -42,9 +42,9 @@ public class PFRouter<E>{
 	
 	private int itry;
 	private int rNodeId = 0;
-	private boolean debugRoutingCon = true;
-	private boolean debugExpansion = false;
-	
+	public boolean debugRoutingCon = false;
+	public boolean debugExpansion = false;
+
 	private int bbRange = 5;//TODO could be tuned later
 	
 	public PFRouter(Design design, 
@@ -82,7 +82,7 @@ public class PFRouter<E>{
 				for(SitePinInst sink:n.getSinkPins()){
 					Connection<E> c = new Connection<E>(icon, source, sink, this.tmodel);
 					
-					RNode<E> sourceRNode = new RNode<E>(source, RNodeType.SOURCEPINWIRE, 1);
+					RNode<E> sourceRNode = new RNode<E>(source, RoutableType.SOURCEPINWIRE, 1);
 					c.setSourceRNode(sourceRNode);
 					this.rnodesCreated.put(sourceRNode.name, sourceRNode);	
 					this.rNodeId++;
@@ -131,12 +131,17 @@ public class PFRouter<E>{
     	this.queue.clear();
 		
     	this.initial_pres_fac = 0.5f; 	
-    	this.pres_fac = 2;
+    	this.pres_fac = this.initial_pres_fac;
+    	this.pres_fac_mult = 2;
     	this.acc_fac = 1;
     	
 		this.itry = 1;
 		this.printInfo("router initialized");
 		this.printInfo("");
+		System.out.printf("------------------------------------------------------------------------\n");
+        System.out.printf("%9s  %8s  %11s  %12s  %15s  %17s \n", "Iteration", "pres_fac", "Conn routed", "Run Time (s)", "Overused RNodes", "overUsePercentage");
+        System.out.printf("---------  --------  -----------  ------------  ---------------  -----------------\n");
+        
 	}
 	
 	public void ripup(Connection<E> con){
@@ -199,20 +204,22 @@ public class PFRouter<E>{
 	}
 	
 	public void exploringAndExpansion(RNode<E> rnode, Connection<E> con){		
-		this.printInfoExpansion("\t" + " exploring rnode " + rnode.toString());
-		this.printInfoExpansion("\t starting  queue size: " + this.queue.size());
+		if(this.debugExpansion){
+			this.printInfo("\t" + " exploring rnode " + rnode.toString());
+		}
+		if(this.debugExpansion) this.printInfo("\t starting  queue size: " + this.queue.size());
 		for(RNode<E> childRNode:rnode.children){
 			
 			if(childRNode.name.equals(con.targetName)){		
-				this.printInfoExpansion("\t\t childRNode is the target");
+				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
 				con.setSinkRNode(childRNode);
 				this.addNodeToQueue(rnode, childRNode, con);
 				
-			}else if(childRNode.type == RNodeType.INTERWIRE){
+			}else if(childRNode.type == RoutableType.INTERWIRE){
 				if(con.isInBoundingBoxLimit(childRNode)){
-					this.printInfoExpansion("\t\t" + " add node to the queue");
+					if(this.debugExpansion) this.printInfo("\t\t" + " add node to the queue");
 					this.addNodeToQueue(rnode, childRNode, con);
-					this.printInfoExpansion("");
+					if(this.debugExpansion) this.printInfo("");
 				}	
 			}
 		}
@@ -236,14 +243,14 @@ public class PFRouter<E>{
 			RNode<E> rn = con.getSinkRNode();
 			while (rn != null) {
 				con.addRNode(rn);
-				rn = rn.rNodeData.prev;
+				rn = rn.rNodeData.getPrev();
 			}
 		}	
 	}
 
 	public void resetPathCost() {
 		for (RNodeData<E> node : this.rnodesTouched) {
-			node.touched = false;
+			node.setTouched(false);
 		}
 		this.rnodesTouched.clear();	
 	}
@@ -260,13 +267,13 @@ public class PFRouter<E>{
 	private void updateCost(float pres_fac, float acc_fac) {
 		for(RNode<E> rnode:this.rnodesCreated.values()){
 			RNodeData<E> data = rnode.rNodeData;
-			int overuse = data.occupation - rnode.capacity;
+			int overuse = data.getOccupation() - rnode.capacity;
 			//Present congestion penalty
 			if(overuse == 0) {
-				data.pres_cost = 1 + pres_fac;
+				data.setPres_cost(1 + pres_fac);
 			} else if (overuse > 0) {
-				data.pres_cost = 1 + (overuse + 1) * pres_fac;
-				data.acc_cost = data.acc_cost + overuse * acc_fac;
+				data.setPres_cost(1 + (overuse + 1) * pres_fac);
+				data.setAcc_cost(data.getAcc_cost() + overuse * acc_fac);
 			}
 		}	
 	}
@@ -274,19 +281,21 @@ public class PFRouter<E>{
 	private void addNodeToQueue(RNode<E> rnode, RNode<E> childRNode, Connection<E> con) {
 		RNodeData<E> data = childRNode.rNodeData;
 		int countSourceUses = data.countSourceUses(con.source);
-		this.printInfoExpansion("\t\t childRNode " + childRNode.toString());
+		if(this.debugExpansion){
+			System.out.println("\t\t childRNode " + childRNode.toString());
+		}
 		
-		float partial_path_cost = rnode.rNodeData.getPartialPathCost();
-		float new_partial_path_cost = partial_path_cost + this.getRouteNodeCost(childRNode, con, countSourceUses);
+		float partial_path_cost = rnode.rNodeData.getPartialPathCost();//upstream path cost
+		float new_partial_path_cost = partial_path_cost + this.getRouteNodeCost(childRNode, con, countSourceUses);//upstream path cost + cost of node under consideration
 		float new_lower_bound_total_path_cost;
 		
-		if(childRNode.type == RNodeType.INTERWIRE){
+		if(childRNode.type == RoutableType.INTERWIRE){
 			
-			this.printInfoExpansion("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
+			if(this.debugExpansion) this.printInfo("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
 			short expected_distance_cost = (short) (Math.abs(childRNode.centerx - con.sink.getTile().getColumn()) + Math.abs(childRNode.centery - con.sink.getTile().getRow()));
 			
-			float expected_wire_cost = expected_distance_cost / (1 + countSourceUses) + IPIN_BASE_COST;
-			new_lower_bound_total_path_cost = expected_wire_cost + rnode.rNodeData.getLevel();
+			float expected_wire_cost = expected_distance_cost / (1 + countSourceUses) + IPIN_WIRE_BASE_COST;
+			new_lower_bound_total_path_cost = expected_wire_cost + rnode.rNodeData.getLevel() + 1;
 			
 		}else{
 			new_lower_bound_total_path_cost = new_partial_path_cost;
@@ -298,21 +307,21 @@ public class PFRouter<E>{
 	private void addRNodeToQueue(RNode<E> node, RNode<E> prev, float new_partial_path_cost, float new_lower_bound_total_path_cost) {
 		RNodeData<E> data = node.rNodeData;
 		
-		if(!data.touched) {
-			this.printInfoExpansion("not touched");
+		if(!data.isTouched()) {
+			if(this.debugExpansion) this.printInfo("\t\t not touched");
 			this.rnodesTouched.add(data);
-			this.printInfoExpansion("touched node size = "+this.rnodesTouched.size());
+			if(this.debugExpansion) this.printInfo("\t\t touched node size = "+this.rnodesTouched.size());
 			data.setLowerBoundTotalPathCost(new_lower_bound_total_path_cost);
 			data.setPartialPathCost(new_partial_path_cost);
-			data.prev = prev;
+			data.setPrev(prev);
 			if(prev != null) data.setLevel(prev.rNodeData.getLevel()+1);
 			this.queue.add(new QueueElement<E>(node, new_lower_bound_total_path_cost));
-			this.printInfoExpansion("node added, queue size = " + this.queue.size());
+			if(this.debugExpansion) this.printInfo("\t\t node added, queue size = " + this.queue.size());
 			
 		} else if (data.updateLowerBoundTotalPathCost(new_lower_bound_total_path_cost)) {
 			//queue is sorted by lower bound total cost
 			data.setPartialPathCost(new_partial_path_cost);
-			data.prev = prev;
+			data.setPrev(prev);
 			if(prev != null) data.setLevel(prev.rNodeData.getLevel()+1);
 			this.queue.add(new QueueElement<E>(node, new_lower_bound_total_path_cost));
 		}
@@ -324,26 +333,26 @@ public class PFRouter<E>{
 		boolean containsSource = countSourceUses != 0;
 		//Present congestion cost
 		float pres_cost;
-		if (containsSource) {
+		if(containsSource) {
 			int overoccupation = data.numUniqueSources() - rnode.capacity;
-			if (overoccupation < 0) {
+			if(overoccupation < 0) {
 				pres_cost = 1;
-			} else {
+			}else{
 				pres_cost = 1 + overoccupation * this.pres_fac;
 			}
-		} else {
-			pres_cost = data.pres_cost;
+		}else{
+			pres_cost = data.getPres_cost();
 		}
 		
 		//Bias cost
 		float bias_cost = 0;
-		if(rnode.type == RNodeType.INTERWIRE) {
+		if(rnode.type == RoutableType.INTERWIRE) {
 			Netplus<E> net = con.getNet();
 			bias_cost = 0.5f * rnode.base_cost / net.fanout * 
 					(Math.abs(rnode.centerx - net.x_geo) + Math.abs(rnode.centery - net.y_geo)) / net.hpwl;
 		}
 
-		return rnode.base_cost * data.acc_cost * pres_cost / (1 + countSourceUses) + bias_cost;
+		return rnode.base_cost * data.getAcc_cost() * pres_cost / (1 + countSourceUses) + bias_cost;
 	}
 	
 	/******************************************************************
@@ -362,21 +371,20 @@ public class PFRouter<E>{
 	/*
 	 * statistics output for each router iteration
 	 */
-	public void staticticsInfo(List<Connection<E>> connections){
+	public void staticticsInfo(List<Connection<E>> connections, long start, long end){
 		int numRNodesCreated = this.rnodesCreated.size();
 		int overUsed = this.getOverusedRNodes(connections);
 		double overUsePercentage = 100.0 * (double)overUsed / numRNodesCreated;
-		System.out.printf("%9d  %9d  %11d  %6.2f%% \n", 
-				this.itry, this.connectionsRoutedIteration, overUsed, overUsePercentage);
-		
+		System.out.printf("%9d  %5.3f  %9d  %10.3f  %9d  %6.2f%% \n", 
+				this.itry, this.pres_fac, this.connectionsRoutedIteration, (end - start)*1e-9, overUsed, overUsePercentage);
 	}
 	
 	private int getOverusedRNodes(List<Connection<E>> connections) {
-		Set<Integer> overUsed = new HashSet<>();
-		for (Connection<E> conn : connections) {
-			for (RNode<E> rnode : conn.rNodes) {
-				if (rnode.overUsed() || rnode.illegal()) {
-					overUsed.add(rnode.hashCode());
+		Set<String> overUsed = new HashSet<>();
+		for(Connection<E> conn : connections) {
+			for(RNode<E> rnode : conn.rNodes) {
+				if(rnode.overUsed() || rnode.illegal()){
+					overUsed.add(rnode.name);
 				}
 			}
 		}
@@ -516,10 +524,7 @@ public class PFRouter<E>{
 		return (Set<RNode<E>>) rnodesCreated.values();
 	}
 	public void printInfo(String s){
-		if(this.debugRoutingCon) System.out.println("  --- " + s + " --- ");
-	}
-	public void printInfoExpansion(String s){
-		if(this.debugExpansion) System.out.println("  --- " + s + " --- ");
+		System.out.println("  --- " + s + " --- ");
 	}
 	
 }

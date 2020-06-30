@@ -108,7 +108,6 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	
 	public void resetConnection(){
 		this.rNodes.clear();
-		this.pips.clear();
 	}
 	
 	
@@ -140,17 +139,18 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		String coordinate = "(" + this.source.getTile().getColumn() + "," + this.source.getTile().getRow() + ") to (" 
 							+ this.sink.getTile().getColumn() + "," + this.sink.getTile().getRow() + ")";
 		
-		s.append("Con " + this.id);
+		s.append("Con");
+		s.append(String.format("%6s", this.id));
 		s.append(", ");
-		s.append(String.format("%-11s", coordinate));
+		s.append(String.format("%22s", coordinate));
 		s.append(", ");
-		s.append(String.format("net = %s", this.net.getNet().getName()));
+		s.append(String.format("net = %12s", this.net.getNet().getName()));
 		s.append(", ");
-		s.append(String.format("source = %s", this.source.getName() + " -> " + this.source.getTile().getName() + "/" + this.source.getSiteExternalWireIndex()));
+		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getTile().getName() + "/" + this.source.getSiteExternalWireIndex()));
 		s.append(", ");
-		s.append(String.format("sink = %s", this.sink.getTile().getName() + "/" + this.sink.getSiteExternalWireIndex() + " -> " +  this.sink.getName()));
+		s.append(String.format("sink = %26s", this.sink.getTile().getName() + "/" + this.sink.getSiteExternalWireIndex() + " -> " +  this.sink.getName()));
 		s.append(", ");
-		s.append(String.format("mahattan d = %d ", this.getManhattanDistance()));
+		s.append(String.format("mahattan d = %4d ", this.getManhattanDistance()));
 		
 		return s.toString();	
 		

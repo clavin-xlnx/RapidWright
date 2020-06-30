@@ -31,12 +31,12 @@ public class ChildRNodeGeneration {
 	public void wireBased(RNode<Wire> rnode, Connection<Wire> con){	
 		//set childRNodes of rnode, and avoid creating RNodes that already exist
 		Tile rnodeTile = rnode.getTile();
-		List<Wire> wires = rnodeTile.getWireConnections(rnode.getWire());//??
+		List<Wire> wires = rnodeTile.getWireConnections(rnode.getWire());
 		List<RNode<Wire>> childRNodes = new ArrayList<>();
 		for(Wire wire:wires){
 			RNode<Wire> childRNode;
-			String name = wire.getTile().getName() + "/" + wire.getWireIndex();//??//CHECK
-			if(!this.rnodesCreated.containsKey(name)){
+			String name = wire.getTile().getName() + "/" + wire.getWireIndex();//use Wire wire as the key instead?
+			if(!this.rnodesCreated.containsKey(name)){//TODO use Wire as the key?
 				childRNode = new RNode<Wire>(wire.getTile(), wire.getWireIndex(), 1);
 				childRNodes.add(childRNode);
 				this.rnodesCreated.put(name, childRNode);
@@ -44,11 +44,10 @@ public class ChildRNodeGeneration {
 				childRNodes.add(this.rnodesCreated.get(name));
 			}
 		}
-		rnode.setChildren(childRNodes);		
+		rnode.setChildren(childRNodes);	
 	}
 	
-	
 	public void printInfo(String s){
-		if(debug) System.out.println("  --- " + s + " --- ");
+		System.out.println("  --- " + s + " --- ");
 	}
 }

@@ -114,19 +114,15 @@ public class Netplus<E>{
 		return this.connections;
 	}
 	
-	//not used, because each net's Opin is fixed
-	public boolean checkOpin(){
-		boolean legal = true;
-		Set<RNode<E>> opins = new HashSet<>();
-		for(Connection<E> c:this.connections){
-			if(c.rNodes.size() == 0){
-				System.out.println("connection has empty route node list");
-			}else{
-				//TODO to check if all connections has the same source pin driver node
-				legal = false;
+	public RNode<E> getIllegalNode() {
+		for(Connection<E> con : this.connections) {
+			for(RNode<E> rnode : con.rNodes) {
+				if(rnode.illegal()) {
+					return rnode;
+				}
 			}
 		}
-		return legal;
+		return null;
 	}
 	
 	
