@@ -35,7 +35,7 @@ public class ChildRNodeGeneration {
 		List<RNode<Wire>> childRNodes = new ArrayList<>();
 		for(Wire wire:wires){
 			RNode<Wire> childRNode;
-			String name = wire.getTile().getName() + "/" + wire.getWireIndex();//use Wire wire as the key instead?
+			String name = wire.getTile().getName() + "/" + wire.getWireIndex();
 			if(!this.rnodesCreated.containsKey(name)){//TODO use Wire as the key?
 				childRNode = new RNode<Wire>(wire.getTile(), wire.getWireIndex(), 1);
 				childRNodes.add(childRNode);

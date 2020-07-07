@@ -47,7 +47,7 @@ public class Main {
 		}else{
 			if(this.opt == ExpanGranularityOpt.WIRE){			
 				PFRouterWireBased router = new PFRouterWireBased(this.design, this.toWriteDCPfileName, this.nrOfTrials, this.t);
-				router.route();
+				router.routingRuntime();
 			}else if(this.opt == ExpanGranularityOpt.NODE){
 //				PFRouterNodeBased router = new PFRouterNodeBased(this.design, this.toWriteDCPfileName, this.nrOfTrials, this.t);
 //				router.route();

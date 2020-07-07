@@ -22,7 +22,7 @@ public class PFRouter<E>{
 	private float initial_pres_fac;
 	private float pres_fac_mult;
 	private float acc_fac;
-	private float IPIN_WIRE_BASE_COST = 0.95f;
+	private float IPIN_WIRE_BASE_COST = 0.95f;//not used currently
 	private Design design;
 	private Device device;
 	
@@ -35,9 +35,7 @@ public class PFRouter<E>{
 	private Collection<RNodeData<E>> rnodesTouched;
 	private Map<String, RNode<E>> rnodesCreated;
 	
-	public RNode<E> sinkBeingRouted;
-	
-	public int connectionsRouted, nodesExpanded;
+	private int connectionsRouted, nodesExpanded;
 	private int connectionsRoutedIteration;
 	
 	private int itry;
@@ -63,8 +61,12 @@ public class PFRouter<E>{
 		this.queue = queue;
 		this.rnodesTouched = rnodesTouched;
 		this.rnodesCreated = rnodesCreated;
-		this.initializeNetsCons();	
-		this.printInfo("initialize nets and cons finished");
+		
+		this.connectionsRouted = 0;
+		this.connectionsRoutedIteration = 0;
+		this.nodesExpanded = 0;
+		
+		this.initializeNetsCons();
 	}
 	
 	public void initializeNetsCons(){
@@ -87,7 +89,7 @@ public class PFRouter<E>{
 					this.rnodesCreated.put(sourceRNode.name, sourceRNode);	
 					this.rNodeId++;
 					
-					/*//not create RNode of the sink pin external wire here 
+					/*//not create RNode of the sink pin external wire up front 
 					RNode<E> sinkRNode = new RNode<E>(sink, RNodeType.SINKPINWIRE, 1);
 					c.setSinkRNode(sinkRNode);
 					this.rnodesCreated.put(sinkRNode.name, sinkRNode);
@@ -104,10 +106,10 @@ public class PFRouter<E>{
 		}
 		
 		System.out.println("------------------------------------------------------------------------------");
-		System.out.println(" FPGA tiles size:\t\t\t" + this.device.getColumns() + "x" + this.device.getRows());
-		System.out.println(" Num con to be routed:\t\t\t" + this.connections.size());
-		System.out.println(" Num net to be routed:\t\t\t" + this.nets.size());
-		System.out.println(" Num 1-sink net:\t\t\t" + fanout1Net);
+		System.out.println(" FPGA tiles size: " + this.device.getColumns() + "x" + this.device.getRows());
+		System.out.println(" Num con to be routed: " + this.connections.size());
+		System.out.println(" Num net to be routed: " + this.nets.size());
+		System.out.println(" Num 1-sink net: " + fanout1Net);
 		System.out.println("------------------------------------------------------------------------------");
 	
 	}
@@ -123,24 +125,21 @@ public class PFRouter<E>{
 			}
 			
 		}
-		this.printInfo("unroute nets finished");
 	}
 	
 	public void initializeRouter(){
 		this.rnodesTouched.clear();
     	this.queue.clear();
 		
-    	this.initial_pres_fac = 0.5f; 	
+    	this.initial_pres_fac = 0.7f; 	
     	this.pres_fac = this.initial_pres_fac;
     	this.pres_fac_mult = 2;
     	this.acc_fac = 1;
-    	
 		this.itry = 1;
-		this.printInfo("router initialized");
-		this.printInfo("");
+		
 		System.out.printf("------------------------------------------------------------------------\n");
-        System.out.printf("%9s  %8s  %11s  %12s  %15s  %17s \n", "Iteration", "pres_fac", "Conn routed", "Run Time (s)", "Overused RNodes", "overUsePercentage");
-        System.out.printf("---------  --------  -----------  ------------  ---------------  -----------------\n");
+        System.out.printf("%9s  %11s  %12s  %15s  %17s \n", "Iteration", "Conn routed", "Run Time (s)", "Overused RNodes", "overUsePercentage");
+        System.out.printf("---------  -----------  ------------  ---------------  -----------------\n");
         
 	}
 	
@@ -203,7 +202,9 @@ public class PFRouter<E>{
 		this.addRNodeToQueue(source, null, 0, 0);
 	}
 	
-	public void exploringAndExpansion(RNode<E> rnode, Connection<E> con){		
+	public void exploringAndExpansion(RNode<E> rnode, Connection<E> con){
+		this.nodesExpanded++;
+		
 		if(this.debugExpansion){
 			this.printInfo("\t" + " exploring rnode " + rnode.toString());
 		}
@@ -251,6 +252,7 @@ public class PFRouter<E>{
 	public void resetPathCost() {
 		for (RNodeData<E> node : this.rnodesTouched) {
 			node.setTouched(false);
+			node.setLevel(0);
 		}
 		this.rnodesTouched.clear();	
 	}
@@ -282,30 +284,49 @@ public class PFRouter<E>{
 		RNodeData<E> data = childRNode.rNodeData;
 		int countSourceUses = data.countSourceUses(con.source);
 		if(this.debugExpansion){
-			System.out.println("\t\t childRNode " + childRNode.toString());
+			this.printInfo("\t\t childRNode " + childRNode.toString());
 		}
 		
 		float partial_path_cost = rnode.rNodeData.getPartialPathCost();//upstream path cost
-		float new_partial_path_cost = partial_path_cost + this.getRouteNodeCost(childRNode, con, countSourceUses);//upstream path cost + cost of node under consideration
+		float rnodeCost = this.getRouteNodeCost(childRNode, con, countSourceUses);
+		float new_partial_path_cost = partial_path_cost + rnodeCost;//upstream path cost + cost of node under consideration
 		float new_lower_bound_total_path_cost;
+		short expected_distance_cost = 0;
+		float expected_wire_cost;
 		
 		if(childRNode.type == RoutableType.INTERWIRE){
 			
-			if(this.debugExpansion) this.printInfo("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
-			short expected_distance_cost = (short) (Math.abs(childRNode.centerx - con.sink.getTile().getColumn()) + Math.abs(childRNode.centery - con.sink.getTile().getRow()));
+//			if(this.debugExpansion) this.printInfo("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
+			expected_distance_cost = (short) (Math.abs(childRNode.centerx - con.sink.getTile().getColumn()) + Math.abs(childRNode.centery - con.sink.getTile().getRow()));
 			
-			float expected_wire_cost = expected_distance_cost / (1 + countSourceUses) + IPIN_WIRE_BASE_COST;
-			new_lower_bound_total_path_cost = expected_wire_cost + rnode.rNodeData.getLevel() + 1;
+			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
+			new_lower_bound_total_path_cost = new_partial_path_cost + expected_wire_cost + (rnode.rNodeData.getLevel() + 1);
 			
-		}else{
+		}else{//lut input pin (sink)
 			new_lower_bound_total_path_cost = new_partial_path_cost;
 		}
+		//cost info for debugging
+		/*if(this.debugExpansion){
+			StringBuilder s = new StringBuilder();
+			s.append(String.format("partial_path_cost = %10.3f", partial_path_cost));
+			s.append(", ");
+			s.append(String.format("rnode_cost = %10.3f", rnodeCost));
+			s.append(", ");
+			s.append(String.format("# count source usage = %2d", countSourceUses));
+			s.append(", ");
+			s.append(String.format("# est_dis = %2d", expected_distance_cost));
+			s.append(", ");
+			s.append(String.format("new_total_path_cost = %10.3f", new_lower_bound_total_path_cost));
+			String costInfo = s.toString();
+			this.printInfo("\t\t "+ costInfo);
+		}*/
+		
 		this.addRNodeToQueue(childRNode, rnode, new_partial_path_cost, new_lower_bound_total_path_cost);
 		
 	}
 	
-	private void addRNodeToQueue(RNode<E> node, RNode<E> prev, float new_partial_path_cost, float new_lower_bound_total_path_cost) {
-		RNodeData<E> data = node.rNodeData;
+	private void addRNodeToQueue(RNode<E> childRNode, RNode<E> rnode, float new_partial_path_cost, float new_lower_bound_total_path_cost) {
+		RNodeData<E> data = childRNode.rNodeData;
 		
 		if(!data.isTouched()) {
 			if(this.debugExpansion) this.printInfo("\t\t not touched");
@@ -313,17 +334,18 @@ public class PFRouter<E>{
 			if(this.debugExpansion) this.printInfo("\t\t touched node size = "+this.rnodesTouched.size());
 			data.setLowerBoundTotalPathCost(new_lower_bound_total_path_cost);
 			data.setPartialPathCost(new_partial_path_cost);
-			data.setPrev(prev);
-			if(prev != null) data.setLevel(prev.rNodeData.getLevel()+1);
-			this.queue.add(new QueueElement<E>(node, new_lower_bound_total_path_cost));
+			data.setPrev(rnode);
+			if(rnode != null) data.setLevel(rnode.rNodeData.getLevel()+1);
+			this.queue.add(new QueueElement<E>(childRNode, new_lower_bound_total_path_cost));
 			if(this.debugExpansion) this.printInfo("\t\t node added, queue size = " + this.queue.size());
 			
 		} else if (data.updateLowerBoundTotalPathCost(new_lower_bound_total_path_cost)) {
 			//queue is sorted by lower bound total cost
+			if(this.debugExpansion) this.printInfo("\t\t touched previously");
 			data.setPartialPathCost(new_partial_path_cost);
-			data.setPrev(prev);
-			if(prev != null) data.setLevel(prev.rNodeData.getLevel()+1);
-			this.queue.add(new QueueElement<E>(node, new_lower_bound_total_path_cost));
+			data.setPrev(rnode);
+			if(rnode != null) data.setLevel(rnode.rNodeData.getLevel()+1);
+			this.queue.add(new QueueElement<E>(childRNode, new_lower_bound_total_path_cost));
 		}
 	}
 
@@ -351,7 +373,10 @@ public class PFRouter<E>{
 			bias_cost = 0.5f * rnode.base_cost / net.fanout * 
 					(Math.abs(rnode.centerx - net.x_geo) + Math.abs(rnode.centery - net.y_geo)) / net.hpwl;
 		}
-
+		
+		/*if(this.debugExpansion)
+			this.printInfo("\t\t rnode cost = b(n)*h(n)*p(n)/(1+sourceUsage) = " + rnode.base_cost + " * " + data.getAcc_cost()+ " * " + pres_cost + " / (1 + " + countSourceUses + ") + " + bias_cost);
+		*/
 		return rnode.base_cost * data.getAcc_cost() * pres_cost / (1 + countSourceUses) + bias_cost;
 	}
 	
@@ -373,17 +398,17 @@ public class PFRouter<E>{
 	 */
 	public void staticticsInfo(List<Connection<E>> connections, long start, long end){
 		int numRNodesCreated = this.rnodesCreated.size();
-		int overUsed = this.getOverusedRNodes(connections);
+		int overUsed = this.getOverusedAndIllegalRNodes(connections);
 		double overUsePercentage = 100.0 * (double)overUsed / numRNodesCreated;
-		System.out.printf("%9d  %5.3f  %9d  %10.3f  %9d  %6.2f%% \n", 
-				this.itry, this.pres_fac, this.connectionsRoutedIteration, (end - start)*1e-9, overUsed, overUsePercentage);
+		System.out.printf("%9d  %11d  %12.3f  %15d  %16.2f%% \n", 
+				this.itry, this.connectionsRoutedIteration, (end - start)*1e-9, overUsed, overUsePercentage);
 	}
 	
-	private int getOverusedRNodes(List<Connection<E>> connections) {
+	private int getOverusedAndIllegalRNodes(List<Connection<E>> connections) {
 		Set<String> overUsed = new HashSet<>();
 		for(Connection<E> conn : connections) {
 			for(RNode<E> rnode : conn.rNodes) {
-				if(rnode.overUsed() || rnode.illegal()){
+				if(rnode.overUsed()){// || rnode.illegal()
 					overUsed.add(rnode.name);
 				}
 			}

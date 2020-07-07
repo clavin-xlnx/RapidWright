@@ -146,6 +146,8 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		s.append(", ");
 		s.append(String.format("net = %12s", this.net.getNet().getName()));
 		s.append(", ");
+		s.append(String.format("net fanout = %3s", this.net.fanout));
+		s.append(", ");
 		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getTile().getName() + "/" + this.source.getSiteExternalWireIndex()));
 		s.append(", ");
 		s.append(String.format("sink = %26s", this.sink.getTile().getName() + "/" + this.sink.getSiteExternalWireIndex() + " -> " +  this.sink.getName()));
