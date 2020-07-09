@@ -450,6 +450,11 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
                 limit = Math.max(numRow,numCol);
             }
 
+            if (verbose > 4) {
+                System.out.printf("          examineEdge %11s   rev %5s  bwd %5s        ",
+                        tg.name(), e.isReverseDirection(), isBackward);
+            }
+
             short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
             if ((endLoc >= limit) || (endLoc < 0)) {
                 // Can't do MAX_VALUE as adding that to other value will become negative.
@@ -460,11 +465,6 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             // Assume bounce happen only before CLE_IN
             if (tg == InterconnectInfo.TimingGroup.BOUNCE && dir == InterconnectInfo.Direction.VERTICAL) {
                 return Short.MAX_VALUE/2;
-            }
-
-            if (verbose > 4) {
-                System.out.printf("          examineEdge %11s   rev %5s  bwd %5s        ",
-                        tg.name(), e.isReverseDirection(), isBackward);
             }
 
             return calcTimingGroupDelay(tg, begLoc, endLoc, dly);
