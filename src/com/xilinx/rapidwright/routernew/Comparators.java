@@ -3,7 +3,8 @@ package com.xilinx.rapidwright.routernew;
 import java.util.Comparator;
 
 public class Comparators {
-    public static Comparator<QueueElement> PRIORITY_COMPARATOR = new Comparator<QueueElement>() {
+    @SuppressWarnings("rawtypes")
+	public static Comparator<QueueElement> PRIORITY_COMPARATOR = new Comparator<QueueElement>() {
         @Override
         public int compare(QueueElement node1, QueueElement node2) {
             if(node1.cost < node2.cost) {
@@ -14,7 +15,8 @@ public class Comparators {
         }
     };
     
-    public static Comparator<Connection>  FanoutBBConnection = new Comparator<Connection>() {
+    @SuppressWarnings("rawtypes")
+	public static Comparator<Connection>  FanoutBBConnection = new Comparator<Connection>() {
     	@Override
     	public int compare(Connection a, Connection b) {
     		if(a.net.fanout < b.net.fanout){
@@ -40,6 +42,7 @@ public class Comparators {
     	}
     };
     
+	@SuppressWarnings("rawtypes")
 	public static Comparator<Netplus> FanoutNet = new Comparator<Netplus>() {
     	@Override
     	public int compare(Netplus n1, Netplus n2) {
@@ -66,7 +69,8 @@ public class Comparators {
     	}
     };
    
-    public static Comparator<Connection> ConnectionCriticality = new Comparator<Connection>() {
+    @SuppressWarnings("rawtypes")
+	public static Comparator<Connection> ConnectionCriticality = new Comparator<Connection>() {
     	@Override
     	public int compare(Connection a, Connection b) {
     		if(a.getCriticality() < b.getCriticality()){

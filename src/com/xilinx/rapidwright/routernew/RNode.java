@@ -1,6 +1,5 @@
 package com.xilinx.rapidwright.routernew;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -9,14 +8,19 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 
 public class RNode<E>{
-//	private int index;
-	
+//	private int index;	
 	public RoutableType type;
+	
+	//RNode<Wire>
 	private Tile tile;
 	private int wire;
+	
+	//RNode<Node>
+	private Node node;
+	
 	public String name;
 	
-	//TODO information used to check if the RNode is in the routing bounding box of a connection
+	//information used to check if the RNode is in the routing bounding box of a connection
 	//to finalize using the column/row of the tile?
 	public short xlow, xhigh;//exact coordinate seems to be invisible
 	public short ylow, yhigh;
@@ -34,18 +38,27 @@ public class RNode<E>{
 	public List<RNode<E>> children;//populate the child rnodes of the current 
 	public boolean childrenSet;
 	
-	public RNode(SitePinInst sitePinInst, RoutableType type, int capacity){
+	public RNode(SitePinInst sitePinInst, RoutableType type, int capacity, ExpanGranularityOpt opt){
 //		this.index = index;
-		this.tile = sitePinInst.getSiteInst().getTile();
-		this.type = type;		
-		this.wire = sitePinInst.getSiteExternalWireIndex();
-		this.name = this.tile.getName() + "/" + this.wire;
+		this.type = type;
+				
+		if(opt == ExpanGranularityOpt.WIRE){
+			this.tile = sitePinInst.getSiteInst().getTile();
+			this.wire = sitePinInst.getSiteExternalWireIndex();
+			this.name = this.tile.getName() + "/" + this.wire;
+			this.setCenterXYWire();
+		}	
+		if(opt == ExpanGranularityOpt.NODE){
+			this.node = sitePinInst.getConnectedNode();
+			this.name = this.node.toString();//TODO unique?
+			this.setCenterXYNode();
+		}
+
 		this.capacity = (short)capacity;
 		this.rNodeData = new RNodeData<E>();
 		this.childrenSet = false;
 		//different base cost for different routing resources
-		this.setBaseCost();
-		this.setCenterXY();
+		this.setBaseCost();	
 	}
 	
 	public RNode(Tile tile, int wire, int capacity){
@@ -59,7 +72,21 @@ public class RNode<E>{
 		this.childrenSet = false;
 		//different base cost for different routing resources
 		this.setBaseCost();
-		this.setCenterXY();
+		this.setCenterXYWire();
+		
+	}
+	public RNode(Node node, int capacity){
+//		this.index = index;
+		this.type = RoutableType.INTERWIRE;
+		this.node = node;
+		this.name = this.node.toString();
+		this.capacity = (short)capacity;
+		
+		this.rNodeData = new RNodeData<E>();
+		this.childrenSet = false;
+		//different base cost for different routing resources
+		this.setBaseCost();
+		this.setCenterXYNode();
 		
 	}
 	
@@ -70,13 +97,77 @@ public class RNode<E>{
 		this.setBaseCost();
 	}*/
 	
-	public void setCenterXY(){
+	public void setCenterXYWire(){
 		this.xlow = (short) this.tile.getColumn();
 		this.xhigh = this.xlow;
 		this.ylow = (short) this.tile.getRow();
 		this.yhigh = this.ylow;
+		
 		this.centerx = (this.xhigh + this.xlow) / 2;
 		this.centery = (this.yhigh + this.ylow) / 2;
+	}
+	
+	public void setCenterXYNode(){
+		int length = this.node.getAllWiresInNode().length;
+		short[] xCoordinates = new short[length];
+		short[] yCoordinates = new short[length];
+		short id = 0;
+		for(Wire w : this.node.getAllWiresInNode()){
+			xCoordinates[id] = (short) w.getTile().getColumn();
+			yCoordinates[id] = (short) w.getTile().getRow();
+			id++;
+		}
+		if(length > 0){
+			this.xlow = this.min(xCoordinates);
+			this.xhigh = this.max(xCoordinates);
+			this.ylow = this.min(yCoordinates);
+			this.yhigh = this.max(yCoordinates);
+		}
+		/*if(id == 1){
+			this.xlow = xCoordinates[0];
+			this.xhigh = this.xlow;
+			this.ylow = yCoordinates[0];
+			this.yhigh = this.ylow;
+		}else if(id == 2){
+			if(xCoordinates[0] < xCoordinates[1]){
+				this.xlow = xCoordinates[0];
+				this.xhigh = xCoordinates[1];
+			}else{
+				this.xlow = xCoordinates[1];
+				this.xhigh = xCoordinates[0];
+			}
+			if(yCoordinates[0] < yCoordinates[1]){
+				this.ylow = yCoordinates[0];
+				this.yhigh = yCoordinates[1];
+			}else{
+				this.ylow = yCoordinates[1];
+				this.yhigh = yCoordinates[0];
+			}
+		}else{
+			this.xlow = this.min(xCoordinates);
+			this.xhigh = this.max(xCoordinates);
+			this.ylow = this.min(yCoordinates);
+			this.yhigh = this.max(yCoordinates);
+		}*/
+		
+		this.centerx = (this.xhigh + this.xlow) / 2;
+		this.centery = (this.yhigh + this.ylow) / 2;
+	}
+	public short max(short[] coordinates){
+		short max = 0;
+		for(short c:coordinates){
+			if(c > max)
+				max = c;
+		}
+		return max;
+	}
+	public short min(short[] coordinates){
+		short min = 10000;
+		for(short c:coordinates){
+			if(c < min)
+				min = c;
+		}
+		return min;
 	}
 	
 	public void setBaseCost(){
@@ -107,26 +198,6 @@ public class RNode<E>{
 		return this.capacity < this.rNodeData.numUniqueParents();
 	}
 	
-	/**
-	 * Gets all the possible connections leaving this node
-	 * @return The list of all possible connections leaving this node 
-	 */
-	public List<RNode<Wire>> getChildRNodeWireGrained(){
-		List<Wire> wires = this.tile.getWireConnections(this.wire);
-		List<RNode<Wire>> childRNodes = new ArrayList<>();
-		
-		for(Wire wire:wires){		
-			childRNodes.add(new RNode<Wire>(wire.getTile(), wire.getWireIndex(), 1));
-		}
-		return childRNodes;
-	}
-	
-	public List<RNode<Node>> getChildRNodeNodeGranied(){
-		//TODO
-		return null;
-		
-	}
-	
 	public Tile getTile() {
 		return tile;
 	}
@@ -151,7 +222,11 @@ public class RNode<E>{
 	public void setWire(int wire) {
 		this.wire = wire;
 	}
-
+	
+	public Node getNode(){
+		return this.node;
+	}
+	
 	public boolean isTarget() {
 		return this.target;
 	}

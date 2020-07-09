@@ -11,21 +11,21 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
-public class PFRouterWireBased {
+public class PFRouterNodeBased{
 	public Design design;
-	public PriorityQueue<QueueElement<Wire>> queue;
-	public Collection<RNodeData<Wire>> rnodesTouched;
-	public Map<String, RNode<Wire>> rnodesCreated;//name and rnode pair
+	public PriorityQueue<QueueElement<Node>> queue;
+	public Collection<RNodeData<Node>> rnodesTouched;
+	public Map<String, RNode<Node>> rnodesCreated;//name and rnode pair
 	public String dcpFileName;
 	public int nrOfTrials;
 	public CodePerfTracker t;
 	
-	public PFRouter<Wire> router;
-	public List<Connection<Wire>> sortedListOfConnection;
-	public List<Netplus<Wire>> sortedListOfNetplus;
+	public PFRouter<Node> router;
+	public List<Connection<Node>> sortedListOfConnection;
+	public List<Netplus<Node>> sortedListOfNetplus;
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -33,7 +33,7 @@ public class PFRouterWireBased {
 	
 	public boolean trial = false;
 	
-	public PFRouterWireBased(Design design,
+	public PFRouterNodeBased(Design design,
 			String dcpFileName,
 			int nrOfTrials,
 			CodePerfTracker t,
@@ -48,9 +48,9 @@ public class PFRouterWireBased {
 		this.t = t;
 		
 		this.routerTimer = new RouterTimer();
-		this.router = new PFRouter<Wire>(this.design, this.queue, this.rnodesTouched, this.rnodesCreated, bbRange);
+		this.router = new PFRouter<Node>(this.design, this.queue, this.rnodesTouched, this.rnodesCreated, bbRange);
 		
-		this.router.initializeNetsCons(ExpanGranularityOpt.WIRE);
+		this.router.initializeNetsCons(ExpanGranularityOpt.NODE);
 		
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -60,7 +60,7 @@ public class PFRouterWireBased {
 		 long start = System.nanoTime();
 		 this.route();
 		 long end = System.nanoTime();
-		 int timeInMilliSeconds = (int)Math.round((end-start) * Math.pow(10, -6));				
+		 int timeInMilliSeconds = (int)Math.round((end-start) * Math.pow(10, -6));			
 		 return timeInMilliSeconds;
 	 }
 	
@@ -79,12 +79,12 @@ public class PFRouterWireBased {
 		//initialize router
 		this.router.initializeRouter();
 		
-		ChildRNodesCreation childRNodesGeneration = new ChildRNodesCreation(this.rnodesCreated);
+		ChildRNodesCreation childRNodesGeneration = new ChildRNodesCreation(this.rnodesCreated, ExpanGranularityOpt.NODE);
 		
 		//do routing
 		boolean validRouting;
-        List<Netplus<Wire>> trialNets = new ArrayList<>();
-        for(Netplus<Wire> net : this.sortedListOfNetplus){
+        List<Netplus<Node>> trialNets = new ArrayList<>();
+        for(Netplus<Node> net : this.sortedListOfNetplus){
 //        	if(net.getNet().getName().equals("n767") || net.getNet().getName().equals("n761")){
         	if(net.getNet().getName().equals("n775") || net.getNet().getName().equals("n689")){
         		trialNets.add(net);
@@ -99,7 +99,7 @@ public class PFRouterWireBased {
 			if(this.trial) this.printInfo("iteration " + this.router.getItry() + " begins");
 			
 			if(!this.trial){
-				for(Connection<Wire> con:this.sortedListOfConnection){
+				for(Connection<Node> con:this.sortedListOfConnection){
 					if(this.router.getItry() == 1){
 						this.routerTimer.firstIteration.start();
 						this.routeACon(this.router, childRNodesGeneration, con);
@@ -111,8 +111,8 @@ public class PFRouterWireBased {
 					}
 				}
 			}else{
-				for(Netplus<Wire> np : trialNets){
-					for(Connection<Wire> c : np.getConnection()){
+				for(Netplus<Node> np : trialNets){
+					for(Connection<Node> c : np.getConnection()){
 						if(this.router.getItry() == 1){
 							this.routerTimer.firstIteration.start();
 							this.routeACon(this.router, childRNodesGeneration, c);
@@ -170,17 +170,17 @@ public class PFRouterWireBased {
 	}
 	
 	public void findCongestion(){
-		/*for(RNode<Wire> rn : this.rnodesCreated.values()){
+		/*for(RNode<Node> rn : this.rnodesCreated.values()){
 			if(rn.overUsed()){
 				System.out.println(rn.toString());
 			}
 		}*/
-		Set<Connection<Wire>> congestedCons = new HashSet<>();
-//		Map<Netplus<Wire>, Integer> congestedNets = new HashMap<>();
-		for(Connection<Wire> con:this.sortedListOfConnection){
+		Set<Connection<Node>> congestedCons = new HashSet<>();
+//		Map<Netplus<Node>, Integer> congestedNets = new HashMap<>();
+		for(Connection<Node> con:this.sortedListOfConnection){
 			if(con.congested()){
 				congestedCons.add(con);
-				/*Netplus<Wire> np = con.getNet();
+				/*Netplus<Node> np = con.getNet();
 				if(congestedNets.containsKey(np)){
 					congestedNets.put(np, congestedNets.get(np)+1);
 				}else{
@@ -188,16 +188,16 @@ public class PFRouterWireBased {
 				}*/
 			}
 		}
-		for(Connection<Wire> con:congestedCons){
+		for(Connection<Node> con:congestedCons){
 			System.out.println(con.toString());
-			for(RNode<Wire> rn : con.rNodes){
+			for(RNode<Node> rn : con.rNodes){
 				if(rn.overUsed()) System.out.println("\t"+ rn.toString());
 			}
 			System.out.println();
 		}
 	}
-	//TODO put into the PFRouter class
-	public void fixIllegalTree(List<Connection<Wire>> cons) {
+	
+	public void fixIllegalTree(List<Connection<Node>> cons) {
 		this.printInfo("checking if there is any illegal node");
 		
 		int numIllegal = this.getIllegalNumRNodes(cons);
@@ -205,10 +205,10 @@ public class PFRouterWireBased {
 		if(numIllegal > 0){
 			this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
 			
-			List<Netplus<Wire>> illegalTrees = new ArrayList<>();
-			for(Netplus<Wire> net : this.router.getNets()) {
+			List<Netplus<Node>> illegalTrees = new ArrayList<>();
+			for(Netplus<Node> net : this.router.getNets()) {
 				boolean illegal = false;
-				for(Connection<Wire> con : net.getConnection()) {
+				for(Connection<Node> con : net.getConnection()) {
 					if(con.illegal()) {
 						illegal = true;
 					}
@@ -220,12 +220,12 @@ public class PFRouterWireBased {
 			
 			this.printInfo("There are " + illegalTrees.size() + " illegal trees");
 			//find the illegal connections
-			for(Netplus<Wire> illegalTree : illegalTrees){
-				RNode<Wire> illegalRNode;
+			for(Netplus<Node> illegalTree : illegalTrees){
+				RNode<Node> illegalRNode;
 				while((illegalRNode = illegalTree.getIllegalNode()) != null){
-					List<Connection<Wire>> illegalCons = new ArrayList<>();
-					for(Connection<Wire> con : illegalTree.getConnection()) {
-						for(RNode<Wire> rnode : con.rNodes) {
+					List<Connection<Node>> illegalCons = new ArrayList<>();
+					for(Connection<Node> con : illegalTree.getConnection()) {
+						for(RNode<Node> rnode : con.rNodes) {
 							if(rnode.equals(illegalRNode)) {
 								illegalCons.add(con);
 							}
@@ -239,19 +239,19 @@ public class PFRouterWireBased {
 		}	
 	}
 	
-	public int getIllegalNumRNodes(List<Connection<Wire>> cons){
+	public int getIllegalNumRNodes(List<Connection<Node>> cons){
 		Set<String> illegal = new HashSet<>();	
-		for(Connection<Wire> c:cons){
-			for(RNode<Wire> rn:c.rNodes){
+		for(Connection<Node> c:cons){
+			for(RNode<Node> rn:c.rNodes){
 				if(rn.illegal()){
 					illegal.add(rn.name);
 				}
 			}
-		}
-		return illegal.size();
+		}	
+		return illegal.size();	
 	}
 
-	public void routeACon(PFRouter<Wire> router, ChildRNodesCreation childRNodesGeneration, Connection<Wire> con){
+	public void routeACon(PFRouter<Node> router, ChildRNodesCreation childRNodesGeneration, Connection<Node> con){
 		router.prepareForRoutingACon(con);
 		if(this.router.debugRoutingCon) this.printInfo("routing for " + con.toString());
 		
@@ -263,9 +263,9 @@ public class PFRouterWireBased {
 				throw new RuntimeException("Queue is empty: target unreachable?");
 			}
 			
-			RNode<Wire> rnode = queue.poll().rnode;
+			RNode<Node> rnode = queue.poll().rnode;
 			if(!rnode.childrenSet){
-				childRNodesGeneration.wireBased(rnode);
+				childRNodesGeneration.nodeBased(rnode);
 			}		
 			router.exploringAndExpansion(rnode, con);
 		}

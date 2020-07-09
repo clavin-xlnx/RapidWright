@@ -1,17 +1,11 @@
 package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.timing.TimingGroup;
-import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.routernew.RNode;
 
 public class Netplus<E>{
@@ -19,7 +13,6 @@ public class Netplus<E>{
 	 * Netplus is a class with additional information of a net for 
 	 * a PathFinder-based router development
 	 */
-	private static final long serialVersionUID = 1L;
 	private List<Connection<E>> connections;
 	private Net net;
 	private NetType type;

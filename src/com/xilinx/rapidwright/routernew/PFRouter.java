@@ -2,6 +2,7 @@ package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,7 @@ public class PFRouter<E>{
 	private float initial_pres_fac;
 	private float pres_fac_mult;
 	private float acc_fac;
-	private float IPIN_WIRE_BASE_COST = 0.95f;//not used currently
+//	private float IPIN_WIRE_BASE_COST = 0.95f;//not used currently
 	private Design design;
 	private Device device;
 	
@@ -43,12 +44,13 @@ public class PFRouter<E>{
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
 
-	private int bbRange = 5;//TODO could be tuned later
+	private int bbRange;
 	
 	public PFRouter(Design design, 
 			PriorityQueue<QueueElement<E>> queue, 
 			Collection<RNodeData<E>> rnodesTouched, 
-			Map<String, RNode<E>> rnodesCreated){
+			Map<String, RNode<E>> rnodesCreated,
+			int bbRange){
 		this.design = design;
 		
 		this.device = this.design.getDevice();
@@ -62,14 +64,14 @@ public class PFRouter<E>{
 		this.rnodesTouched = rnodesTouched;
 		this.rnodesCreated = rnodesCreated;
 		
+		this.bbRange = bbRange;
+		
 		this.connectionsRouted = 0;
 		this.connectionsRoutedIteration = 0;
 		this.nodesExpanded = 0;
-		
-		this.initializeNetsCons();
 	}
 	
-	public void initializeNetsCons(){
+	public void initializeNetsCons(ExpanGranularityOpt opt){
 		int inet = 0;
 		int icon = 0;
 		int fanout1Net = 0;
@@ -81,13 +83,14 @@ public class PFRouter<E>{
 				inet++;
 				
 				SitePinInst source = n.getSource();
+				RNode<E> sourceRNode = new RNode<E>(source, RoutableType.SOURCEPINWIRE, 1, opt);
+				this.rNodeId++;
+				
 				for(SitePinInst sink:n.getSinkPins()){
-					Connection<E> c = new Connection<E>(icon, source, sink, this.tmodel);
-					
-					RNode<E> sourceRNode = new RNode<E>(source, RoutableType.SOURCEPINWIRE, 1);
+					Connection<E> c = new Connection<E>(icon, source, sink, this.tmodel);	
 					c.setSourceRNode(sourceRNode);
 					this.rnodesCreated.put(sourceRNode.name, sourceRNode);	
-					this.rNodeId++;
+					c.setTargetName(opt);
 					
 					/*//not create RNode of the sink pin external wire up front 
 					RNode<E> sinkRNode = new RNode<E>(sink, RNodeType.SINKPINWIRE, 1);
@@ -140,7 +143,6 @@ public class PFRouter<E>{
 		System.out.printf("------------------------------------------------------------------------\n");
         System.out.printf("%9s  %11s  %12s  %15s  %17s \n", "Iteration", "Conn routed", "Run Time (s)", "Overused RNodes", "overUsePercentage");
         System.out.printf("---------  -----------  ------------  ---------------  -----------------\n");
-        
 	}
 	
 	public void ripup(Connection<E> con){
@@ -181,15 +183,17 @@ public class PFRouter<E>{
 	}
 	
 	public void printConRNodes(Connection<E> con){
-		if(this.debugRoutingCon){
+		if(this.debugExpansion){
 			for(RNode<E> rn:con.rNodes){
 				this.printInfo(rn.toString());
 			}
-			this.printInfo("");
-		}
+			this.printInfo("");	
+		}	
 	}
 	
 	public void prepareForRoutingACon(Connection<E> con){
+		this.ripup(con);
+		
 		this.connectionsRouted++;
 		this.connectionsRoutedIteration++;
 		// Clear previous route of the connection
@@ -226,7 +230,6 @@ public class PFRouter<E>{
 		}
 	}
 	
-	
 	public boolean targetReached(Connection<E> con){
 		if(this.queue.size() > 0){
 			RNode<E> queueHead = this.queue.peek().rnode;
@@ -235,6 +238,15 @@ public class PFRouter<E>{
 			System.out.println("queue is empty");
 			return false;
 		}
+	}
+	
+	public void finishRoutingACon(Connection<E> con){
+		//save routing in connection class
+		this.saveRouting(con);
+		// Reset path cost
+		this.resetPathCost();
+		
+		this.add(con);
 	}
 	
 	public void saveRouting(Connection<E> con){
@@ -415,6 +427,11 @@ public class PFRouter<E>{
 		}
 		return overUsed.size();
 	}
+	public void outOfTrialIterations(int nrOfTrials){
+		if (this.itry == nrOfTrials + 1) {
+			System.out.println("Routing failled after " + this.itry + " trials!");
+		}
+	}
 
 	/********************************
 	 * print PIPs info of routed nets
@@ -503,8 +520,7 @@ public class PFRouter<E>{
 	public void updateItry() {
 		this.itry++;
 	}
-	
-	
+		
 	public float getPres_fac() {
 		return pres_fac;
 	}

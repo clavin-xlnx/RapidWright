@@ -47,7 +47,6 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		this.timingEdge = new TimingEdge(tm.getTimingManager().getTimingGraph(), this.sourceTimingNode,
 				this.sinkTimingNode, null, this.net.getNet());//this.net should be set first
 		*/
-		this.targetName = this.sink.getSiteInst().getTile().getName() + "/" + this.sink.getSiteExternalWireIndex();
 		
 		this.boundingBox = this.calculateBoundingBox();
 		this.sourceName = this.source.getName();
@@ -55,10 +54,20 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		this.rNodes = new ArrayList<>();
 		this.pips = new ArrayList<>();
 		this.sinkRNodeSet = false;
-		
 	}
 	
-	private int calculateBoundingBox() {
+	//TODO optimization using Wire wire / Node node /TimingGroup tg as the target
+	public void setTargetName(ExpanGranularityOpt opt){
+		if(opt == ExpanGranularityOpt.WIRE){
+			this.targetName = this.sink.getSiteInst().getTile().getName() + "/" + this.sink.getSiteExternalWireIndex();
+		}else if(opt == ExpanGranularityOpt.NODE){
+			this.targetName = this.sink.getConnectedNode().toString();
+		}else if(opt == ExpanGranularityOpt.TIMINGGROUP){
+			
+		}
+	}
+	
+	public int calculateBoundingBox() {
 		int min_x, max_x, min_y, max_y;
 		
 		int sourceX = this.source.getTile().getColumn();
