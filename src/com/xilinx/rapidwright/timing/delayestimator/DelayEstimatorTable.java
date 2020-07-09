@@ -141,83 +141,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        return delay;
     }
 
-    private Pair<Short,String> getMinDelayToSinkPin(T.TimingGroup begTg, T.TimingGroup endTg,
-                                      short begX, short begY, short endX, short endY, TileSide begSide, TileSide endSide) {
 
-        assert endTg == T.TimingGroup.CLE_IN : "getMinDelayToSinkPin expects CLE_IN as the target timing group.";
-
-        String route = "";
-
-
-        List<T.TimingGroup> begTgs = new ArrayList<T.TimingGroup>() {{add(begTg);}};
-        List<T.TimingGroup> endTgs = new ArrayList<T.TimingGroup>() {{add(endTg);}};
-
-        short delay = 0;
-        if ((begX == endX) && (begY == endY)) {
-            // TODO: should be handle by findMinVerticalDelay
-            if (begSide != endSide) {
-                delay = K0.get(InterconnectInfo.Direction.LOCAL).get(GroupDelayType.PIN_BOUNCE).shortValue();
-                if (verbose == -1)
-                    route = "i";
-            }
-        } else if (begX == endX) {
-            Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delayY =
-                    findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, endTgs, begY, endY, begSide, endSide);
-            delay = delayY.get(begTg).get(endTg).getFirst();
-            if (verbose == -1)
-                route = delayY.get(begTg).get(endTg).getSecond();
-        } else if (begY == endY) {
-            Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delayY =
-                    findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, endTgs, begX, endX, begSide, endSide);
-            delay = delayY.get(begTg).get(endTg).getFirst();
-            if (verbose == -1)
-                route = delayY.get(begTg).get(endTg).getSecond();
-        } else {
-            // The key TimingGroups are used to connect between vertical and horizontal sections.
-            // The direction of the key TimingGroup is not used.
-
-            List<Pair<Short,String>> pathDelays = new ArrayList<>();
-            {
-                if (verbose > 0)
-                    System.out.println("getMinDelayToSinkPin hor->ver");
-                List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
-                        (T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL));
-                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay1 =
-                        findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, keyTgs, begX, endX, begSide, endSide);
-                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay2 =
-                        findMinDelayOneDirection(this::findMinVerticalDelay, keyTgs, endTgs, begY, endY, begSide, endSide);
-                for (T.TimingGroup tg : keyTgs) {
-                    pathDelays.add(new Pair<>(
-                            (short) (delay1.get(begTg).get(tg).getFirst() + delay2.get(tg).get(endTg).getFirst()),
-                            delay1.get(begTg).get(tg).getSecond() + delay2.get(tg).get(endTg).getSecond())
-                    );
-                }
-            }
-
-            {
-                if (verbose > 0)
-                    System.out.println("getMinDelayToSinkPin ver->hor");
-                List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
-                        (T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL));
-                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay1 =
-                        findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, keyTgs, begY, endY, begSide, endSide);
-                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay2 =
-                        findMinDelayOneDirection(this::findMinHorizontalDelay, keyTgs, endTgs, begX, endX, begSide, endSide);
-
-                for (T.TimingGroup tg : keyTgs) {
-                    pathDelays.add(new Pair<>(
-                            (short) (delay1.get(begTg).get(tg).getFirst() + delay2.get(tg).get(endTg).getFirst()),
-                            delay1.get(begTg).get(tg).getSecond() + delay2.get(tg).get(endTg).getSecond())
-                    );
-                }
-            }
-            Pair<Short,String> minEntry = Collections.min(pathDelays, new PairUtil.CompareFirst<>());
-            delay = minEntry.getFirst();
-        }
-
-        // add delay of input sitepin
-        return new Pair<>((short) (delay + K0.get(InterconnectInfo.Direction.INPUT).get(GroupDelayType.PINFEED)),route);
-    }
 
     private short width;
     private short height;
@@ -830,6 +754,85 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     // ----------------------------------------------------------------------------------
     // -----------------------   Methods for computing min delay ------------------------
 
+    private Pair<Short,String> getMinDelayToSinkPin(T.TimingGroup begTg, T.TimingGroup endTg,
+                               short begX, short begY, short endX, short endY, TileSide begSide, TileSide endSide) {
+
+        assert endTg == T.TimingGroup.CLE_IN : "getMinDelayToSinkPin expects CLE_IN as the target timing group.";
+
+        String route = null;
+
+
+        List<T.TimingGroup> begTgs = new ArrayList<T.TimingGroup>() {{add(begTg);}};
+        List<T.TimingGroup> endTgs = new ArrayList<T.TimingGroup>() {{add(endTg);}};
+
+        short delay = 0;
+        if ((begX == endX) && (begY == endY)) {
+            // TODO: should be handle by findMinVerticalDelay
+            if (begSide != endSide) {
+                delay = K0.get(InterconnectInfo.Direction.LOCAL).get(GroupDelayType.PIN_BOUNCE).shortValue();
+                if (verbose == -1)
+                    route = "i";
+            }
+        } else if (begX == endX) {
+            Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delayY =
+                    findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, endTgs, begY, endY, begSide, endSide);
+            delay = delayY.get(begTg).get(endTg).getFirst();
+            if (verbose == -1)
+                route = delayY.get(begTg).get(endTg).getSecond();
+        } else if (begY == endY) {
+            Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delayY =
+                    findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, endTgs, begX, endX, begSide, endSide);
+            delay = delayY.get(begTg).get(endTg).getFirst();
+            if (verbose == -1)
+                route = delayY.get(begTg).get(endTg).getSecond();
+        } else {
+            // The key TimingGroups are used to connect between vertical and horizontal sections.
+            // The direction of the key TimingGroup is not used.
+
+            List<Pair<Short,String>> pathDelays = new ArrayList<>();
+            {
+                if (verbose > 0)
+                    System.out.println("getMinDelayToSinkPin hor->ver");
+                List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
+                        (T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL));
+                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay1 =
+                        findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, keyTgs, begX, endX, begSide, endSide);
+                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay2 =
+                        findMinDelayOneDirection(this::findMinVerticalDelay, keyTgs, endTgs, begY, endY, begSide, endSide);
+                for (T.TimingGroup tg : keyTgs) {
+                    pathDelays.add(new Pair<>(
+                            (short) (delay1.get(begTg).get(tg).getFirst() + delay2.get(tg).get(endTg).getFirst()),
+                            delay1.get(begTg).get(tg).getSecond() + delay2.get(tg).get(endTg).getSecond())
+                    );
+                }
+            }
+
+            {
+                if (verbose > 0)
+                    System.out.println("getMinDelayToSinkPin ver->hor");
+                List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
+                        (T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL));
+                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay1 =
+                        findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, keyTgs, begY, endY, begSide, endSide);
+                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay2 =
+                        findMinDelayOneDirection(this::findMinHorizontalDelay, keyTgs, endTgs, begX, endX, begSide, endSide);
+
+                for (T.TimingGroup tg : keyTgs) {
+                    pathDelays.add(new Pair<>(
+                            (short) (delay1.get(begTg).get(tg).getFirst() + delay2.get(tg).get(endTg).getFirst()),
+                            delay1.get(begTg).get(tg).getSecond() + delay2.get(tg).get(endTg).getSecond())
+                    );
+                }
+            }
+            Pair<Short,String> minEntry = Collections.min(pathDelays, new PairUtil.CompareFirst<>());
+            delay = minEntry.getFirst();
+            route = minEntry.getSecond();
+        }
+
+        // add delay of input sitepin
+        return new Pair<>((short) (delay + K0.get(InterconnectInfo.Direction.INPUT).get(GroupDelayType.PINFEED)),route);
+    }
+
     /**
      *
      * @param fromTgs
@@ -1029,6 +1032,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     private Pair<Double,Pair<Boolean,String>> lookupDelayBackToBackTile(ArrayList<Map<T.TimingGroup, Map<T.TimingGroup, DelayGraphEntry>>> table,
             T.TimingGroup s, T.TimingGroup t,short dist, double dAtSource,
             TileSide begSide, TileSide endSide, boolean isBackward, InterconnectInfo.Direction dir) {
+
+        if (verbose > 2)
+            System.out.println("        lookupDelayBackToBackTile from " + s.name() + " to " + t.name() + " loc " + dAtSource + " dist " + dist);
 
         DelayGraphEntry  sentry = table.get(dist).get(s).get(t);
         Object dst = null;
@@ -1388,7 +1394,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        est.testCases("est_dly_ref_44_53_80_80_E_E.txt");
 //        est.testCases("est_dly_ref_44_53_80_80_E_W.txt");
 //        est.testCases("est_dly_ref_44_53_80_80_W_E.txt");
-        est.testCases("est_dly_ref_44_53_80_80_W_W.txt");
+//        est.testCases("est_dly_ref_44_53_80_80_W_W.txt");
         // diag in table
 //        est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
 

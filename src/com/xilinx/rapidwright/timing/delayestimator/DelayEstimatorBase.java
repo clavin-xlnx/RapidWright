@@ -459,13 +459,17 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             if ((endLoc >= limit) || (endLoc < 0)) {
                 // Can't do MAX_VALUE as adding that to other value will become negative.
                 // TODO: consider using INT as intemediate computation
+                if (verbose > 4)
+                    System.out.println("endLoc " + endLoc + " is out of range (0," + limit);
                 return Short.MAX_VALUE/2;
             }
 
             // Assume bounce happen only before CLE_IN
-            if (tg == InterconnectInfo.TimingGroup.BOUNCE && dir == InterconnectInfo.Direction.VERTICAL) {
-                return Short.MAX_VALUE/2;
-            }
+//            if (tg == InterconnectInfo.TimingGroup.BOUNCE && dir == InterconnectInfo.Direction.VERTICAL) {
+//                if (verbose > 4)
+//                    System.out.println("skip BOUNCE is not allowed in Vvertical");
+//                return Short.MAX_VALUE/2;
+//            }
 
             return calcTimingGroupDelay(tg, begLoc, endLoc, dly);
         }
