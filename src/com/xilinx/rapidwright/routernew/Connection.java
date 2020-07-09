@@ -57,12 +57,12 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	}
 	
 	//TODO optimization using Wire wire / Node node /TimingGroup tg as the target
-	public void setTargetName(ExpanGranularityOpt opt){
-		if(opt == ExpanGranularityOpt.WIRE){
+	public void setTargetName(RoutingGranularityOpt opt){
+		if(opt == RoutingGranularityOpt.WIRE){
 			this.targetName = this.sink.getSiteInst().getTile().getName() + "/" + this.sink.getSiteExternalWireIndex();
-		}else if(opt == ExpanGranularityOpt.NODE){
+		}else if(opt == RoutingGranularityOpt.NODE){
 			this.targetName = this.sink.getConnectedNode().toString();
-		}else if(opt == ExpanGranularityOpt.TIMINGGROUP){
+		}else if(opt == RoutingGranularityOpt.TIMINGGROUP){
 			
 		}
 	}

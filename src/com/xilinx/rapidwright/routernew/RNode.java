@@ -38,17 +38,17 @@ public class RNode<E>{
 	public List<RNode<E>> children;//populate the child rnodes of the current 
 	public boolean childrenSet;
 	
-	public RNode(SitePinInst sitePinInst, RoutableType type, int capacity, ExpanGranularityOpt opt){
+	public RNode(SitePinInst sitePinInst, RoutableType type, int capacity, RoutingGranularityOpt opt){
 //		this.index = index;
 		this.type = type;
 				
-		if(opt == ExpanGranularityOpt.WIRE){
+		if(opt == RoutingGranularityOpt.WIRE){
 			this.tile = sitePinInst.getSiteInst().getTile();
 			this.wire = sitePinInst.getSiteExternalWireIndex();
 			this.name = this.tile.getName() + "/" + this.wire;
 			this.setCenterXYWire();
 		}	
-		if(opt == ExpanGranularityOpt.NODE){
+		if(opt == RoutingGranularityOpt.NODE){
 			this.node = sitePinInst.getConnectedNode();
 			this.name = this.node.toString();//TODO unique?
 			this.setCenterXYNode();

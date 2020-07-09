@@ -50,7 +50,7 @@ public class PFRouterWireBased {
 		this.routerTimer = new RouterTimer();
 		this.router = new PFRouter<Wire>(this.design, this.queue, this.rnodesTouched, this.rnodesCreated, bbRange);
 		
-		this.router.initializeNetsCons(ExpanGranularityOpt.WIRE);
+		this.router.initializeNetsCons(RoutingGranularityOpt.WIRE);
 		
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();

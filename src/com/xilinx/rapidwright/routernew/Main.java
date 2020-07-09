@@ -8,8 +8,8 @@ public class Main {
 	private String toWriteDCPfileName;
 	private CodePerfTracker t;
 	
-	private boolean pfRouterNew = true;
-	private ExpanGranularityOpt opt = ExpanGranularityOpt.NODE;
+	private boolean routerNew = true;
+	private RoutingGranularityOpt opt = RoutingGranularityOpt.NODE;
 	
 	//allowed number of routing iterations
 	private int nrOfTrials = 100;
@@ -26,17 +26,18 @@ public class Main {
 		
 		for(int i = 2; i < arguments.length; i++) {
 			if(arguments[i].contains("routingGranularity")){
+				
 				short optNum = Short.parseShort(arguments[++i]);
 				if(optNum == 1){
-					this.opt = ExpanGranularityOpt.WIRE;
+					this.opt = RoutingGranularityOpt.WIRE;
 				}else if(optNum == 2){
-					this.opt = ExpanGranularityOpt.NODE;
+					this.opt = RoutingGranularityOpt.NODE;
 				}
+				
 			}else if(arguments[i].contains("bbRange")) {
 				this.bbRange = Short.parseShort(arguments[++i]);
 			}
 		}
-		
 	}
 	
 	public static void main(String[] args) {
@@ -46,7 +47,7 @@ public class Main {
 	
 	public void processing(){
 		int routingRuntime = 0;
-		if(!this.pfRouterNew){
+		if(!this.routerNew){
 			RWRouter router = new RWRouter(this.design);
 			this.t.start("Route Design");
 			router.routeDesign();
@@ -58,14 +59,17 @@ public class Main {
 			
 			this.t.stop();
 			router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
-		}else{
-			System.out.println(this.bbRange);
-			if(this.opt == ExpanGranularityOpt.WIRE){			
+			
+		}else{			
+			if(this.opt == RoutingGranularityOpt.WIRE){			
 				PFRouterWireBased router = new PFRouterWireBased(this.design, 
 						this.toWriteDCPfileName, 
 						this.nrOfTrials, 
 						this.t, 
 						this.bbRange);
+				router.router.designInfo();
+				this.routerConfigurationInfo();
+				
 				routingRuntime = router.routingRuntime();
 				
 				this.runtimeInfoPrinting(routingRuntime, 
@@ -75,12 +79,15 @@ public class Main {
 						router.router.getNodesExpanded(),
 						router.routerTimer);
 				
-			}else if(this.opt == ExpanGranularityOpt.NODE){
+			}else if(this.opt == RoutingGranularityOpt.NODE){
 				PFRouterNodeBased router = new PFRouterNodeBased(this.design, 
 						this.toWriteDCPfileName, 
 						this.nrOfTrials, 
 						this.t, 
 						this.bbRange);
+				router.router.designInfo();
+				this.routerConfigurationInfo();
+				
 				routingRuntime = router.routingRuntime();
 				
 				this.runtimeInfoPrinting(routingRuntime, 
@@ -94,7 +101,19 @@ public class Main {
 	}
 	
 	public void routerConfigurationInfo(){
+		StringBuilder s = new StringBuilder();
+		s.append("Router: ");
+		if(routerNew){
+			s.append("PathFinder-based");
+		}else{
+			s.append("RapidWright orginal router");
+		}
+		s.append("\n");
+		s.append("Routing granularity option: " + this.opt);
+		s.append("\n");
+		s.append("Bounding box range: " + this.bbRange);
 		
+		System.out.println(s);
 	}
 	
 	public void runtimeInfoPrinting(int routingRuntime, 
@@ -104,14 +123,14 @@ public class Main {
 			int nodesExpanded, 
 			RouterTimer timer){
 		System.out.printf("------------------------------------------------------------------------------\n");
-		 System.out.println("Runtime " + routingRuntime + " ms");
-		 System.out.println("Num iterations: " + iterations);
-		 System.out.println("Connections routed: " + consRouted);
-		 System.out.println("Connections rerouted: " + (consRouted - toalCons));
-		 System.out.println("Nodes expanded: " + nodesExpanded);
-		 System.out.printf("------------------------------------------------------------------------------\n");
-		 System.out.print(timer);
-		 System.out.printf("------------------------------------------------------------------------------\n\n");
+		System.out.println("Runtime " + routingRuntime + " ms");
+		System.out.println("Num iterations: " + iterations);
+		System.out.println("Connections routed: " + consRouted);
+		System.out.println("Connections rerouted: " + (consRouted - toalCons));
+		System.out.println("Nodes expanded: " + nodesExpanded);
+		System.out.printf("------------------------------------------------------------------------------\n");
+		System.out.print(timer);
+		System.out.printf("------------------------------------------------------------------------------\n\n");
 	}
 	
 }

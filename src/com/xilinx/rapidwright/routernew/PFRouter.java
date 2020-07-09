@@ -32,6 +32,7 @@ public class PFRouter<E>{
 	
 	private List<Netplus<E>> nets;
 	private List<Connection<E>> connections;
+	private int fanout1Net;
 	private PriorityQueue<QueueElement<E>> queue;
 	private Collection<RNodeData<E>> rnodesTouched;
 	private Map<String, RNode<E>> rnodesCreated;
@@ -41,6 +42,7 @@ public class PFRouter<E>{
 	
 	private int itry;
 	private int rNodeId = 0;
+	
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
 
@@ -71,7 +73,7 @@ public class PFRouter<E>{
 		this.nodesExpanded = 0;
 	}
 	
-	public void initializeNetsCons(ExpanGranularityOpt opt){
+	public void initializeNetsCons(RoutingGranularityOpt opt){
 		int inet = 0;
 		int icon = 0;
 		int fanout1Net = 0;
@@ -105,16 +107,17 @@ public class PFRouter<E>{
 				}
 			}
 			if(n.getFanOut() == 1)
-				fanout1Net++;
+				this.fanout1Net++;
 		}
-		
-		System.out.println("------------------------------------------------------------------------------");
-		System.out.println(" FPGA tiles size: " + this.device.getColumns() + "x" + this.device.getRows());
-		System.out.println(" Num con to be routed: " + this.connections.size());
-		System.out.println(" Num net to be routed: " + this.nets.size());
-		System.out.println(" Num 1-sink net: " + fanout1Net);
-		System.out.println("------------------------------------------------------------------------------");
+	}
 	
+	public void designInfo(){
+		System.out.println("------------------------------------------------------------------------------");
+		System.out.println("FPGA tiles size: " + this.device.getColumns() + "x" + this.device.getRows());
+		System.out.println("Num con to be routed: " + this.connections.size());
+		System.out.println("Num net to be routed: " + this.nets.size());
+		System.out.println("Num 1-sink net: " + this.fanout1Net);
+		System.out.println("------------------------------------------------------------------------------");
 	}
 	
 	public void unrouteNetsReserveGndVccClock(){	

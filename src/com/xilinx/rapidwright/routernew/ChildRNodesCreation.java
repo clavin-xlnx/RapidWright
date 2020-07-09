@@ -19,8 +19,8 @@ public class ChildRNodesCreation{
 		this.rnodesCreatedWire = rnodesCreated;	
 	}
 	
-	public ChildRNodesCreation(Map<String, RNode<Node>> rnodesCreated, ExpanGranularityOpt opt){
-		if(opt == ExpanGranularityOpt.NODE){
+	public ChildRNodesCreation(Map<String, RNode<Node>> rnodesCreated, RoutingGranularityOpt opt){
+		if(opt == RoutingGranularityOpt.NODE){
 			this.rnodesCreatedNode = rnodesCreated;
 		}
 	}

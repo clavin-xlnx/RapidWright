@@ -50,7 +50,7 @@ public class PFRouterNodeBased{
 		this.routerTimer = new RouterTimer();
 		this.router = new PFRouter<Node>(this.design, this.queue, this.rnodesTouched, this.rnodesCreated, bbRange);
 		
-		this.router.initializeNetsCons(ExpanGranularityOpt.NODE);
+		this.router.initializeNetsCons(RoutingGranularityOpt.NODE);
 		
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -79,7 +79,7 @@ public class PFRouterNodeBased{
 		//initialize router
 		this.router.initializeRouter();
 		
-		ChildRNodesCreation childRNodesGeneration = new ChildRNodesCreation(this.rnodesCreated, ExpanGranularityOpt.NODE);
+		ChildRNodesCreation childRNodesGeneration = new ChildRNodesCreation(this.rnodesCreated, RoutingGranularityOpt.NODE);
 		
 		//do routing
 		boolean validRouting;
