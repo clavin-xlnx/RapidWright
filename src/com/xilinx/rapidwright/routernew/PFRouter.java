@@ -40,7 +40,7 @@ public class PFRouter<E>{
 	private int connectionsRoutedIteration;
 	
 	private int itry;
-	private int rNodeId = 0;
+	private int rnodeId = 0;
 	
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
@@ -78,7 +78,7 @@ public class PFRouter<E>{
 		this.nodesExpanded = 0;
 	}
 	
-	public void initializeNetsCons(RoutingGranularityOpt opt){
+	public int initializeNetsCons(RoutingGranularityOpt opt){
 		int inet = 0;
 		int icon = 0;
 		for(Net n:this.design.getNets()){
@@ -89,8 +89,8 @@ public class PFRouter<E>{
 				inet++;
 				
 				SitePinInst source = n.getSource();
-				RNode<E> sourceRNode = new RNode<E>(source, RoutableType.SOURCEPINWIRE, 1, opt);
-				this.rNodeId++;
+				RNode<E> sourceRNode = new RNode<E>(this.rnodeId, source, RoutableType.SOURCEPINWIRE, opt);
+				this.rnodeId++;
 				
 				for(SitePinInst sink:n.getSinkPins()){
 					Connection<E> c = new Connection<E>(icon, source, sink, this.tmodel);	
@@ -113,15 +113,16 @@ public class PFRouter<E>{
 			if(n.getFanOut() == 1)
 				this.fanout1Net++;
 		}
+		return this.rnodeId;
 	}
 	
 	public void designInfo(){
-		System.out.println("------------------------------------------------------------------------------");
+		System.out.println("--------------------------------------------------------------------------------------");
 		System.out.println("FPGA tiles size: " + this.device.getColumns() + "x" + this.device.getRows());
 		System.out.println("Num con to be routed: " + this.connections.size());
 		System.out.println("Num net to be routed: " + this.nets.size());
 		System.out.println("Num 1-sink net: " + this.fanout1Net);
-		System.out.println("------------------------------------------------------------------------------");
+		System.out.println("--------------------------------------------------------------------------------------");
 	}
 	
 	public void unrouteNetsReserveGndVccClock(){	
@@ -148,9 +149,9 @@ public class PFRouter<E>{
 		this.itry = 1;
 		this.pres_fac = this.initial_pres_fac;
 		
-		System.out.printf("------------------------------------------------------------------------\n");
-        System.out.printf("%9s  %11s  %12s  %15s  %17s \n", "Iteration", "Conn routed", "Run Time (s)", "Overused RNodes", "overUsePercentage");
-        System.out.printf("---------  -----------  ------------  ---------------  -----------------\n");
+		System.out.printf("--------------------------------------------------------------------------------------\n");
+        System.out.printf("%9s  %11s  %12s  %15s  %12s  %17s \n", "Iteration", "Conn routed", "Run Time (s)", "Overused RNodes", "total RNodes", "overUsePercentage");
+        System.out.printf("---------  -----------  ------------  ---------------  ------------  -----------------\n");
 	}
 	
 	public void ripup(Connection<E> con){
@@ -416,12 +417,12 @@ public class PFRouter<E>{
 	/*
 	 * statistics output for each router iteration
 	 */
-	public void staticticsInfo(List<Connection<E>> connections, long start, long end){
+	public void staticticsInfo(List<Connection<E>> connections, long start, long end, int globalRNodeId){
 		int numRNodesCreated = this.rnodesCreated.size();
 		int overUsed = this.getOverusedAndIllegalRNodes(connections);
 		double overUsePercentage = 100.0 * (double)overUsed / numRNodesCreated;
-		System.out.printf("%9d  %11d  %12.3f  %15d  %16.2f%% \n", 
-				this.itry, this.connectionsRoutedIteration, (end - start)*1e-9, overUsed, overUsePercentage);
+		System.out.printf("%9d  %11d  %12.3f  %15d  %12d  %16.2f%% \n", 
+				this.itry, this.connectionsRoutedIteration, (end - start)*1e-9, overUsed, globalRNodeId, overUsePercentage);
 	}
 	
 	private int getOverusedAndIllegalRNodes(List<Connection<E>> connections) {

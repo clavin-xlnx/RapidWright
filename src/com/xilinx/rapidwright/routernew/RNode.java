@@ -8,7 +8,7 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 
 public class RNode<E>{
-//	private int index;	
+	public int index;	
 	public RoutableType type;
 	
 	//RNode<Wire>
@@ -26,7 +26,7 @@ public class RNode<E>{
 	public short ylow, yhigh;
 	public float centerx, centery;
 	
-	public final short capacity;
+	public final short capacity = 1;
 	
 	public float delay;//TODO for timing-driven
 		
@@ -38,8 +38,8 @@ public class RNode<E>{
 	public List<RNode<E>> children;//populate the child rnodes of the current 
 	public boolean childrenSet;
 	
-	public RNode(SitePinInst sitePinInst, RoutableType type, int capacity, RoutingGranularityOpt opt){
-//		this.index = index;
+	public RNode(int index, SitePinInst sitePinInst, RoutableType type, RoutingGranularityOpt opt){
+		this.index = index;
 		this.type = type;
 				
 		if(opt == RoutingGranularityOpt.WIRE){
@@ -54,35 +54,32 @@ public class RNode<E>{
 			this.setCenterXYNode();
 		}
 
-		this.capacity = (short)capacity;
-		this.rNodeData = new RNodeData<E>();
+		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
 		this.setBaseCost();	
 	}
 	
-	public RNode(Tile tile, int wire, int capacity){
-//		this.index = index;
+	public RNode(int index, Tile tile, int wire){
+		this.index = index;
 		this.tile = tile;
 		this.wire = wire;
-		this.capacity = (short)capacity;
 		this.type = RoutableType.INTERWIRE;
 		this.name = this.tile.getName() + "/" + this.wire;
-		this.rNodeData = new RNodeData<E>();
+		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
 		this.setBaseCost();
 		this.setCenterXYWire();
 		
 	}
-	public RNode(Node node, int capacity){
-//		this.index = index;
+	public RNode(int index, Node node){
+		this.index = index;
 		this.type = RoutableType.INTERWIRE;
 		this.node = node;
 		this.name = this.node.toString();
-		this.capacity = (short)capacity;
 		
-		this.rNodeData = new RNodeData<E>();
+		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
 		this.setBaseCost();
@@ -117,18 +114,18 @@ public class RNode<E>{
 			yCoordinates[id] = (short) w.getTile().getRow();
 			id++;
 		}
-		if(length > 0){
+		/*if(length > 0){
 			this.xlow = this.min(xCoordinates);
 			this.xhigh = this.max(xCoordinates);
 			this.ylow = this.min(yCoordinates);
 			this.yhigh = this.max(yCoordinates);
-		}
-		/*if(id == 1){
+		}*/
+		if(length == 1){
 			this.xlow = xCoordinates[0];
 			this.xhigh = this.xlow;
 			this.ylow = yCoordinates[0];
 			this.yhigh = this.ylow;
-		}else if(id == 2){
+		}else if(length == 2){
 			if(xCoordinates[0] < xCoordinates[1]){
 				this.xlow = xCoordinates[0];
 				this.xhigh = xCoordinates[1];
@@ -148,7 +145,7 @@ public class RNode<E>{
 			this.xhigh = this.max(xCoordinates);
 			this.ylow = this.min(yCoordinates);
 			this.yhigh = this.max(yCoordinates);
-		}*/
+		}
 		
 		this.centerx = (this.xhigh + this.xlow) / 2;
 		this.centery = (this.yhigh + this.ylow) / 2;
@@ -280,4 +277,8 @@ public class RNode<E>{
 		return s.toString();
 	}
 	
+	@Override
+	public int hashCode() {
+		return this.index;
+	}
 }

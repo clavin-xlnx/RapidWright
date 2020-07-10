@@ -25,7 +25,7 @@ public class ChildRNodesCreation{
 		}
 	}
 	
-	public void nodeBased(RNode<Node> rnode){
+	public int nodeBased(RNode<Node> rnode, int globalRNodeIndex){
 		//TODO
 		Node rnodeNode = rnode.getNode();
 		List<RNode<Node>> childRNodes = new ArrayList<>();
@@ -33,17 +33,20 @@ public class ChildRNodesCreation{
 			RNode<Node> childRNode;
 			String key = node.toString();
 			if(!this.rnodesCreatedNode.containsKey(key)){
-				childRNode = new RNode<Node>(node, 1);
+				childRNode = new RNode<Node>(globalRNodeIndex, node);
+				globalRNodeIndex++;
 				childRNodes.add(childRNode);
 				this.rnodesCreatedNode.put(key, childRNode);
 			}else{
 				childRNodes.add(this.rnodesCreatedNode.get(key));
 			}
 		}
-		rnode.setChildren(childRNodes);	
+		rnode.setChildren(childRNodes);
+		
+		return globalRNodeIndex;
 	}
 	
-	public void wireBased(RNode<Wire> rnode){	
+	public int wireBased(RNode<Wire> rnode, int globalRNodeIndex){	
 		//set childRNodes of rnode, and avoid creating RNodes that already exist
 		Tile rnodeTile = rnode.getTile();
 		List<Wire> wires = rnodeTile.getWireConnections(rnode.getWire());
@@ -52,14 +55,17 @@ public class ChildRNodesCreation{
 			RNode<Wire> childRNode;
 			String key = wire.getTile().getName() + "/" + wire.getWireIndex();
 			if(!this.rnodesCreatedWire.containsKey(key)){//TODO use Wire as the key?
-				childRNode = new RNode<Wire>(wire.getTile(), wire.getWireIndex(), 1);
+				childRNode = new RNode<Wire>(globalRNodeIndex, wire.getTile(), wire.getWireIndex());
+				globalRNodeIndex++;
 				childRNodes.add(childRNode);
 				this.rnodesCreatedWire.put(key, childRNode);
 			}else{
 				childRNodes.add(this.rnodesCreatedWire.get(key));
 			}
 		}
-		rnode.setChildren(childRNodes);	
+		rnode.setChildren(childRNodes);
+		
+		return globalRNodeIndex;
 	}
 	
 	public void printInfo(String s){

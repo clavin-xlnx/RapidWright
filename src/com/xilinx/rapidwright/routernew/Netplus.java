@@ -118,5 +118,7 @@ public class Netplus<E>{
 		return null;
 	}
 	
-	
+	public int hashCode(){
+		return this.id;
+	}
 }

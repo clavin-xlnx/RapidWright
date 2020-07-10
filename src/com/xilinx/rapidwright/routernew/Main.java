@@ -9,7 +9,7 @@ public class Main {
 	private CodePerfTracker t;
 	
 	private boolean routerNew = true;
-	private RoutingGranularityOpt opt = RoutingGranularityOpt.WIRE;
+	private RoutingGranularityOpt opt = RoutingGranularityOpt.NODE;
 	
 	//allowed number of routing iterations
 	private int nrOfTrials = 100;
@@ -167,16 +167,16 @@ public class Main {
 			int toalCons, 
 			int nodesExpanded, 
 			RouterTimer timer){
-		System.out.printf("------------------------------------------------------------------------------\n");
+		System.out.printf("--------------------------------------------------------------------------------------\n");
 		System.out.println("Runtime " + routingRuntime + " ms");
 		System.out.println("Num iterations: " + iterations);
 		System.out.println("Connections routed: " + consRouted);
 		System.out.println("Connections rerouted: " + (consRouted - toalCons));
 		System.out.println("Nodes expanded: " + nodesExpanded);
-		System.out.printf("------------------------------------------------------------------------------\n");
+		System.out.printf("--------------------------------------------------------------------------------------\n");
 		System.out.print(timer);
-		System.out.printf("------------------------------------------------------------------------------\n");
-		System.out.printf("==============================================================================\n\n");
+		System.out.printf("--------------------------------------------------------------------------------------\n");
+		System.out.printf("======================================================================================\n\n");
 	}
 	
 }

@@ -3,7 +3,7 @@ package com.xilinx.rapidwright.routernew;
 import com.xilinx.rapidwright.design.SitePinInst;
 
 public class RNodeData<E> {
-//	public final int index;
+	public final int index;
 	
 	private float pres_cost;
 	private float acc_cost;
@@ -22,8 +22,8 @@ public class RNodeData<E> {
 	public CountingSet<SitePinInst> sourcesSet;
 	public CountingSet<RNode<E>> parentsSet;//the drivers of the route node
 	
-	public RNodeData() {
-//    	this.index = index;
+	public RNodeData(int index) {
+    	this.index = index;
     	this.pres_cost = 1;
     	this.acc_cost = 1;
     	this.occupation = 0;
@@ -159,9 +159,9 @@ public class RNodeData<E> {
 		this.touched = touched;
 	}
 
-	/*@Override
+	@Override
 	public int hashCode() {
 		return this.index;
-	}*/
+	}
 	
 }

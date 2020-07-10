@@ -35,6 +35,8 @@ public class PFRouterWireBased {
 	public float pres_fac_mult; 
 	public float acc_fac;
 	
+	public int globalRNodeIndex;
+	
 	public boolean trial = false;
 	
 	public PFRouterWireBased(Design design,
@@ -161,7 +163,7 @@ public class PFRouterWireBased {
 			this.iterationEnd = System.nanoTime();
 			//statistics
 			this.routerTimer.calculateStatistics.start();
-			this.router.staticticsInfo(this.sortedListOfConnection, this.iterationStart, this.iterationEnd);
+			this.router.staticticsInfo(this.sortedListOfConnection, this.iterationStart, this.iterationEnd, this.globalRNodeIndex);
 			this.routerTimer.calculateStatistics.finish();;
 			//if the routing is valid /realizable return, the routing completed successfully
 	
@@ -284,7 +286,7 @@ public class PFRouterWireBased {
 			
 			RNode<Wire> rnode = queue.poll().rnode;
 			if(!rnode.childrenSet){
-				childRNodesGeneration.wireBased(rnode);
+				this.globalRNodeIndex = childRNodesGeneration.wireBased(rnode, this.globalRNodeIndex);
 			}		
 			router.exploringAndExpansion(rnode, con);
 		}

@@ -201,7 +201,11 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		// TODO Auto-generated method stub
 		return 0;
 	}
-
+	
+	public int hashCode(){
+		return this.id;
+	}
+	
 	public void addRNode(RNode<E> rn) {
 		this.rNodes.add(rn);	
 	}
