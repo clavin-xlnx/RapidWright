@@ -2,7 +2,6 @@ package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -47,12 +46,16 @@ public class PFRouter<E>{
 	public boolean debugExpansion = false;
 
 	private int bbRange;
+	public float mdWeight;
+	public float hopWeight;
 	
 	public PFRouter(Design design, 
 			PriorityQueue<QueueElement<E>> queue, 
 			Collection<RNodeData<E>> rnodesTouched, 
 			Map<String, RNode<E>> rnodesCreated,
-			int bbRange){
+			int bbRange,
+			float mdWeight,
+			float hopWeight){
 		this.design = design;
 		
 		this.device = this.design.getDevice();
@@ -67,6 +70,8 @@ public class PFRouter<E>{
 		this.rnodesCreated = rnodesCreated;
 		
 		this.bbRange = bbRange;
+		this.mdWeight = mdWeight;
+		this.hopWeight = hopWeight;
 		
 		this.connectionsRouted = 0;
 		this.connectionsRoutedIteration = 0;
@@ -76,7 +81,6 @@ public class PFRouter<E>{
 	public void initializeNetsCons(RoutingGranularityOpt opt){
 		int inet = 0;
 		int icon = 0;
-		int fanout1Net = 0;
 		for(Net n:this.design.getNets()){
 			if(n.getFanOut() > 0){//ignore nets that have no pins
 				
@@ -133,15 +137,16 @@ public class PFRouter<E>{
 		}
 	}
 	
-	public void initializeRouter(){
+	public void initializeRouter(float initial_pres_fac, float pres_fac_mult, float acc_fac){
 		this.rnodesTouched.clear();
     	this.queue.clear();
-		
-    	this.initial_pres_fac = 0.7f; 	
-    	this.pres_fac = this.initial_pres_fac;
-    	this.pres_fac_mult = 2;
-    	this.acc_fac = 1;
+    	
+		//routing schedule
+    	this.initial_pres_fac = initial_pres_fac;
+    	this.pres_fac_mult = pres_fac_mult;
+    	this.acc_fac = acc_fac;
 		this.itry = 1;
+		this.pres_fac = this.initial_pres_fac;
 		
 		System.out.printf("------------------------------------------------------------------------\n");
         System.out.printf("%9s  %11s  %12s  %15s  %17s \n", "Iteration", "Conn routed", "Run Time (s)", "Overused RNodes", "overUsePercentage");
@@ -315,7 +320,7 @@ public class PFRouter<E>{
 			expected_distance_cost = (short) (Math.abs(childRNode.centerx - con.sink.getTile().getColumn()) + Math.abs(childRNode.centery - con.sink.getTile().getRow()));
 			
 			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
-			new_lower_bound_total_path_cost = new_partial_path_cost + expected_wire_cost + (rnode.rNodeData.getLevel() + 1);
+			new_lower_bound_total_path_cost = new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * (rnode.rNodeData.getLevel() + 1);
 			
 		}else{//lut input pin (sink)
 			new_lower_bound_total_path_cost = new_partial_path_cost;

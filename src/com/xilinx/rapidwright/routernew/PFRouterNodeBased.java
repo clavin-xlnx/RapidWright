@@ -31,13 +31,22 @@ public class PFRouterNodeBased{
 	public long iterationStart;
 	public long iterationEnd;
 	
+	public float initial_pres_fac; 
+	public float pres_fac_mult; 
+	public float acc_fac;
+	
 	public boolean trial = false;
 	
 	public PFRouterNodeBased(Design design,
 			String dcpFileName,
 			int nrOfTrials,
 			CodePerfTracker t,
-			int bbRange){
+			int bbRange,
+			float mdWeight,
+			float hopWeight,
+			float initial_pres_fac, 
+			float pres_fac_mult, 
+			float acc_fac){
 		this.design = design;
 		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
@@ -47,8 +56,18 @@ public class PFRouterNodeBased{
 		this.nrOfTrials = nrOfTrials;
 		this.t = t;
 		
+		this.initial_pres_fac = initial_pres_fac;
+		this.pres_fac_mult = pres_fac_mult;
+		this.acc_fac = acc_fac;
+		
 		this.routerTimer = new RouterTimer();
-		this.router = new PFRouter<Node>(this.design, this.queue, this.rnodesTouched, this.rnodesCreated, bbRange);
+		this.router = new PFRouter<Node>(this.design, 
+				this.queue, 
+				this.rnodesTouched, 
+				this.rnodesCreated, 
+				bbRange,
+				mdWeight,
+				hopWeight);
 		
 		this.router.initializeNetsCons(RoutingGranularityOpt.NODE);
 		
@@ -77,7 +96,7 @@ public class PFRouterNodeBased{
 		this.router.unrouteNetsReserveGndVccClock();
 		
 		//initialize router
-		this.router.initializeRouter();
+		this.router.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
 		
 		ChildRNodesCreation childRNodesGeneration = new ChildRNodesCreation(this.rnodesCreated, RoutingGranularityOpt.NODE);
 		
