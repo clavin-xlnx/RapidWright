@@ -743,8 +743,8 @@ public class TimingModel {
                     IntY = matcher.group(1);
                 }
 
-                System.out.printf("PM:PM col %3d : %3d %3d %3d %3d : %s %s\n", i, sDistVertical[i],
-                        dDistVertical[i], qDistVertical[i], lDistVertical[i], testT.getName(), IntY);
+//                System.out.printf("PM:PM col %3d : %3d %3d %3d %3d : %s %s\n", i, sDistVertical[i],
+//                        dDistVertical[i], qDistVertical[i], lDistVertical[i], testT.getName(), IntY);
             }
         }
 
@@ -760,7 +760,7 @@ public class TimingModel {
     };
 
     public Map<GroupDelayType,List<Short>> getHorDistArrayInIntTileGrid() {
-        System.out.println("getHorDistArrayInIntTileGrid");
+//        System.out.println("getHorDistArrayInIntTileGrid");
         Tile[][] tiles = this.device.getTiles();
         int maxCol = tiles[0].length;
         Pattern pattern = Pattern.compile("INT_X(\\d+)Y");
@@ -770,7 +770,7 @@ public class TimingModel {
     }
 
     public Map<GroupDelayType,List<Short>> getVerDistArrayInIntTileGrid() {
-        System.out.println("getVerDistArrayInIntTileGrid");
+//        System.out.println("getVerDistArrayInIntTileGrid");
         Tile[][] tiles = this.device.getTiles();
         int maxRow = tiles.length;
         Pattern pattern = Pattern.compile("INT_X\\d+Y(\\d+)");
@@ -827,7 +827,7 @@ public class TimingModel {
                     if (i ==0)
                         expectCoor = coor;
 
-                    System.out.println(expectCoor + " " + coor);
+//                    System.out.println(expectCoor + " " + coor);
                     assert coor == expectCoor : "Interconnect tile is not consecutive.";
 
                     expectCoor += step;
@@ -838,8 +838,8 @@ public class TimingModel {
                     res.get(GroupDelayType.LONG).add((short) accuLVal);
 
 
-                    System.out.printf("  %3d %3d : %3d %3d %3d %3d : %s\n", coor, i, accuSVal, accuDVal,
-                            accuQVal, accuLVal, testT.getName());
+//                    System.out.printf("  %3d %3d : %3d %3d %3d %3d : %s\n", coor, i, accuSVal, accuDVal,
+//                            accuQVal, accuLVal, testT.getName());
 
 
                     accuSVal = 0;

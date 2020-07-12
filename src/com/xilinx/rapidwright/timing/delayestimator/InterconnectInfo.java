@@ -118,16 +118,19 @@ public class InterconnectInfo {
 //        return Collections.unmodifiableList(tempList);
     }
 
-    public short minDetour(TimingGroup tg) {
-        return minDetourMap.get(tg);
+    public short minDetourFrTg(TimingGroup tg) {
+        return minDetourMapFrTg.get(tg);
     }
-
+    public short minDetourToTg(TimingGroup tg) {
+        return minDetourMapToTg.get(tg);
+    }
     /**
      * List possible TG types that can be driven by a TG type.
      * It is immutable.
      */
     private Map<TimingGroup, List<TimingGroup>> interconnectHier;
-    private Map<TimingGroup, Short> minDetourMap;
+    private Map<TimingGroup, Short> minDetourMapFrTg;
+    private Map<TimingGroup, Short> minDetourMapToTg;
 
     InterconnectInfo() {
         buildInterconnectHier();
@@ -136,14 +139,22 @@ public class InterconnectInfo {
     private void buildInterconnectHier() {
 
 
-        minDetourMap = new EnumMap<>(TimingGroup.class);
+        minDetourMapFrTg = new EnumMap<>(TimingGroup.class);
+        minDetourMapToTg = new EnumMap<>(TimingGroup.class);
         for (TimingGroup tg : TimingGroup.values()) {
-            minDetourMap.put(tg, (short) 0);
+            minDetourMapFrTg.put(tg, (short) 0);
+            minDetourMapToTg.put(tg, (short) 0);
         }
-        minDetourMap.put(TimingGroup.VERT_LONG, TimingGroup.VERT_QUAD.length());
-        // TODO: investigate why using HORT_QUAD crate unreachable
-        minDetourMap.put(TimingGroup.HORT_LONG, TimingGroup.VERT_QUAD.length());
-
+        // the length of itself
+        minDetourMapFrTg.put(TimingGroup.VERT_LONG, TimingGroup.VERT_LONG.length());
+        minDetourMapFrTg.put(TimingGroup.HORT_LONG, TimingGroup.HORT_LONG.length());
+        minDetourMapFrTg.put(TimingGroup.VERT_QUAD, TimingGroup.VERT_QUAD.length());
+        minDetourMapFrTg.put(TimingGroup.HORT_QUAD, TimingGroup.HORT_QUAD.length());
+        minDetourMapFrTg.put(TimingGroup.VERT_DOUBLE, TimingGroup.VERT_DOUBLE.length());
+        minDetourMapFrTg.put(TimingGroup.HORT_DOUBLE, TimingGroup.HORT_DOUBLE.length());
+        // the length of required driver on the other direction
+        minDetourMapToTg.put(TimingGroup.VERT_LONG, TimingGroup.HORT_QUAD.length());
+        minDetourMapToTg.put(TimingGroup.HORT_LONG, TimingGroup.VERT_QUAD.length());
 
         Map<TimingGroup, List<TimingGroup>> ictHier = new HashMap();
 

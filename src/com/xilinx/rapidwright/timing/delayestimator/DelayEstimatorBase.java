@@ -171,7 +171,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
                         i++;
                         line = reader.readLine();
 
-                        System.out.println(listOfShort);
+//                        System.out.println(listOfShort);
                     }
                 } catch (IOException e) {
                     System.out.println("Can't open file " + verFileName + " for read.");
@@ -353,6 +353,23 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             tl.put(GroupDelayType.PIN_BOUNCE, (short) 0);
             L.put(T.Direction.LOCAL, tl);
         }
+//        {
+//            Map<GroupDelayType, Float> tk0 = new EnumMap<>(GroupDelayType.class);
+//            tk0.put(GroupDelayType.OTHER, 0f);
+//            K0.put(T.Direction.OUTPUT, tk0);
+//
+//            Map<GroupDelayType, Float> tk1 = new EnumMap<>(GroupDelayType.class);
+//            tk1.put(GroupDelayType.OTHER, 0f);
+//            K1.put(T.Direction.OUTPUT, tk1);
+//
+//            Map<GroupDelayType, Float> tk2 = new EnumMap<>(GroupDelayType.class);
+//            tk2.put(GroupDelayType.OTHER, 0f);
+//            K2.put(T.Direction.OUTPUT, tk2);
+//
+//            Map<GroupDelayType, Short> tl = new EnumMap<>(GroupDelayType.class);
+//            tl.put(GroupDelayType.OTHER, (short) 0);
+//            L.put(T.Direction.OUTPUT, tl);
+//        }
     }
 
     protected boolean isSwitchingSide(TimingGroupEdge e) {
@@ -377,7 +394,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         if (verbose > 4) {
             T.TimingGroup tg = e.getTimingGroup();
 
-            System.out.printf("          **updateVtx %11s   rev %5s  bwd %5s  len %2d dly %3d\n",
+            System.out.printf("          **updateVtx  %11s   rev %5s  bwd %5s  len %2d dly %3d\n",
                     tg.name(), e.isReverseDirection(), isBackward, tg.length(), dly.shortValue());
         }
         return 0f;
@@ -401,8 +418,8 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         if (verbose > 4) {
             T.TimingGroup tg = e.getTimingGroup();
 
-            System.out.printf("          discoverVtx %11s   rev %5s  bwd %5s" +
-                    "                                          len %2d  begLoc %3d  endLoc %3d   dly %4d\n",
+            System.out.printf("          findVtx fr e %11s   rev %5s  bwd %5s" +
+                    "                                len %2d  begLoc %3d  endLoc %3d   dly %4d\n",
                     tg.name(),  e.isReverseDirection(), isBackward,
                     tg.length(), loc.shortValue(), newLoc.shortValue(), dly.shortValue());
         }
@@ -427,52 +444,45 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      */
     protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, Double loc, Double dly,
                                                 boolean isBackward, InterconnectInfo.Direction dir) {
-//        boolean dbg = false;
-//        if (e.getTimingGroup() == InterconnectInfo.TimingGroup.HORT_LONG)
-//            dbg = true;
 
-        if (u == dst)
+        // return calcTimingGroupDelay(e.getTimingGroup(), loc.shortValue(), e.isReverseDirection() ^ isBackward);
+        T.TimingGroup tg = e.getTimingGroup();
+        if (tg == null)
             return 0;
-        else {
-           // return calcTimingGroupDelay(e.getTimingGroup(), loc.shortValue(), e.isReverseDirection() ^ isBackward);
-            T.TimingGroup tg = e.getTimingGroup();
-            if (tg == null)
-                return 0;
-            short begLoc = loc.shortValue();
-            boolean isReverseDirection = e.isReverseDirection() ^ isBackward;
+        short begLoc = loc.shortValue();
+        boolean isReverseDirection = e.isReverseDirection() ^ isBackward;
 
-            int limit = 0;
-            if (tg.direction() == InterconnectInfo.Direction.VERTICAL) {
-                limit = numRow;
-            } else if (tg.direction() == InterconnectInfo.Direction.HORIZONTAL) {
-                limit = numCol;
-            } else {
-                limit = Math.max(numRow,numCol);
-            }
-
-            if (verbose > 4) {
-                System.out.printf("          examineEdge %11s   rev %5s  bwd %5s        ",
-                        tg.name(), e.isReverseDirection(), isBackward);
-            }
-
-            short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
-            if ((endLoc >= limit) || (endLoc < 0)) {
-                // Can't do MAX_VALUE as adding that to other value will become negative.
-                // TODO: consider using INT as intemediate computation
-                if (verbose > 4)
-                    System.out.println("endLoc " + endLoc + " is out of range (0," + limit);
-                return Short.MAX_VALUE/2;
-            }
-
-            // Assume bounce happen only before CLE_IN
-//            if (tg == InterconnectInfo.TimingGroup.BOUNCE && dir == InterconnectInfo.Direction.VERTICAL) {
-//                if (verbose > 4)
-//                    System.out.println("skip BOUNCE is not allowed in Vvertical");
-//                return Short.MAX_VALUE/2;
-//            }
-
-            return calcTimingGroupDelay(tg, begLoc, endLoc, dly);
+        int limit = 0;
+        if (tg.direction() == InterconnectInfo.Direction.VERTICAL) {
+            limit = numRow;
+        } else if (tg.direction() == InterconnectInfo.Direction.HORIZONTAL) {
+            limit = numCol;
+        } else {
+            limit = Math.max(numRow,numCol);
         }
+
+        if (verbose > 4) {
+            System.out.printf("          examineEdge  %11s   rev %5s  bwd %5s        ",
+                    tg.name(), e.isReverseDirection(), isBackward);
+        }
+
+        short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
+        if ((endLoc >= limit) || (endLoc < 0)) {
+            // Can't do MAX_VALUE as adding that to other value will become negative.
+            // TODO: consider using INT as intemediate computation
+            if (verbose > 4)
+                System.out.println("endLoc " + endLoc + " is out of range (0," + limit);
+            return Short.MAX_VALUE/2;
+        }
+
+        // Assume bounce happen only before CLE_IN
+//        if (tg == InterconnectInfo.TimingGroup.BOUNCE && dir == InterconnectInfo.Direction.VERTICAL) {
+//            if (verbose > 4)
+//                System.out.println("skip BOUNCE is not allowed in Vvertical");
+//            return Short.MAX_VALUE/2;
+//        }
+
+        return calcTimingGroupDelay(tg, begLoc, endLoc, dly);
     }
 
     /**
@@ -483,6 +493,11 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @return
      */
     protected double calcTimingGroupDelay(T.TimingGroup tg, short begLoc, short endLoc, Double dly) {
+        if (tg == T.TimingGroup.CLE_OUT) {
+            if (verbose > 5)
+                System.out.println();
+            return (short) 0;
+        }
 
         float k0 = K0.get(tg.direction()).get(tg.type());
         float k1 = K1.get(tg.direction()).get(tg.type());
@@ -497,9 +512,9 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         if (verbose > 5) {
             System.out.printf("calTiming %11s   len %2d  begLoc %3d  endLoc %3d  ",
                     tg.name(), tg.length(), begLoc, endLoc);
-            System.out.printf(" k0 %3.1f k1 %3.1f k2 %4.1f   l %2d   d %3d   dst %3d   dsp %3d" +
-                            "    del %4d   begDly %4d endDly %4d\n",
-                    k0, k1, k2, l, (sp - st), st, sp, del, dly.shortValue(), dly.shortValue()+del);
+            System.out.printf(" dly %4d   k0 %3.1f k1 %3.1f k2 %4.1f   l %2d   d %3d   dst %3d   dsp %3d" +
+                            "    begDly %4d endDly %4d\n",
+                    del, k0, k1, k2, l, (sp - st), st, sp, dly.shortValue(), dly.shortValue()+del);
         }
         return del;
     }
