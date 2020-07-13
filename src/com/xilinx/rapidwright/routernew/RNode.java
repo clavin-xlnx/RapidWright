@@ -6,6 +6,8 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.timing.TimingGroup;
+import com.xilinx.rapidwright.timing.TimingModel;
 
 public class RNode<E>{
 	public int index;	
@@ -17,6 +19,9 @@ public class RNode<E>{
 	
 	//RNode<Node>
 	private Node node;
+	
+	//RNode<TimingGroup>
+	private TimingGroup timingGroup;
 	
 	public String name;
 	
@@ -46,25 +51,26 @@ public class RNode<E>{
 			this.tile = sitePinInst.getSiteInst().getTile();
 			this.wire = sitePinInst.getSiteExternalWireIndex();
 			this.name = this.tile.getName() + "/" + this.wire;
+			this.setBaseCost();
 			this.setCenterXYWire();
-		}	
-		if(opt == RoutingGranularityOpt.NODE){
+		}else if(opt == RoutingGranularityOpt.NODE){
 			this.node = sitePinInst.getConnectedNode();
-			this.name = this.node.toString();//TODO unique?
+			this.name = this.node.toString();
+			this.setBaseCostNode();
 			this.setCenterXYNode();
 		}
 
 		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
-		this.setBaseCost();	
+		
 	}
 	
 	public RNode(int index, Tile tile, int wire){
 		this.index = index;
 		this.tile = tile;
 		this.wire = wire;
-		this.type = RoutableType.INTERWIRE;
+		this.type = RoutableType.INTERRNODE;
 		this.name = this.tile.getName() + "/" + this.wire;
 		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
@@ -75,24 +81,28 @@ public class RNode<E>{
 	}
 	public RNode(int index, Node node){
 		this.index = index;
-		this.type = RoutableType.INTERWIRE;
+		this.type = RoutableType.INTERRNODE;
 		this.node = node;
 		this.name = this.node.toString();
 		
 		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
-		this.setBaseCost();
+		this.setBaseCostNode();
 		this.setCenterXYNode();
 		
 	}
 	
-	/*public RNode(short capacity, TimingModel timingModel){
-		this.type = RNodeType.WIRE;
+	public RNode(int index, TimingGroup timingGroup){//, TimingModel timingModel){
+		this.index = index;
+		this.type = RoutableType.INTERRNODE;
+		this.timingGroup = timingGroup;
 		this.rNodeData = new RNodeData<E>(this.index);
-		this.capacity = capacity;
-		this.setBaseCost();
-	}*/
+		this.childrenSet = false;
+		
+		this.setBaseCostTimingGroup();
+		//TODO set centerXY
+	}
 	
 	public void setCenterXYWire(){
 		this.xlow = (short) this.tile.getColumn();
@@ -167,10 +177,25 @@ public class RNode<E>{
 		return min;
 	}
 	
+	public void setBaseCostNode(){
+		this.setBaseCost();
+//		this.base_cost *= this.node.getAllWiresInNode().length;
+		this.base_cost *= (this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
+	}
+	
+	public void setBaseCostTimingGroup(){
+		this.setBaseCost();
+		int sum = 0;
+		for(Node n:this.timingGroup.getNodes()){
+			sum += n.getAllWiresInNode().length;
+		}
+		this.base_cost *= sum;//
+	}
+	
 	public void setBaseCost(){
-		if(this.type == RoutableType.SOURCEPINWIRE || this.type == RoutableType.INTERWIRE){
+		if(this.type == RoutableType.SOURCERNODE || this.type == RoutableType.INTERRNODE){
 			this.base_cost = 1;
-		}else if(this.type == RoutableType.SINKPINWIRE){
+		}else if(this.type == RoutableType.SINKRNODE){//this is for faster convergence to the sink, but not used currently
 			this.base_cost = 0.95f;
 		}
 	}
@@ -222,6 +247,10 @@ public class RNode<E>{
 	
 	public Node getNode(){
 		return this.node;
+	}
+	
+	public TimingGroup getTimingGroup(){
+		return this.timingGroup;
 	}
 	
 	public boolean isTarget() {

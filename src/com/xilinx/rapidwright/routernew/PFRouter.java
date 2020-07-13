@@ -89,7 +89,7 @@ public class PFRouter<E>{
 				inet++;
 				
 				SitePinInst source = n.getSource();
-				RNode<E> sourceRNode = new RNode<E>(this.rnodeId, source, RoutableType.SOURCEPINWIRE, opt);
+				RNode<E> sourceRNode = new RNode<E>(this.rnodeId, source, RoutableType.SOURCERNODE, opt);
 				this.rnodeId++;
 				
 				for(SitePinInst sink:n.getSinkPins()){
@@ -229,7 +229,7 @@ public class PFRouter<E>{
 				con.setSinkRNode(childRNode);
 				this.addNodeToQueue(rnode, childRNode, con);
 				
-			}else if(childRNode.type == RoutableType.INTERWIRE){
+			}else if(childRNode.type == RoutableType.INTERRNODE){
 				if(con.isInBoundingBoxLimit(childRNode)){
 					if(this.debugExpansion) this.printInfo("\t\t" + " add node to the queue");
 					this.addNodeToQueue(rnode, childRNode, con);
@@ -315,7 +315,7 @@ public class PFRouter<E>{
 		short expected_distance_cost = 0;
 		float expected_wire_cost;
 		
-		if(childRNode.type == RoutableType.INTERWIRE){
+		if(childRNode.type == RoutableType.INTERRNODE){
 			
 //			if(this.debugExpansion) this.printInfo("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
 			expected_distance_cost = (short) (Math.abs(childRNode.centerx - con.sink.getTile().getColumn()) + Math.abs(childRNode.centery - con.sink.getTile().getRow()));
@@ -389,7 +389,7 @@ public class PFRouter<E>{
 		
 		//Bias cost
 		float bias_cost = 0;
-		if(rnode.type == RoutableType.INTERWIRE) {
+		if(rnode.type == RoutableType.INTERRNODE) {
 			Netplus<E> net = con.getNet();
 			bias_cost = 0.5f * rnode.base_cost / net.fanout * 
 					(Math.abs(rnode.centerx - net.x_geo) + Math.abs(rnode.centery - net.y_geo)) / net.hpwl;

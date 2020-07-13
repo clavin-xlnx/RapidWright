@@ -7,11 +7,12 @@ import java.util.Map;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.timing.TimingGroup;
 
 public class ChildRNodesCreation{	
 	public Map<String, RNode<Wire>> rnodesCreatedWire;
 	public Map<String, RNode<Node>> rnodesCreatedNode;
-	public Map<String, RNode<Wire>> rnodesCreatedTimingGroup;
+	public Map<String, RNode<TimingGroup>> rnodesCreatedTimingGroup;
 	
 	public boolean debug = false;
 	
@@ -23,6 +24,41 @@ public class ChildRNodesCreation{
 		if(opt == RoutingGranularityOpt.NODE){
 			this.rnodesCreatedNode = rnodesCreated;
 		}
+	}
+	//TODO remove previous two constructors
+	public ChildRNodesCreation(Map<String, RNode<Wire>> rnodesWireCreated,
+			Map<String, RNode<Node>> rnodesNodeCreated,
+			Map<String, RNode<TimingGroup>> rnodesTGCreated,
+			RoutingGranularityOpt opt){
+		if(opt == RoutingGranularityOpt.NODE){
+			this.rnodesCreatedWire = rnodesWireCreated;
+		}else if(opt == RoutingGranularityOpt.NODE){
+			this.rnodesCreatedNode = rnodesNodeCreated;
+		}else{
+			this.rnodesCreatedTimingGroup = rnodesTGCreated;
+		}
+	}
+	
+	//TODO
+	public int timingGroupBased(RNode<TimingGroup> rnode, int globalRNodeIndex){
+		TimingGroup rnodeNode = rnode.getTimingGroup();
+		List<RNode<TimingGroup>> childRNodes = new ArrayList<>();
+		for(TimingGroup timingGroup:rnodeNode.getNextTimingGroups()){
+			RNode<TimingGroup> childRNode;
+			String key = timingGroup.toString();
+			if(!this.rnodesCreatedTimingGroup.containsKey(key)){
+				childRNode = new RNode<TimingGroup>(globalRNodeIndex, timingGroup);
+				globalRNodeIndex++;
+				childRNodes.add(childRNode);
+				this.rnodesCreatedTimingGroup.put(key, childRNode);
+			}else{
+				childRNodes.add(this.rnodesCreatedTimingGroup.get(key));
+			}
+		}
+		rnode.setChildren(childRNodes);
+		
+		
+		return globalRNodeIndex;
 	}
 	
 	public int nodeBased(RNode<Node> rnode, int globalRNodeIndex){
