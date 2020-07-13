@@ -1185,6 +1185,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             private int cnt;
             private int minErr;
             private int maxErr;
+            private int minLine;
+            private int maxLine;
             private int sumErr;
 
             ErrorComputer() {
@@ -1197,16 +1199,25 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             }
 
 
-            void insert(int err) {
-                minErr = Math.min(minErr, err);
-                maxErr = Math.max(maxErr, err);
+            void insert(int err, int linNo) {
+//                minErr = Math.min(minErr, err);
+//                maxErr = Math.max(maxErr, err);
+                if (minErr >= err) {
+                    minErr = err;
+                    minLine = linNo;
+                }
+                // include = max error is the same as default
+                if (maxErr <= err) {
+                    maxErr = err;
+                    maxLine = linNo;
+                }
                 sumErr += err;
                 cnt++;
             }
 
             String report(String prefix) {
                 float avgErr = sumErr/cnt;
-                return prefix + " min " + minErr + " max " + maxErr + " avg " + avgErr + " cnt " + cnt;
+                return prefix + " min " + minErr + " @" + minLine + " max " + maxErr + " @" + maxLine + " avg " + avgErr + " cnt " + cnt;
             }
         }
 
@@ -1259,6 +1270,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 BufferedReader reader = new BufferedReader(new FileReader(fname));
                 String line = reader.readLine();
                 int cnt = 1;
+                int resLineNo = 1;
                 while (line != null) {
                     if ((line.length() > 0) && (line.indexOf("#") != 0)) {
                         Matcher matcher = pattern.matcher(line);
@@ -1314,15 +1326,18 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
                             if (!exceptionCase) {
-                                errToTgExc.insert(err1);
-                                errToRtExc.insert(err2);
+                                errToTgExc.insert(err1,resLineNo);
+                                errToRtExc.insert(err2,resLineNo);
                             }
-                            errToTg.insert(err1);
-                            errToRt.insert(err2);
+                            errToTg.insert(err1,resLineNo);
+                            errToRt.insert(err2,resLineNo);
                         }
                     } else {
                         System.out.println("Find comment at line " + cnt);
+                        outfile.write(line);
+                        outfile.write(System.lineSeparator());
                     }
+                    resLineNo++;
                     cnt++;
                     line = reader.readLine();
                 }
@@ -1435,7 +1450,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        est.testCases("est_dly_ref_44_53_80_80_W_E.txt");
 //        est.testCases("est_dly_ref_44_53_80_80_W_W.txt");
         // diag in table
-//        est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+        est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
 
 //        est.testOne(46,52,80,80,"W","E");
 //        est.testOne(52,46,80,80,"E","W");
