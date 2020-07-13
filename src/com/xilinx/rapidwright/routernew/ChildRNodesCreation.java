@@ -26,7 +26,6 @@ public class ChildRNodesCreation{
 	}
 	
 	public int nodeBased(RNode<Node> rnode, int globalRNodeIndex){
-		//TODO
 		Node rnodeNode = rnode.getNode();
 		List<RNode<Node>> childRNodes = new ArrayList<>();
 		for(Node node:rnodeNode.getAllDownhillNodes()){

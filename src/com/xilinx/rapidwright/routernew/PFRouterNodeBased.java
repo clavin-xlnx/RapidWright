@@ -81,7 +81,8 @@ public class PFRouterNodeBased{
 		 long start = System.nanoTime();
 		 this.route();
 		 long end = System.nanoTime();
-		 int timeInMilliSeconds = (int)Math.round((end-start) * Math.pow(10, -6));			
+		 int timeInMilliSeconds = (int)Math.round((end-start) * Math.pow(10, -6));
+		 
 		 return timeInMilliSeconds;
 	 }
 	
@@ -294,6 +295,17 @@ public class PFRouterNodeBased{
 		router.finishRoutingACon(con);
 		
 		router.printConRNodes(con);
+	}
+	
+	public float checkAverageNumWires(){
+		float aver = 0;
+		float sum = 0;
+		for(RNode<Node> rn:this.rnodesCreated.values()){
+			sum += rn.getNode().getAllWiresInNode().length;
+		}
+		aver = sum / this.rnodesCreated.values().size();
+		
+		return aver;
 	}
 	
 	public void printInfo(String s){

@@ -14,7 +14,7 @@ public class Main {
 	//allowed number of routing iterations
 	private int nrOfTrials = 100;
 	private int bbRange = 3;
-	private boolean columnRowConstraint = true;
+	private boolean isINTtileRange = false;
 	private float mdWeight = 1;
 	private float hopWeight = 1;
 	private float initial_pres_fac = 0.5f; 
@@ -38,13 +38,15 @@ public class Main {
 					this.opt = RoutingGranularityOpt.WIRE;
 				}else if(optNum == 2){
 					this.opt = RoutingGranularityOpt.NODE;
+				}else if(optNum == 3){
+					this.opt = RoutingGranularityOpt.TIMINGGROUP;
 				}
 				
 			}else if(arguments[i].contains("bbRange")){
 				this.bbRange = Short.parseShort(arguments[++i]);
 				
-			}else if(arguments[i].contains("columnRowConstraint")){
-				this.columnRowConstraint = true;
+			}else if(arguments[i].contains("isINTtileRange")){
+				this.isINTtileRange = true;
 				
 			}else if(arguments[i].contains("mdWeight")){
 				this.mdWeight = Float.parseFloat(arguments[++i]);
@@ -102,6 +104,8 @@ public class Main {
 				
 				routingRuntime = router.routingRuntime();
 				
+				this.rnodesInfo(router.globalRNodeIndex, 1, 0);
+				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.router.getItry(), 
 						router.router.getConnectionsRouted(),
@@ -124,6 +128,8 @@ public class Main {
 				this.routerConfigurationInfo();
 				
 				routingRuntime = router.routingRuntime();
+				
+				this.rnodesInfo(router.globalRNodeIndex, router.checkAverageNumWires(), 1);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.router.getItry(), 
@@ -159,6 +165,17 @@ public class Main {
 		s.append("acc fac: " + this.acc_fac);
 		
 		System.out.println(s);
+	}
+	
+	public void rnodesInfo(int totalRNodes, float averWire, float averNode){
+		System.out.printf("--------------------------------------------------------------------------------------\n");
+		System.out.printf("Total rnodes created: %d\n", totalRNodes);
+		if(this.opt == RoutingGranularityOpt.NODE){
+			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
+		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
+			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
+			System.out.printf("Average #node in rnodes: %5.2f\n", averNode);
+		}
 	}
 	
 	public void runtimeInfoPrinting(int routingRuntime, 
