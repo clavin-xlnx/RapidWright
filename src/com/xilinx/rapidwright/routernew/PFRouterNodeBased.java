@@ -26,6 +26,7 @@ public class PFRouterNodeBased{
 	public PFRouter<Node> router;
 	public List<Connection<Node>> sortedListOfConnection;
 	public List<Netplus<Node>> sortedListOfNetplus;
+	public ChildRNodesCreation childRNodesGeneration;
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -48,7 +49,8 @@ public class PFRouterNodeBased{
 			float hopWeight,
 			float initial_pres_fac, 
 			float pres_fac_mult, 
-			float acc_fac){
+			float acc_fac,
+			float base_cost_fac){
 		this.design = design;
 		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
@@ -69,9 +71,12 @@ public class PFRouterNodeBased{
 				this.rnodesCreated, 
 				bbRange,
 				mdWeight,
-				hopWeight);
+				hopWeight,
+				base_cost_fac);
 		
 		this.globalRNodeIndex = this.router.initializeNetsCons(RoutingGranularityOpt.NODE);
+		
+		this.childRNodesGeneration = new ChildRNodesCreation(null, this.rnodesCreated, null, base_cost_fac);
 		
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -81,9 +86,9 @@ public class PFRouterNodeBased{
 		 long start = System.nanoTime();
 		 this.route();
 		 long end = System.nanoTime();
-		 int timeInMilliSeconds = (int)Math.round((end-start) * Math.pow(10, -6));
+		 int timeInMilliseconds = (int)Math.round((end-start) * Math.pow(10, -6));
 		 
-		 return timeInMilliSeconds;
+		 return timeInMilliseconds;
 	 }
 	
 	public void route(){
@@ -100,9 +105,7 @@ public class PFRouterNodeBased{
 		
 		//initialize router
 		this.router.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
-		
-		ChildRNodesCreation childRNodesGeneration = new ChildRNodesCreation(this.rnodesCreated, RoutingGranularityOpt.NODE);
-		
+				
 		//do routing
 		boolean validRouting;
         List<Netplus<Node>> trialNets = new ArrayList<>();
@@ -124,11 +127,11 @@ public class PFRouterNodeBased{
 				for(Connection<Node> con:this.sortedListOfConnection){
 					if(this.router.getItry() == 1){
 						this.routerTimer.firstIteration.start();
-						this.routeACon(this.router, childRNodesGeneration, con);
+						this.routeACon(con);
 						this.routerTimer.firstIteration.finish();
 					}else if(con.congested()){
 						this.routerTimer.rerouteCongestion.start();
-						this.routeACon(this.router, childRNodesGeneration, con);
+						this.routeACon(con);
 						this.routerTimer.rerouteCongestion.finish();
 					}
 				}
@@ -137,13 +140,13 @@ public class PFRouterNodeBased{
 					for(Connection<Node> c : np.getConnection()){
 						if(this.router.getItry() == 1){
 							this.routerTimer.firstIteration.start();
-							this.routeACon(this.router, childRNodesGeneration, c);
+							this.routeACon(c);
 							this.routerTimer.firstIteration.finish();
 						}else if(c.congested()){
 							this.routerTimer.rerouteCongestion.start();
-//							this.router.debugExpansion = true;
-//							this.router.debugRoutingCon = true;
-							this.routeACon(this.router, childRNodesGeneration, c);
+							/*this.router.debugExpansion = true;
+							this.router.debugRoutingCon = true;*/
+							this.routeACon(c);
 							this.routerTimer.rerouteCongestion.finish();
 						}
 					}	
@@ -273,12 +276,12 @@ public class PFRouterNodeBased{
 		return illegal.size();	
 	}
 
-	public void routeACon(PFRouter<Node> router, ChildRNodesCreation childRNodesGeneration, Connection<Node> con){
-		router.prepareForRoutingACon(con);
+	public void routeACon(Connection<Node> con){
+		this.router.prepareForRoutingACon(con);
 		if(this.router.debugRoutingCon) this.printInfo("routing for " + con.toString());
 		
-		while(!router.targetReached(con)){
-			router.increaseNodesExpanded();
+		while(!this.router.targetReached(con)){
+			this.router.increaseNodesExpanded();
 			
 			if(this.queue.isEmpty()){
 				System.out.println(con.getNet().getNet().getName() + " " + con.source.getName() + " " + con.sink.getName());
@@ -286,15 +289,19 @@ public class PFRouterNodeBased{
 			}
 			
 			RNode<Node> rnode = queue.poll().rnode;
+			
+			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.globalRNodeIndex = childRNodesGeneration.nodeBased(rnode, this.globalRNodeIndex);
-			}		
-			router.exploringAndExpansion(rnode, con);
+				this.globalRNodeIndex = this.childRNodesGeneration.nodeBased(rnode, this.globalRNodeIndex);
+			}
+			this.routerTimer.rnodesCreation.finish();
+			
+			this.router.exploringAndExpansion(rnode, con);
 		}
 		
-		router.finishRoutingACon(con);
+		this.router.finishRoutingACon(con);
 		
-		router.printConRNodes(con);
+		this.router.printConRNodes(con);
 	}
 	
 	public float checkAverageNumWires(){

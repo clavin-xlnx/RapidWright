@@ -36,6 +36,8 @@ public class PFRouter<E>{
 	private Collection<RNodeData<E>> rnodesTouched;
 	private Map<String, RNode<E>> rnodesCreated;
 	
+	private int usedRNodes;
+	
 	private int connectionsRouted, nodesExpanded;
 	private int connectionsRoutedIteration;
 	
@@ -45,9 +47,10 @@ public class PFRouter<E>{
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
 
-	private int bbRange;
+	public int bbRange;
 	public float mdWeight;
 	public float hopWeight;
+	public float base_cost_fac;
 	
 	public PFRouter(Design design, 
 			PriorityQueue<QueueElement<E>> queue, 
@@ -55,7 +58,8 @@ public class PFRouter<E>{
 			Map<String, RNode<E>> rnodesCreated,
 			int bbRange,
 			float mdWeight,
-			float hopWeight){
+			float hopWeight,
+			float base_cost_fac){
 		this.design = design;
 		
 		this.device = this.design.getDevice();
@@ -72,6 +76,7 @@ public class PFRouter<E>{
 		this.bbRange = bbRange;
 		this.mdWeight = mdWeight;
 		this.hopWeight = hopWeight;
+		this.base_cost_fac = base_cost_fac;
 		
 		this.connectionsRouted = 0;
 		this.connectionsRoutedIteration = 0;
@@ -90,6 +95,7 @@ public class PFRouter<E>{
 				
 				SitePinInst source = n.getSource();
 				RNode<E> sourceRNode = new RNode<E>(this.rnodeId, source, RoutableType.SOURCERNODE, opt);
+				sourceRNode.setBaseCost(this.base_cost_fac);
 				this.rnodeId++;
 				
 				for(SitePinInst sink:n.getSinkPins()){
@@ -117,12 +123,12 @@ public class PFRouter<E>{
 	}
 	
 	public void designInfo(){
-		System.out.println("--------------------------------------------------------------------------------------");
+		System.out.println("---------------------------------------------------------------------------------------------------");
 		System.out.println("FPGA tiles size: " + this.device.getColumns() + "x" + this.device.getRows());
 		System.out.println("Num con to be routed: " + this.connections.size());
 		System.out.println("Num net to be routed: " + this.nets.size());
 		System.out.println("Num 1-sink net: " + this.fanout1Net);
-		System.out.println("--------------------------------------------------------------------------------------");
+		System.out.println("---------------------------------------------------------------------------------------------------");
 	}
 	
 	public void unrouteNetsReserveGndVccClock(){	
@@ -149,9 +155,16 @@ public class PFRouter<E>{
 		this.itry = 1;
 		this.pres_fac = this.initial_pres_fac;
 		
-		System.out.printf("--------------------------------------------------------------------------------------\n");
-        System.out.printf("%9s  %11s  %12s  %15s  %12s  %17s \n", "Iteration", "Conn routed", "Run Time (s)", "Overused RNodes", "total RNodes", "overUsePercentage");
-        System.out.printf("---------  -----------  ------------  ---------------  ------------  -----------------\n");
+		System.out.printf("---------------------------------------------------------------------------------------------------\n");
+        System.out.printf("%9s  %11s  %12s  %11s  %15s  %12s  %17s \n", 
+        		"Iteration", 
+        		"Conn routed", 
+        		"Run Time (s)", 
+        		"Used RNodes", 
+        		"Overused RNodes", 
+        		"Total RNodes", 
+        		"OverUsePercentage");
+        System.out.printf("---------  -----------  ------------  -----------  ---------------  ------------  -----------------\n");
 	}
 	
 	public void ripup(Connection<E> con){
@@ -417,23 +430,36 @@ public class PFRouter<E>{
 	/*
 	 * statistics output for each router iteration
 	 */
-	public void staticticsInfo(List<Connection<E>> connections, long start, long end, int globalRNodeId){
+	public void staticticsInfo(List<Connection<E>> connections, 
+			long iterStart, long iterEnd,
+			int globalRNodeId){
 		int numRNodesCreated = this.rnodesCreated.size();
 		int overUsed = this.getOverusedAndIllegalRNodes(connections);
 		double overUsePercentage = 100.0 * (double)overUsed / numRNodesCreated;
-		System.out.printf("%9d  %11d  %12.3f  %15d  %12d  %16.2f%% \n", 
-				this.itry, this.connectionsRoutedIteration, (end - start)*1e-9, overUsed, globalRNodeId, overUsePercentage);
+		System.out.printf("%9d  %11d  %12.2f  %11d  %15d  %12d  %16.2f%% \n", 
+				this.itry,
+				this.connectionsRoutedIteration,
+				(iterEnd - iterStart)*1e-9,
+				this.usedRNodes,
+				overUsed,
+				globalRNodeId,
+				overUsePercentage);
 	}
 	
 	private int getOverusedAndIllegalRNodes(List<Connection<E>> connections) {
 		Set<String> overUsed = new HashSet<>();
+		Set<String> used = new HashSet<>();
 		for(Connection<E> conn : connections) {
 			for(RNode<E> rnode : conn.rNodes) {
+				if(rnode.used()){
+					used.add(rnode.name);
+				}
 				if(rnode.overUsed()){// || rnode.illegal()
 					overUsed.add(rnode.name);
 				}
 			}
 		}
+		this.usedRNodes = used.size();
 		return overUsed.size();
 	}
 	public void outOfTrialIterations(int nrOfTrials){
@@ -540,6 +566,10 @@ public class PFRouter<E>{
 
 	public int getNodesExpanded() {
 		return nodesExpanded;
+	}
+	
+	public int getUsedRNodes() {
+		return usedRNodes;
 	}
 
 	public void increaseNodesExpanded() {

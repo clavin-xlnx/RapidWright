@@ -26,6 +26,7 @@ public class PFRouterWireBased {
 	public PFRouter<Wire> router;
 	public List<Connection<Wire>> sortedListOfConnection;
 	public List<Netplus<Wire>> sortedListOfNetplus;
+	public ChildRNodesCreation childRNodesGeneration;
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -48,7 +49,8 @@ public class PFRouterWireBased {
 			float hopWeight,
 			float initial_pres_fac, 
 			float pres_fac_mult, 
-			float acc_fac){
+			float acc_fac,
+			float base_cost_fac){
 		this.design = design;
 		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
@@ -69,9 +71,12 @@ public class PFRouterWireBased {
 				this.rnodesCreated, 
 				bbRange,
 				mdWeight,
-				hopWeight);
+				hopWeight,
+				base_cost_fac);
 		
-		this.router.initializeNetsCons(RoutingGranularityOpt.WIRE);
+		this.globalRNodeIndex = this.router.initializeNetsCons(RoutingGranularityOpt.WIRE);
+		
+		this.childRNodesGeneration = new ChildRNodesCreation(this.rnodesCreated, null, null, base_cost_fac);
 		
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -81,8 +86,9 @@ public class PFRouterWireBased {
 		 long start = System.nanoTime();
 		 this.route();
 		 long end = System.nanoTime();
-		 int timeInMilliSeconds = (int)Math.round((end-start) * Math.pow(10, -6));				
-		 return timeInMilliSeconds;
+		 int timeInMilliseconds = (int)Math.round((end-start) * Math.pow(10, -6));
+		 
+		 return timeInMilliseconds;
 	 }
 	
 	public void route(){
@@ -99,8 +105,6 @@ public class PFRouterWireBased {
 		
 		//initialize router
 		this.router.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
-		
-		ChildRNodesCreation childRNodesGeneration = new ChildRNodesCreation(this.rnodesCreated);
 		
 		//do routing
 		boolean validRouting;
@@ -285,9 +289,13 @@ public class PFRouterWireBased {
 			}
 			
 			RNode<Wire> rnode = queue.poll().rnode;
+			
+			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
 				this.globalRNodeIndex = childRNodesGeneration.wireBased(rnode, this.globalRNodeIndex);
-			}		
+			}
+			this.routerTimer.rnodesCreation.finish();
+			
 			router.exploringAndExpansion(rnode, con);
 		}
 		

@@ -7,7 +7,6 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.timing.TimingGroup;
-import com.xilinx.rapidwright.timing.TimingModel;
 
 public class RNode<E>{
 	public int index;	
@@ -51,19 +50,15 @@ public class RNode<E>{
 			this.tile = sitePinInst.getSiteInst().getTile();
 			this.wire = sitePinInst.getSiteExternalWireIndex();
 			this.name = this.tile.getName() + "/" + this.wire;
-			this.setBaseCost();
 			this.setCenterXYWire();
 		}else if(opt == RoutingGranularityOpt.NODE){
 			this.node = sitePinInst.getConnectedNode();
 			this.name = this.node.toString();
-			this.setBaseCostNode();
 			this.setCenterXYNode();
 		}
 
 		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
-		//different base cost for different routing resources
-		
 	}
 	
 	public RNode(int index, Tile tile, int wire){
@@ -75,7 +70,6 @@ public class RNode<E>{
 		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
-		this.setBaseCost();
 		this.setCenterXYWire();
 		
 	}
@@ -88,9 +82,7 @@ public class RNode<E>{
 		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
-		this.setBaseCostNode();
 		this.setCenterXYNode();
-		
 	}
 	
 	public RNode(int index, TimingGroup timingGroup){//, TimingModel timingModel){
@@ -100,7 +92,6 @@ public class RNode<E>{
 		this.rNodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		
-		this.setBaseCostTimingGroup();
 		//TODO set centerXY
 	}
 	
@@ -179,17 +170,13 @@ public class RNode<E>{
 	
 	public void setBaseCostNode(){
 		this.setBaseCost();
-//		this.base_cost *= this.node.getAllWiresInNode().length;
-		this.base_cost *= (this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
+		this.base_cost *= 3;
 	}
 	
-	public void setBaseCostTimingGroup(){
+	//TODO tune fac to check if #averWire works best
+	public void setBaseCost(float fac){
 		this.setBaseCost();
-		int sum = 0;
-		for(Node n:this.timingGroup.getNodes()){
-			sum += n.getAllWiresInNode().length;
-		}
-		this.base_cost *= sum;//
+		this.base_cost *= fac;
 	}
 	
 	public void setBaseCost(){

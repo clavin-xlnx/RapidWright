@@ -13,33 +13,21 @@ public class ChildRNodesCreation{
 	public Map<String, RNode<Wire>> rnodesCreatedWire;
 	public Map<String, RNode<Node>> rnodesCreatedNode;
 	public Map<String, RNode<TimingGroup>> rnodesCreatedTimingGroup;
+	public float base_cost_fac;
 	
 	public boolean debug = false;
 	
-	public ChildRNodesCreation(Map<String, RNode<Wire>> rnodesCreated){
-		this.rnodesCreatedWire = rnodesCreated;	
-	}
-	
-	public ChildRNodesCreation(Map<String, RNode<Node>> rnodesCreated, RoutingGranularityOpt opt){
-		if(opt == RoutingGranularityOpt.NODE){
-			this.rnodesCreatedNode = rnodesCreated;
-		}
-	}
-	//TODO remove previous two constructors
 	public ChildRNodesCreation(Map<String, RNode<Wire>> rnodesWireCreated,
 			Map<String, RNode<Node>> rnodesNodeCreated,
 			Map<String, RNode<TimingGroup>> rnodesTGCreated,
-			RoutingGranularityOpt opt){
-		if(opt == RoutingGranularityOpt.NODE){
-			this.rnodesCreatedWire = rnodesWireCreated;
-		}else if(opt == RoutingGranularityOpt.NODE){
-			this.rnodesCreatedNode = rnodesNodeCreated;
-		}else{
-			this.rnodesCreatedTimingGroup = rnodesTGCreated;
-		}
+			float base_cost_fac){
+		this.rnodesCreatedWire = rnodesWireCreated;
+		this.rnodesCreatedNode = rnodesNodeCreated;
+		this.rnodesCreatedTimingGroup = rnodesTGCreated;
+		this.base_cost_fac = base_cost_fac;
 	}
 	
-	//TODO
+	//TODO check
 	public int timingGroupBased(RNode<TimingGroup> rnode, int globalRNodeIndex){
 		TimingGroup rnodeNode = rnode.getTimingGroup();
 		List<RNode<TimingGroup>> childRNodes = new ArrayList<>();
@@ -48,6 +36,7 @@ public class ChildRNodesCreation{
 			String key = timingGroup.toString();
 			if(!this.rnodesCreatedTimingGroup.containsKey(key)){
 				childRNode = new RNode<TimingGroup>(globalRNodeIndex, timingGroup);
+				childRNode.setBaseCost(this.base_cost_fac);
 				globalRNodeIndex++;
 				childRNodes.add(childRNode);
 				this.rnodesCreatedTimingGroup.put(key, childRNode);
@@ -56,7 +45,6 @@ public class ChildRNodesCreation{
 			}
 		}
 		rnode.setChildren(childRNodes);
-		
 		
 		return globalRNodeIndex;
 	}
@@ -69,6 +57,7 @@ public class ChildRNodesCreation{
 			String key = node.toString();
 			if(!this.rnodesCreatedNode.containsKey(key)){
 				childRNode = new RNode<Node>(globalRNodeIndex, node);
+				childRNode.setBaseCost(this.base_cost_fac);
 				globalRNodeIndex++;
 				childRNodes.add(childRNode);
 				this.rnodesCreatedNode.put(key, childRNode);
@@ -91,6 +80,7 @@ public class ChildRNodesCreation{
 			String key = wire.getTile().getName() + "/" + wire.getWireIndex();
 			if(!this.rnodesCreatedWire.containsKey(key)){//TODO use Wire as the key?
 				childRNode = new RNode<Wire>(globalRNodeIndex, wire.getTile(), wire.getWireIndex());
+				childRNode.setBaseCost(this.base_cost_fac);
 				globalRNodeIndex++;
 				childRNodes.add(childRNode);
 				this.rnodesCreatedWire.put(key, childRNode);

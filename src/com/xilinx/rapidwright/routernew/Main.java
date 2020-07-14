@@ -17,6 +17,7 @@ public class Main {
 	private boolean isINTtileRange = false;
 	private float mdWeight = 1;
 	private float hopWeight = 1;
+	private float base_cost_fac = 3;
 	private float initial_pres_fac = 0.5f; 
 	private float pres_fac_mult = 2; 
 	private float acc_fac = 1;
@@ -63,6 +64,13 @@ public class Main {
 			}else if(arguments[i].contains("acc_fac")){
 				this.acc_fac = Float.parseFloat(arguments[++i]);
 				
+			}else if(arguments[i].contains("base_cost_fac")){
+//				if(this.opt == RoutingGranularityOpt.WIRE){
+//					this.base_cost_fac = 1;
+//				}else {
+					this.base_cost_fac = Float.parseFloat(arguments[++i]);
+//				}
+				
 			}
 		}
 	}
@@ -98,13 +106,14 @@ public class Main {
 						this.hopWeight,
 						this.initial_pres_fac,
 						this.pres_fac_mult,
-						this.acc_fac);
+						this.acc_fac,
+						this.base_cost_fac);//base cost factor of RNode<Wire> is 1 by default
 				router.router.designInfo();
 				this.routerConfigurationInfo();
 				
 				routingRuntime = router.routingRuntime();
 				
-				this.rnodesInfo(router.globalRNodeIndex, 1, 0);
+				this.rnodesInfo(router.globalRNodeIndex, router.router.getUsedRNodes(), 1, 0);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.router.getItry(), 
@@ -123,13 +132,14 @@ public class Main {
 						this.hopWeight,
 						this.initial_pres_fac,
 						this.pres_fac_mult,
-						this.acc_fac);
+						this.acc_fac,
+						this.base_cost_fac);
 				router.router.designInfo();
 				this.routerConfigurationInfo();
 				
 				routingRuntime = router.routingRuntime();
 				
-				this.rnodesInfo(router.globalRNodeIndex, router.checkAverageNumWires(), 1);
+				this.rnodesInfo(router.globalRNodeIndex, router.router.getUsedRNodes(), router.checkAverageNumWires(), 1);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.router.getItry(), 
@@ -163,13 +173,16 @@ public class Main {
 		s.append("pres fac mult: " + this.pres_fac_mult);
 		s.append("\n");
 		s.append("acc fac: " + this.acc_fac);
+		s.append("\n");
+		s.append("base cost fac: " + this.base_cost_fac);
 		
 		System.out.println(s);
 	}
 	
-	public void rnodesInfo(int totalRNodes, float averWire, float averNode){
-		System.out.printf("--------------------------------------------------------------------------------------\n");
+	public void rnodesInfo(int totalRNodes, int totalUsage, float averWire, float averNode){
+		System.out.printf("---------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Total rnodes created: %d\n", totalRNodes);
+		System.out.printf("Total rnodes used: %d\n", totalUsage);
 		if(this.opt == RoutingGranularityOpt.NODE){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
@@ -184,16 +197,16 @@ public class Main {
 			int toalCons, 
 			int nodesExpanded, 
 			RouterTimer timer){
-		System.out.printf("--------------------------------------------------------------------------------------\n");
-		System.out.println("Runtime " + routingRuntime + " ms");
+		System.out.printf("---------------------------------------------------------------------------------------------------\n");
+		System.out.printf("Routing took %.2f s\n", routingRuntime*1e-3);
 		System.out.println("Num iterations: " + iterations);
 		System.out.println("Connections routed: " + consRouted);
 		System.out.println("Connections rerouted: " + (consRouted - toalCons));
 		System.out.println("Nodes expanded: " + nodesExpanded);
-		System.out.printf("--------------------------------------------------------------------------------------\n");
+		System.out.printf("---------------------------------------------------------------------------------------------------\n");
 		System.out.print(timer);
-		System.out.printf("--------------------------------------------------------------------------------------\n");
-		System.out.printf("======================================================================================\n\n");
+		System.out.printf("---------------------------------------------------------------------------------------------------\n");
+		System.out.printf("===================================================================================================\n\n");
 	}
 	
 }

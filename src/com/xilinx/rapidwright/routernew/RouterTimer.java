@@ -2,13 +2,14 @@ package com.xilinx.rapidwright.routernew;
 
 public class RouterTimer {
 	public Timer firstIteration;
-	public Timer updateTiming;
-	public Timer rerouteCritical;
+//	public Timer updateTiming;
+//	public Timer rerouteCritical;
 	public Timer rerouteCongestion;
-	public Timer rerouteIllegal;
-	public Timer rerouteOpin;
-	public Timer fixOpin;
-	public Timer setRerouteCriticality;
+//	public Timer rerouteIllegal;
+//	public Timer rerouteOpin;
+//	public Timer fixOpin;
+//	public Timer setRerouteCriticality;
+	public Timer rnodesCreation;
 	public Timer calculateStatistics;
 	public Timer updateCost;
 	
@@ -17,7 +18,8 @@ public class RouterTimer {
 //		this.updateTiming = new Timer("update timing");
 //		this.rerouteCritical = new Timer("reroute critical");
 		this.rerouteCongestion = new Timer("reroute congestion");
-		this.rerouteIllegal = new Timer("reroute illegal");
+//		this.rerouteIllegal = new Timer("reroute illegal");
+		this.rnodesCreation = new Timer("rnodesCreation");
 //		this.rerouteOpin = new Timer("reroute opin");
 //		this.fixOpin = new Timer("fix opin");
 //		this.setRerouteCriticality = new Timer("set reroute crit");
@@ -31,11 +33,12 @@ public class RouterTimer {
 		
 		result += this.firstIteration;
 		result += this.rerouteCongestion;
-		result += this.rerouteIllegal;
+//		result += this.rerouteIllegal;
 //		result += this.rerouteOpin;
 //		result += this.rerouteCritical;
 //		result += this.fixOpin;
 //		result += this.setRerouteCriticality;
+		result += this.rnodesCreation;
 		result += this.calculateStatistics;
 //		result += this.updateTiming;
 		result += this.updateCost;
