@@ -40,6 +40,8 @@ public class PFRouter<E>{
 	
 	private int connectionsRouted, nodesExpanded;
 	private int connectionsRoutedIteration;
+	private long hops;
+	private float manhattanD;
 	
 	private int itry;
 	private int rnodeId = 0;
@@ -325,13 +327,13 @@ public class PFRouter<E>{
 		float rnodeCost = this.getRouteNodeCost(childRNode, con, countSourceUses);
 		float new_partial_path_cost = partial_path_cost + rnodeCost;//upstream path cost + cost of node under consideration
 		float new_lower_bound_total_path_cost;
-		short expected_distance_cost = 0;
+		float expected_distance_cost = 0;
 		float expected_wire_cost;
 		
 		if(childRNode.type == RoutableType.INTERRNODE){
 			
 //			if(this.debugExpansion) this.printInfo("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
-			expected_distance_cost = (short) (Math.abs(childRNode.centerx - con.sink.getTile().getColumn()) + Math.abs(childRNode.centery - con.sink.getTile().getRow()));
+			expected_distance_cost = this.expectMahatD(childRNode, con);
 			
 			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
 			new_lower_bound_total_path_cost = new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * (rnode.rNodeData.getLevel() + 1);
@@ -381,6 +383,16 @@ public class PFRouter<E>{
 			if(rnode != null) data.setLevel(rnode.rNodeData.getLevel()+1);
 			this.queue.add(new QueueElement<E>(childRNode, new_lower_bound_total_path_cost));
 		}
+	}
+	
+	private float expectMahatD(RNode<E> childRNode, Connection<E>con){
+		float md;
+		if(this.itry == 1){
+			md = Math.abs(childRNode.centerx - con.sink.getTile().getColumn()) + Math.abs(childRNode.centery - con.sink.getTile().getRow());
+		}else{
+			md = Math.abs(childRNode.centerx - con.getSinkRNode().centerx) + Math.abs(childRNode.centery - con.getSinkRNode().centery);
+		}
+		return md;
 	}
 
 	private float getRouteNodeCost(RNode<E> rnode, Connection<E> con, int countSourceUses) {
@@ -446,7 +458,23 @@ public class PFRouter<E>{
 				overUsePercentage);
 	}
 	
-	private int getOverusedAndIllegalRNodes(List<Connection<E>> connections) {
+	public void getAllHopsAndManhattanD(){
+		this.hops = 0;
+		this.manhattanD = 0;
+		Set<RNode<E>> netRNodes = new HashSet<>();
+		for(Netplus<E> net:this.nets){	
+			for(Connection<E> c:net.getConnection()){
+				netRNodes.addAll(c.rNodes);
+				this.hops += c.rNodes.size() - 1;//hops for all sinks
+			}
+			for(RNode<E> rnode:netRNodes){
+				this.manhattanD += rnode.getManhattanD();
+			}
+			netRNodes.clear();
+		}
+	}
+	
+	public int getOverusedAndIllegalRNodes(List<Connection<E>> connections) {
 		Set<String> overUsed = new HashSet<>();
 		Set<String> used = new HashSet<>();
 		for(Connection<E> conn : connections) {
@@ -603,6 +631,15 @@ public class PFRouter<E>{
 	public Set<RNode<E>> getRnodesCreated() {
 		return (Set<RNode<E>>) rnodesCreated.values();
 	}
+	
+	public long getHops() {
+		return hops;
+	}
+
+	public float getManhattanD() {
+		return manhattanD;
+	}
+
 	public void printInfo(String s){
 		System.out.println("  --- " + s + " --- ");
 	}

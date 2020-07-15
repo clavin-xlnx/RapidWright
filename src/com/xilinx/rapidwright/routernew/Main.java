@@ -17,10 +17,10 @@ public class Main {
 	private boolean isINTtileRange = false;
 	private float mdWeight = 1;
 	private float hopWeight = 1;
-	private float base_cost_fac = 3;
 	private float initial_pres_fac = 0.5f; 
 	private float pres_fac_mult = 2; 
 	private float acc_fac = 1;
+	private float base_cost_fac = 1;
 	
 	public Main(String[] arguments) {
 		if(arguments.length < 2){
@@ -113,7 +113,14 @@ public class Main {
 				
 				routingRuntime = router.routingRuntime();
 				
-				this.rnodesInfo(router.globalRNodeIndex, router.router.getUsedRNodes(), 1, 0);
+				router.router.getAllHopsAndManhattanD();
+				
+				this.rnodesInfo(router.router.getManhattanD(),
+						router.router.getHops(),
+						router.globalRNodeIndex,
+						router.router.getUsedRNodes(),
+						1,
+						0);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.router.getItry(), 
@@ -139,7 +146,14 @@ public class Main {
 				
 				routingRuntime = router.routingRuntime();
 				
-				this.rnodesInfo(router.globalRNodeIndex, router.router.getUsedRNodes(), router.checkAverageNumWires(), 1);
+				router.router.getAllHopsAndManhattanD();
+				
+				this.rnodesInfo(router.router.getManhattanD(),
+						router.router.getHops(),
+						router.globalRNodeIndex,
+						router.router.getUsedRNodes(),
+						router.checkAverageNumWires(),
+						1);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.router.getItry(), 
@@ -179,8 +193,10 @@ public class Main {
 		System.out.println(s);
 	}
 	
-	public void rnodesInfo(int totalRNodes, int totalUsage, float averWire, float averNode){
+	public void rnodesInfo(float sumMD, long hops, int totalRNodes, int totalUsage, float averWire, float averNode){
 		System.out.printf("---------------------------------------------------------------------------------------------------\n");
+		System.out.printf("Total Manhattan distance: %10.2f\n", sumMD);
+		System.out.printf("Total hops: %d\n", hops);
 		System.out.printf("Total rnodes created: %d\n", totalRNodes);
 		System.out.printf("Total rnodes used: %d\n", totalUsage);
 		if(this.opt == RoutingGranularityOpt.NODE){

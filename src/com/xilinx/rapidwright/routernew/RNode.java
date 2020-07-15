@@ -263,6 +263,14 @@ public class RNode<E>{
 		data.setOccupation(occ);
 	}
 	
+	public float getManhattanD(){
+		float md = 0;
+		if(this.rNodeData.getPrev() != null){
+			md = Math.abs(this.rNodeData.getPrev().centerx - this.centerx) + Math.abs(this.rNodeData.getPrev().centery - this.centery);
+		}
+		return md;
+	}
+	
 	public String toString() {	
 		String coordinate = "";
 		if(this.xlow == this.xhigh && this.ylow == this.yhigh) {

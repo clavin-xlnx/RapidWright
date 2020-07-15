@@ -171,6 +171,7 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		// TODO Auto-generated method stub
 		return this.criticality;
 	}
+	
 	public int getManhattanDistance() {
 		int dx = Math.abs(this.source.getTile().getColumn() - this.sink.getTile().getColumn());
 		int dy = Math.abs(this.source.getTile().getRow() - this.sink.getTile().getRow());
@@ -178,6 +179,7 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		
 		return manhattanDistance;
 	}
+	
 	public boolean congested() {
 		for(RNode<E> rn : this.rNodes){
 			if(rn.overUsed()) {
