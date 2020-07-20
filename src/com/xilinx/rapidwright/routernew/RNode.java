@@ -36,7 +36,7 @@ public class RNode<E>{
 		
 	public float base_cost;
 	
-	public final RNodeData<E> rNodeData;
+	public final RNodeData<E> rnodeData;
 	
 	public boolean target;
 	public List<RNode<E>> children;//populate the child rnodes of the current 
@@ -45,7 +45,7 @@ public class RNode<E>{
 	public RNode(int index, SitePinInst sitePinInst, RoutableType type, RoutingGranularityOpt opt){
 		this.index = index;
 		this.type = type;
-				
+		//TODO get Wire wire to replace the name as the key, no name will be needed
 		if(opt == RoutingGranularityOpt.WIRE){
 			this.tile = sitePinInst.getSiteInst().getTile();
 			this.wire = sitePinInst.getSiteExternalWireIndex();
@@ -53,11 +53,18 @@ public class RNode<E>{
 			this.setCenterXYWire();
 		}else if(opt == RoutingGranularityOpt.NODE){
 			this.node = sitePinInst.getConnectedNode();
+			
+//			this.tile = sitePinInst.getSiteInst().getTile();
+//			this.wire = sitePinInst.getSiteExternalWireIndex();
+//			this.name = this.tile.getName() + "/" + this.wire;
+//			
+//			System.out.println(this.node);
+//			System.out.println(this.name);
 			this.name = this.node.toString();
 			this.setCenterXYNode();
 		}
 
-		this.rNodeData = new RNodeData<E>(this.index);
+		this.rnodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 	}
 	
@@ -67,9 +74,8 @@ public class RNode<E>{
 		this.wire = wire;
 		this.type = RoutableType.INTERRNODE;
 		this.name = this.tile.getName() + "/" + this.wire;
-		this.rNodeData = new RNodeData<E>(this.index);
+		this.rnodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
-		//different base cost for different routing resources
 		this.setCenterXYWire();
 		
 	}
@@ -79,7 +85,7 @@ public class RNode<E>{
 		this.node = node;
 		this.name = this.node.toString();
 		
-		this.rNodeData = new RNodeData<E>(this.index);
+		this.rnodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
 		this.setCenterXYNode();
@@ -89,7 +95,7 @@ public class RNode<E>{
 		this.index = index;
 		this.type = RoutableType.INTERRNODE;
 		this.timingGroup = timingGroup;
-		this.rNodeData = new RNodeData<E>(this.index);
+		this.rnodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		
 		//TODO set centerXY
@@ -168,22 +174,31 @@ public class RNode<E>{
 		return min;
 	}
 	
-	public void setBaseCostNode(){
+	/*public void setBaseCostNode(){
 		this.setBaseCost();
-		this.base_cost *= 3;
-	}
+		this.base_cost *= (this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
+	}*/
 	
-	//TODO tune fac to check if #averWire works best
+	//increasing base_cost only will hurt the runtime a lot
 	public void setBaseCost(float fac){
 		this.setBaseCost();
-		this.base_cost *= fac;
+		this.base_cost *= fac;//(this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
 	}
 	
+	//default 1, 1, 0.95 are picked up from Vaughn's book page 77
 	public void setBaseCost(){
-		if(this.type == RoutableType.SOURCERNODE || this.type == RoutableType.INTERRNODE){
+		//base cost of different types of routing resource
+		if(this.type == RoutableType.SOURCERNODE){
 			this.base_cost = 1;
-		}else if(this.type == RoutableType.SINKRNODE){//this is for faster convergence to the sink, but not used currently
-			this.base_cost = 0.95f;
+			
+		}else if(this.type == RoutableType.INTERRNODE){
+			//TODO aver cost around 4 when using deltaX + deltaY +1 
+			//(most (deltaX + deltaY +1 ) values range from 1 to 90+, maximum can be 176)
+			//(deltaX + deltaY +1 ) normalized to the maximum , does not work
+			this.base_cost = 1;
+			
+		}else if(this.type == RoutableType.SINKRNODE){//this is for faster maze expansion convergence to the sink
+			this.base_cost = 0.95f;//virtually the same to the logic block input pin, since no alternative ipins are considered
 		}
 	}
 	
@@ -196,15 +211,15 @@ public class RNode<E>{
 	}
 	
 	public boolean overUsed(){
-		return this.capacity < this.rNodeData.getOccupation();
+		return this.capacity < this.rnodeData.getOccupation();
 	}
 	
 	public boolean used(){
-		return this.rNodeData.getOccupation() > 0;
+		return this.rnodeData.getOccupation() > 0;
 	}
 	
 	public boolean illegal(){
-		return this.capacity < this.rNodeData.numUniqueParents();
+		return this.capacity < this.rnodeData.numUniqueParents();
 	}
 	
 	public Tile getTile() {
@@ -249,7 +264,7 @@ public class RNode<E>{
 	}
 	
 	public void updatePresentCongestionPenalty(float pres_fac) {
-		RNodeData<E> data = this.rNodeData;
+		RNodeData<E> data = this.rnodeData;
 		
 		int occ = data.numUniqueSources();
 		int cap = this.capacity;
@@ -265,8 +280,8 @@ public class RNode<E>{
 	
 	public float getManhattanD(){
 		float md = 0;
-		if(this.rNodeData.getPrev() != null){
-			md = Math.abs(this.rNodeData.getPrev().centerx - this.centerx) + Math.abs(this.rNodeData.getPrev().centery - this.centery);
+		if(this.rnodeData.getPrev() != null){
+			md = Math.abs(this.rnodeData.getPrev().centerx - this.centerx) + Math.abs(this.rnodeData.getPrev().centery - this.centery);
 		}
 		return md;
 	}
@@ -288,13 +303,13 @@ public class RNode<E>{
 //		s.append(", ");
 //		s.append(String.format("children = %d", this.children.size()));
 		s.append(", ");
-		s.append(String.format("occupation = %d", this.rNodeData.getOccupation()));
+		s.append(String.format("occupation = %d", this.rnodeData.getOccupation()));
 		s.append(", ");
-		s.append(String.format("num_unique_sources = %d", this.rNodeData.numUniqueSources()));
+		s.append(String.format("num_unique_sources = %d", this.rnodeData.numUniqueSources()));
 		s.append(", ");
-		s.append(String.format("num_unique_parents = %d", this.rNodeData.numUniqueParents()));
+		s.append(String.format("num_unique_parents = %d", this.rnodeData.numUniqueParents()));
 		s.append(", ");
-		s.append(String.format("level = %d", this.rNodeData.getLevel()));
+		s.append(String.format("level = %d", this.rnodeData.getLevel()));
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		

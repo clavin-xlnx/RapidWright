@@ -7,11 +7,12 @@ public class RouterTimer {
 	public Timer rerouteCongestion;
 //	public Timer rerouteIllegal;
 //	public Timer rerouteOpin;
-//	public Timer fixOpin;
+	public Timer rerouteIllegal;
 //	public Timer setRerouteCriticality;
 	public Timer rnodesCreation;
 	public Timer calculateStatistics;
 	public Timer updateCost;
+	public Timer pipsAssignment;
 	
 	public RouterTimer() {
 		this.firstIteration = new Timer("first iteration");
@@ -19,12 +20,13 @@ public class RouterTimer {
 //		this.rerouteCritical = new Timer("reroute critical");
 		this.rerouteCongestion = new Timer("reroute congestion");
 //		this.rerouteIllegal = new Timer("reroute illegal");
-		this.rnodesCreation = new Timer("rnodesCreation");
+		this.rnodesCreation = new Timer("rnodes creation");
 //		this.rerouteOpin = new Timer("reroute opin");
-//		this.fixOpin = new Timer("fix opin");
+		this.rerouteIllegal = new Timer("fix illegal tree");
 //		this.setRerouteCriticality = new Timer("set reroute crit");
 		this.calculateStatistics = new Timer("calc stat");
 		this.updateCost = new Timer("update cost");
+		this.pipsAssignment = new Timer("pips assignment");
 	}
 	
 	@Override
@@ -34,14 +36,14 @@ public class RouterTimer {
 		result += this.firstIteration;
 		result += this.rerouteCongestion;
 //		result += this.rerouteIllegal;
-//		result += this.rerouteOpin;
 //		result += this.rerouteCritical;
-//		result += this.fixOpin;
 //		result += this.setRerouteCriticality;
 		result += this.rnodesCreation;
 		result += this.calculateStatistics;
 //		result += this.updateTiming;
 		result += this.updateCost;
+		result += this.rerouteIllegal;
+		result += this.pipsAssignment;
 		
 		return result;
 	}
@@ -62,8 +64,10 @@ class Timer {
 	}
 	public void finish() {
 		this.time += System.nanoTime() - this.start;
+	}	
+	public long getTime() {
+		return this.time;
 	}
-	
 	public String toString() {
 		return String.format("%-20s %7.2f s\n", this.name, this.time * 1e-9);
 	}

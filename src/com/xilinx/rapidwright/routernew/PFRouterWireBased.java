@@ -11,6 +11,7 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
@@ -37,6 +38,7 @@ public class PFRouterWireBased {
 	public float acc_fac;
 	
 	public int globalRNodeIndex;
+	public int firstIterRNodes;
 	
 	public boolean trial = false;
 	
@@ -101,7 +103,7 @@ public class PFRouterWireBased {
 		Collections.sort(this.sortedListOfNetplus, Comparators.FanoutNet);
 		
 		//unroute nets except GND VCC and clocK
-		this.router.unrouteNetsReserveGndVccClock();
+//		this.router.unrouteNetsReserveGndVccClock();
 		
 		//initialize router
 		this.router.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
@@ -111,7 +113,7 @@ public class PFRouterWireBased {
         List<Netplus<Wire>> trialNets = new ArrayList<>();
         for(Netplus<Wire> net : this.sortedListOfNetplus){
 //        	if(net.getNet().getName().equals("n767") || net.getNet().getName().equals("n761")){
-        	if(net.getNet().getName().equals("n775") || net.getNet().getName().equals("n689")){
+        	if(net.getNet().getName().equals("n22c")){// || net.getNet().getName().equals("n689")){
         		trialNets.add(net);
         	}
         }
@@ -157,25 +159,31 @@ public class PFRouterWireBased {
 			validRouting = this.router.isValidRouting();
 			
 			//fix illegal routing trees if any
-			/*if(validRouting){
-				this.fixIllegalTree(sortedListOfConnection);
-				this.printInfo("\tvalid routing - no congested rnodes");
-			}*/
+			if(validRouting){
+				this.router.fixIllegalTree(sortedListOfConnection);
+			}
 			
 			//TODO update timing and criticalities of connections
 			
 			this.iterationEnd = System.nanoTime();
 			//statistics
 			this.routerTimer.calculateStatistics.start();
-			this.router.staticticsInfo(this.sortedListOfConnection, this.iterationStart, this.iterationEnd, this.globalRNodeIndex);
+			this.router.staticticsInfo(this.sortedListOfConnection, 
+					this.iterationStart, this.iterationEnd, 
+					this.globalRNodeIndex, this.routerTimer.rnodesCreation.getTime());
 			this.routerTimer.calculateStatistics.finish();;
 			//if the routing is valid /realizable return, the routing completed successfully
 	
-//			if(this.router.getItry() > 1)this.findCongestion();
+			if(this.router.getItry() == 1) this.firstIterRNodes = this.rnodesCreated.size();
 	
 			if (validRouting) {
 				//TODO generate and assign a list of PIPs for each Net net
 				this.printInfo("\tvalid routing - no congested rnodes");
+				
+				/*this.routerTimer.pipsAssignment.start();
+				this.pipsAssignment();
+				this.routerTimer.pipsAssignment.finish();*/
+				
 				this.router.getDesign().writeCheckpoint(dcpFileName,t);
 				return;
 			}
@@ -192,6 +200,37 @@ public class PFRouterWireBased {
 		this.router.getDesign().writeCheckpoint(dcpFileName,t);
 		
 		return;
+	}
+	
+	public void pipsAssignment(){
+		for(Netplus<Wire> np:this.sortedListOfNetplus){
+			if(np.getNet().getName().equals("n22c")){
+				System.out.println(np.getNet().toStringFull());
+				Set<PIP> netPIPs = new HashSet<>();
+				for(Connection<Wire> c:np.getConnection()){
+					netPIPs.addAll(this.conPIPs(c));
+				}
+				np.getNet().setPIPs(netPIPs);
+				
+			}
+		}
+	}
+	
+	public List<PIP> conPIPs(Connection<Wire> con){
+		List<PIP> conPIPs = new ArrayList<>();
+		RNode<Wire> rn = con.getSinkRNode().rnodeData.getPrev();//this is a wire, add sink pin SitePinInst?
+		while(rn != null){
+			RNode<Wire> rnprev = rn.rnodeData.getPrev(); 
+			PIP pip = new PIP(rn.getTile(), rnprev.getWire(), rn.getWire());//NullPointerException when creating PIPs between two INT tiles
+			conPIPs.add(pip);
+			System.out.println(pip.toString());
+			if(rnprev.rnodeData.getPrev().type == RoutableType.SOURCERNODE){
+				break;
+			}
+			rn = rnprev;
+		}
+		
+		return conPIPs;
 	}
 	
 	public void findCongestion(){
@@ -215,67 +254,13 @@ public class PFRouterWireBased {
 		}
 		for(Connection<Wire> con:congestedCons){
 			System.out.println(con.toString());
-			for(RNode<Wire> rn : con.rNodes){
+			for(RNode<Wire> rn : con.rnodes){
 				if(rn.overUsed()) System.out.println("\t"+ rn.toString());
 			}
 			System.out.println();
 		}
 	}
-	//TODO put into the PFRouter class
-	public void fixIllegalTree(List<Connection<Wire>> cons) {
-		this.printInfo("checking if there is any illegal node");
-		
-		int numIllegal = this.getIllegalNumRNodes(cons);
-		
-		if(numIllegal > 0){
-			this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
-			
-			List<Netplus<Wire>> illegalTrees = new ArrayList<>();
-			for(Netplus<Wire> net : this.router.getNets()) {
-				boolean illegal = false;
-				for(Connection<Wire> con : net.getConnection()) {
-					if(con.illegal()) {
-						illegal = true;
-					}
-				}
-				if(illegal) {
-					illegalTrees.add(net);
-				}
-			}
-			
-			this.printInfo("There are " + illegalTrees.size() + " illegal trees");
-			//find the illegal connections
-			for(Netplus<Wire> illegalTree : illegalTrees){
-				RNode<Wire> illegalRNode;
-				while((illegalRNode = illegalTree.getIllegalNode()) != null){
-					List<Connection<Wire>> illegalCons = new ArrayList<>();
-					for(Connection<Wire> con : illegalTree.getConnection()) {
-						for(RNode<Wire> rnode : con.rNodes) {
-							if(rnode.equals(illegalRNode)) {
-								illegalCons.add(con);
-							}
-						}
-					}
-					
-					//TODO fix the illegal trees, since there is no criticality info, using the Manhattan distance, or hops?
-					
-				}
-			}
-		}	
-	}
 	
-	public int getIllegalNumRNodes(List<Connection<Wire>> cons){
-		Set<String> illegal = new HashSet<>();	
-		for(Connection<Wire> c:cons){
-			for(RNode<Wire> rn:c.rNodes){
-				if(rn.illegal()){
-					illegal.add(rn.name);
-				}
-			}
-		}
-		return illegal.size();
-	}
-
 	public void routeACon(PFRouter<Wire> router, ChildRNodesCreation childRNodesGeneration, Connection<Wire> con){
 		router.prepareForRoutingACon(con);
 		if(this.router.debugRoutingCon) this.printInfo("routing for " + con.toString());

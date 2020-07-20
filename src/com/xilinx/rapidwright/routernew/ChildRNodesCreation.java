@@ -1,8 +1,10 @@
 package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
@@ -75,6 +77,24 @@ public class ChildRNodesCreation{
 		Tile rnodeTile = rnode.getTile();
 		List<Wire> wires = rnodeTile.getWireConnections(rnode.getWire());
 		List<RNode<Wire>> childRNodes = new ArrayList<>();
+		
+		/*//check childRNodes of a source RNode, to see if they are in a unique tile
+		if(rnode.type == RoutableType.SOURCERNODE){
+			if(wires.size() != 1) System.out.println(wires.size());
+			Set<String> downhillINTtileNames = new HashSet<>();
+			for(Wire wire:wires){
+//				if(wire.getTile().getName().contains("INT_"))
+					downhillINTtileNames.add(wire.getTile().getName());
+			}
+			if(downhillINTtileNames.size() != 1){
+				System.out.println("currSourceRNode " + rnode.getTile().getName() + ": ");
+				for(String tilename:downhillINTtileNames){
+					System.out.println(tilename);
+				}
+				System.out.println();
+			}
+		}*/
+		
 		for(Wire wire:wires){
 			RNode<Wire> childRNode;
 			String key = wire.getTile().getName() + "/" + wire.getWireIndex();

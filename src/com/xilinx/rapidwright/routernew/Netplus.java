@@ -109,7 +109,7 @@ public class Netplus<E>{
 	
 	public RNode<E> getIllegalNode() {
 		for(Connection<E> con : this.connections) {
-			for(RNode<E> rnode : con.rNodes) {
+			for(RNode<E> rnode : con.rnodes) {
 				if(rnode.illegal()) {
 					return rnode;
 				}

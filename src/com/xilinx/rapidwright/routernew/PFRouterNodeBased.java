@@ -37,6 +37,7 @@ public class PFRouterNodeBased{
 	public float acc_fac;
 	
 	public int globalRNodeIndex;
+	public int firstIterRNodes;
 	
 	public boolean trial = false;
 	
@@ -157,21 +158,24 @@ public class PFRouterNodeBased{
 			validRouting = this.router.isValidRouting();
 			
 			//fix illegal routing trees if any
-			/*if(validRouting){
-				this.fixIllegalTree(sortedListOfConnection);
-				this.printInfo("\tvalid routing - no congested rnodes");
-			}*/
+			if(validRouting){
+				this.routerTimer.rerouteIllegal.start();
+				this.router.fixIllegalTree(sortedListOfConnection);
+				this.routerTimer.rerouteIllegal.finish();
+			}
 			
 			//TODO update timing and criticalities of connections
 			
 			this.iterationEnd = System.nanoTime();
 			//statistics
 			this.routerTimer.calculateStatistics.start();
-			this.router.staticticsInfo(this.sortedListOfConnection, this.iterationStart, this.iterationEnd, this.globalRNodeIndex);
+			this.router.staticticsInfo(this.sortedListOfConnection, 
+					this.iterationStart, this.iterationEnd, 
+					this.globalRNodeIndex, this.routerTimer.rnodesCreation.getTime());
 			this.routerTimer.calculateStatistics.finish();;
 			//if the routing is valid /realizable return, the routing completed successfully
 	
-//			if(this.router.getItry() > 1)this.findCongestion();
+			if(this.router.getItry() == 1) this.firstIterRNodes = this.rnodesCreated.size();
 	
 			if (validRouting) {
 				//TODO generate and assign a list of PIPs for each Net net
@@ -186,12 +190,25 @@ public class PFRouterNodeBased{
 			// increase router iteration
 			this.router.updateItry();
 			this.routerTimer.updateCost.finish();
+//			System.out.println(this.routerTimer.rnodesCreation.toString());
 		}
 		
 		this.router.outOfTrialIterations(this.nrOfTrials);
 		this.router.getDesign().writeCheckpoint(dcpFileName,t);
 		
 		return;
+	}
+	
+	public void findAverBaseCosts(){
+		Set<Float> costs = new HashSet<>();
+		float aver = 0;
+		float sum = 0;
+		for(RNode<Node> rn:this.rnodesCreated.values()){
+			sum += rn.base_cost;
+			costs.add(rn.base_cost);
+		}
+		aver = sum/this.rnodesCreated.size();
+		System.out.println(aver);
 	}
 	
 	public void findCongestion(){
@@ -215,65 +232,11 @@ public class PFRouterNodeBased{
 		}
 		for(Connection<Node> con:congestedCons){
 			System.out.println(con.toString());
-			for(RNode<Node> rn : con.rNodes){
+			for(RNode<Node> rn : con.rnodes){
 				if(rn.overUsed()) System.out.println("\t"+ rn.toString());
 			}
 			System.out.println();
 		}
-	}
-	
-	public void fixIllegalTree(List<Connection<Node>> cons) {
-		this.printInfo("checking if there is any illegal node");
-		
-		int numIllegal = this.getIllegalNumRNodes(cons);
-		
-		if(numIllegal > 0){
-			this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
-			
-			List<Netplus<Node>> illegalTrees = new ArrayList<>();
-			for(Netplus<Node> net : this.router.getNets()) {
-				boolean illegal = false;
-				for(Connection<Node> con : net.getConnection()) {
-					if(con.illegal()) {
-						illegal = true;
-					}
-				}
-				if(illegal) {
-					illegalTrees.add(net);
-				}
-			}
-			
-			this.printInfo("There are " + illegalTrees.size() + " illegal trees");
-			//find the illegal connections
-			for(Netplus<Node> illegalTree : illegalTrees){
-				RNode<Node> illegalRNode;
-				while((illegalRNode = illegalTree.getIllegalNode()) != null){
-					List<Connection<Node>> illegalCons = new ArrayList<>();
-					for(Connection<Node> con : illegalTree.getConnection()) {
-						for(RNode<Node> rnode : con.rNodes) {
-							if(rnode.equals(illegalRNode)) {
-								illegalCons.add(con);
-							}
-						}
-					}
-					
-					//TODO fix the illegal trees, since there is no criticality info, using the Manhattan distance, or hops?
-					
-				}
-			}
-		}	
-	}
-	
-	public int getIllegalNumRNodes(List<Connection<Node>> cons){
-		Set<String> illegal = new HashSet<>();	
-		for(Connection<Node> c:cons){
-			for(RNode<Node> rn:c.rNodes){
-				if(rn.illegal()){
-					illegal.add(rn.name);
-				}
-			}
-		}	
-		return illegal.size();	
 	}
 
 	public void routeACon(Connection<Node> con){

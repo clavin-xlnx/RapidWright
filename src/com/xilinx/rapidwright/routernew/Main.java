@@ -1,6 +1,11 @@
 package com.xilinx.rapidwright.routernew;
 
+import java.util.Collection;
+import java.util.HashSet;
+
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class Main {
@@ -13,12 +18,12 @@ public class Main {
 	
 	//allowed number of routing iterations
 	private int nrOfTrials = 100;
-	private int bbRange = 3;
-	private boolean isINTtileRange = false;
+	private int bbRange = 5;
+	private boolean isINTtileRange = false;//TODO
 	private float mdWeight = 1;
 	private float hopWeight = 1;
 	private float initial_pres_fac = 0.5f; 
-	private float pres_fac_mult = 2; 
+	private float pres_fac_mult = 2f; 
 	private float acc_fac = 1;
 	private float base_cost_fac = 1;
 	
@@ -82,12 +87,14 @@ public class Main {
 	
 	public void processing(){
 		int routingRuntime = 0;
+		this.checkAverageWiresandNodesEachTile();
 		if(!this.routerNew){
 			RWRouter router = new RWRouter(this.design);
 			this.t.start("Route Design");
 			router.routeDesign();
 			
 			System.out.println("------------------------------------------------------------------------------");
+			System.out.printf("Find input pin feed took : %10.4f s\n", router.findInputPinFeedTime);
 			System.out.println("Failed connections: " + router.failedConnections);
 			System.out.println("Total nodes processed: " + router.totalNodesProcessed);
 			System.out.println("------------------------------------------------------------------------------");
@@ -117,6 +124,7 @@ public class Main {
 				
 				this.rnodesInfo(router.router.getManhattanD(),
 						router.router.getHops(),
+						router.firstIterRNodes,
 						router.globalRNodeIndex,
 						router.router.getUsedRNodes(),
 						1,
@@ -150,6 +158,7 @@ public class Main {
 				
 				this.rnodesInfo(router.router.getManhattanD(),
 						router.router.getHops(),
+						router.firstIterRNodes,
 						router.globalRNodeIndex,
 						router.router.getUsedRNodes(),
 						router.checkAverageNumWires(),
@@ -165,11 +174,34 @@ public class Main {
 		}
 	}
 	
+	public void checkAverageWiresandNodesEachTile(){
+		Device dev = this.design.getDevice();
+		Collection<Tile> tiles = dev.getAllTiles();
+		float totalWires = 0;
+		float totalINTWires = 0;
+		int totalINTtiles = 0;
+		HashSet<Integer> xTiles = new HashSet<>();
+		for(Tile tile:tiles){
+			totalWires += tile.getWireCount();
+			if(tile.getTileNamePrefix().contains("INT_")){
+				totalINTWires += tile.getWireCount();
+				totalINTtiles++;
+				xTiles.add(tile.getColumn());
+			}
+		}
+		float averWireEachTile = totalWires / tiles.size();
+		float averWireEachINTtile = totalINTWires / totalINTtiles;
+		System.out.println("total Wires: " + totalWires + "\ntotal tiles: " + tiles.size());
+		System.out.println("total INT Wires: " + totalINTWires+ "\ntotal INT tiles: " + totalINTtiles);
+		System.out.printf("average wires in each tile: %5.2f\n", averWireEachTile);
+		System.out.printf("average wires in each INT tile: %5.2f\n", averWireEachINTtile);
+	}
+	
 	public void routerConfigurationInfo(){
 		StringBuilder s = new StringBuilder();
 		s.append("Router: ");
 		if(routerNew){
-			s.append("PathFinder-based");
+			s.append("PathFinder-based connection router");
 		}else{
 			s.append("RapidWright orginal router");
 		}
@@ -193,10 +225,11 @@ public class Main {
 		System.out.println(s);
 	}
 	
-	public void rnodesInfo(float sumMD, long hops, int totalRNodes, int totalUsage, float averWire, float averNode){
-		System.out.printf("---------------------------------------------------------------------------------------------------\n");
+	public void rnodesInfo(float sumMD, long hops, int firstIterRNodes, int totalRNodes, int totalUsage, float averWire, float averNode){
+		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Total Manhattan distance: %10.2f\n", sumMD);
 		System.out.printf("Total hops: %d\n", hops);
+		System.out.printf("Rnodes created 1st iter: %d\n", firstIterRNodes);
 		System.out.printf("Total rnodes created: %d\n", totalRNodes);
 		System.out.printf("Total rnodes used: %d\n", totalUsage);
 		if(this.opt == RoutingGranularityOpt.NODE){
@@ -211,18 +244,18 @@ public class Main {
 			int iterations, 
 			int consRouted,
 			int toalCons, 
-			int nodesExpanded, 
+			long nodesExpanded, 
 			RouterTimer timer){
-		System.out.printf("---------------------------------------------------------------------------------------------------\n");
+		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Routing took %.2f s\n", routingRuntime*1e-3);
 		System.out.println("Num iterations: " + iterations);
 		System.out.println("Connections routed: " + consRouted);
 		System.out.println("Connections rerouted: " + (consRouted - toalCons));
 		System.out.println("Nodes expanded: " + nodesExpanded);
-		System.out.printf("---------------------------------------------------------------------------------------------------\n");
+		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.print(timer);
-		System.out.printf("---------------------------------------------------------------------------------------------------\n");
-		System.out.printf("===================================================================================================\n\n");
+		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
+		System.out.printf("====================================================================================================================\n\n");
 	}
 	
 }

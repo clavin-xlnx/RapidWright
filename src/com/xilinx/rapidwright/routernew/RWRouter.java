@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -88,7 +89,7 @@ public class RWRouter extends AbstractRouter {
 	
 	public static boolean ENABLE_LUT_INPUT_SWAP = true;
 
-	
+	public float findInputPinFeedTime = 0;
 	private PBlock routingPblock;
 	
 	private ArrayList<RouteNode> pathFromSinkToSwitchBox = null;
@@ -576,11 +577,10 @@ public class RWRouter extends AbstractRouter {
 			if(debug) System.out.println(MessageGenerator.makeWhiteSpace(currNode.getLevel()) + currNode.toString() + " " + currNode.getIntentCode() + " *DQ*");
 			nodesProcessed++;
 			
-			if(currNode.getConnections().size() == 0){
-				System.out.printf("tile = " + currNode.tile.getName() + ", wire = " + currNode.getWireName());
-				System.out.println(" child wire size = " + currNode.getConnections().size());
-			}
-			
+//			if(currNode.getConnections().size() == 0){
+//				System.out.printf("tile = " + currNode.tile.getName() + ", wire = " + currNode.getWireName());
+//				System.out.println(" child wire size = " + currNode.getConnections().size());
+//			}			
 			nextNode: for(Wire w : currNode.getConnections()){
 //				System.out.println("\tchild wire tile: " + w.getTile().getName());
 				//node: w.getNode().getAllDownhillNodes();
@@ -733,7 +733,10 @@ public class RWRouter extends AbstractRouter {
 	private void prepareSwitchBoxSink(SitePinInst currPin){
 		// For the input, find the entry point into its switch box
 		switchMatrixSink = null;
+		long start = System.nanoTime();
 		pathFromSinkToSwitchBox = findInputPinFeed(currPin); 
+		long end = System.nanoTime();
+		this.findInputPinFeedTime += (end - start)*1e-9;
 		if(pathFromSinkToSwitchBox != null){
 			switchMatrixSink = pathFromSinkToSwitchBox.get(0);
 			currSink = switchMatrixSink;
@@ -1272,7 +1275,7 @@ public class RWRouter extends AbstractRouter {
 		int wire = site.getTileWireIndexFromPinName(pinName);
 		if(wire == -1) return null; // Pin is not connected to anything (unbonded IO)
 		Node node = new Node(t,wire);
-		RouteNode n = new RouteNode(node.getTile(),node.getWire());
+		RouteNode n = new RouteNode(node.getTile(),node.getWire());//node tile could be different from t
 		Queue<RouteNode> q = new LinkedList<RouteNode>();
 		q.add(n);
 		while(!q.isEmpty()){
@@ -1291,6 +1294,7 @@ public class RWRouter extends AbstractRouter {
 				q.add(newNode);
 				Wire nodeHead = tmp.getStartWire();
 				if(!nodeHead.equals(tmp)){
+					System.out.println("----many----");
 					q.add(new RouteNode(nodeHead.getTile(),nodeHead.getWireIndex(),newNode,newNode.getLevel()+1));
 				}
 				

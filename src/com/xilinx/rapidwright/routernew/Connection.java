@@ -31,9 +31,9 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	private RNode<E> sinkRNode;
 	boolean sinkRNodeSet;
 	
-	public List<RNode<E>> rNodes;
+	public List<RNode<E>> rnodes;
 	public List<PIP> pips;
-	public String targetName;
+	public String targetName;//remove target name save memory?
 	
 	public Connection(int id, SitePinInst source, SitePinInst sink, TimingModel tm){
 		this.id = id;
@@ -51,7 +51,7 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		this.boundingBox = this.calculateBoundingBox();
 		this.sourceName = this.source.getName();
 		
-		this.rNodes = new ArrayList<>();
+		this.rnodes = new ArrayList<>();
 		this.pips = new ArrayList<>();
 		this.sinkRNodeSet = false;
 	}
@@ -116,7 +116,7 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	}
 	
 	public void resetConnection(){
-		this.rNodes.clear();
+		this.rnodes.clear();
 	}
 	
 	
@@ -132,8 +132,9 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		return sinkRNode;
 	}
 
-	public void setSinkRNode(RNode<E> childRNode) {
+	public void setSinkRNodeAndTargetName(RNode<E> childRNode) {
 		this.sinkRNode = childRNode;
+		this.targetName = this.sinkRNode.name;
 		this.sinkRNodeSet = true;
 	}
 
@@ -181,7 +182,7 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	}
 	
 	public boolean congested() {
-		for(RNode<E> rn : this.rNodes){
+		for(RNode<E> rn : this.rnodes){
 			if(rn.overUsed()) {
 				return true;
 			}
@@ -190,7 +191,7 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	}
 	
 	public boolean illegal() {
-		for(RNode<E> rn : this.rNodes){
+		for(RNode<E> rn : this.rnodes){
 			if(rn.illegal()) {
 				return true;
 			}
@@ -209,6 +210,6 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	}
 	
 	public void addRNode(RNode<E> rn) {
-		this.rNodes.add(rn);	
+		this.rnodes.add(rn);	
 	}
 }
