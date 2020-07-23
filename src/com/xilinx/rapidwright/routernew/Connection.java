@@ -29,10 +29,8 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	
 	private RNode<E> sourceRNode;
 	private RNode<E> sinkRNode;
-	boolean sinkRNodeSet;
 	
 	public List<RNode<E>> rnodes;
-	public List<PIP> pips;
 	public String targetName;//remove target name save memory?
 	
 	public Connection(int id, SitePinInst source, SitePinInst sink, TimingModel tm){
@@ -52,8 +50,6 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		this.sourceName = this.source.getName();
 		
 		this.rnodes = new ArrayList<>();
-		this.pips = new ArrayList<>();
-		this.sinkRNodeSet = false;
 	}
 	
 	//TODO optimization using Wire wire / Node node /TimingGroup tg as the target
@@ -111,10 +107,6 @@ public class Connection<E> implements Comparable<Connection<E>>{
 		System.out.println(s);
 	}
 	
-	public void addPIP(PIP p){
-		this.pips.add(p);
-	}
-	
 	public void resetConnection(){
 		this.rnodes.clear();
 	}
@@ -135,7 +127,6 @@ public class Connection<E> implements Comparable<Connection<E>>{
 	public void setSinkRNodeAndTargetName(RNode<E> childRNode) {
 		this.sinkRNode = childRNode;
 		this.targetName = this.sinkRNode.name;
-		this.sinkRNodeSet = true;
 	}
 
 	public void setCriticality(float criticality) {

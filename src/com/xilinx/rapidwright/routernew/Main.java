@@ -4,12 +4,13 @@ import java.util.Collection;
 import java.util.HashSet;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class Main {
-	private Design design;
+	public Design design;
 	private String toWriteDCPfileName;
 	private CodePerfTracker t;
 	
@@ -91,7 +92,7 @@ public class Main {
 		if(!this.routerNew){
 			RWRouter router = new RWRouter(this.design);
 			this.t.start("Route Design");
-			router.routeDesign();
+//			router.routeDesign();
 			
 			System.out.println("------------------------------------------------------------------------------");
 			System.out.printf("Find input pin feed took : %10.4f s\n", router.findInputPinFeedTime);
@@ -103,7 +104,7 @@ public class Main {
 			router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
 			
 		}else{			
-			if(this.opt == RoutingGranularityOpt.WIRE){			
+			if(this.opt == RoutingGranularityOpt.WIRE){	
 				PFRouterWireBased router = new PFRouterWireBased(this.design, 
 						this.toWriteDCPfileName,
 						this.nrOfTrials,
@@ -118,7 +119,10 @@ public class Main {
 				router.router.designInfo();
 				this.routerConfigurationInfo();
 				
+				this.t.start("Route Design");
 				routingRuntime = router.routingRuntime();
+				this.t.stop();
+				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
 				
 				router.router.getAllHopsAndManhattanD();
 				
@@ -152,7 +156,10 @@ public class Main {
 				router.router.designInfo();
 				this.routerConfigurationInfo();
 				
+				this.t.start("Route Design");
 				routingRuntime = router.routingRuntime();
+				this.t.stop();
+				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
 				
 				router.router.getAllHopsAndManhattanD();
 				

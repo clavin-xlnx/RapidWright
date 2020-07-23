@@ -342,15 +342,11 @@ public class PFRouter<E>{
 	}
 	
 	public void saveRouting(Connection<E> con){
-		if(!con.sinkRNodeSet){
-			System.out.println("----sinkRNode of this connection is not set----");
-		}else{
-			RNode<E> rn = con.getSinkRNode();
-			while (rn != null) {
-				con.addRNode(rn);
-				rn = rn.rnodeData.getPrev();
-			}
-		}	
+		RNode<E> rn = con.getSinkRNode();
+		while (rn != null) {
+			con.addRNode(rn);
+			rn = rn.rnodeData.getPrev();
+		}
 	}
 
 	public void resetPathCost() {

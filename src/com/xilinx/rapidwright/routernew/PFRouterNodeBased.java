@@ -11,7 +11,11 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
 public class PFRouterNodeBased{
@@ -180,7 +184,11 @@ public class PFRouterNodeBased{
 			if (validRouting) {
 				//TODO generate and assign a list of PIPs for each Net net
 				this.printInfo("\tvalid routing - no congested rnodes");
-				this.router.getDesign().writeCheckpoint(dcpFileName,t);
+				
+				this.routerTimer.pipsAssignment.start();
+				this.pipsAssignment();
+				this.routerTimer.pipsAssignment.finish();
+				
 				return;
 			}
 			
@@ -194,9 +202,51 @@ public class PFRouterNodeBased{
 		}
 		
 		this.router.outOfTrialIterations(this.nrOfTrials);
-		this.router.getDesign().writeCheckpoint(dcpFileName,t);
 		
 		return;
+	}
+	
+	public void pipsAssignment(){
+		for(Netplus<Node> np:this.sortedListOfNetplus){
+			Set<PIP> netPIPs = new HashSet<>();
+			for(Connection<Node> c:np.getConnection()){
+				netPIPs.addAll(this.conPIPs(c));
+			}
+			np.getNet().setPIPs(netPIPs);
+		}
+		
+		for(Net n:this.design.getNets()){
+			if(n.getName().equals("n689"))
+			System.out.println(n.getFanOut());
+		}
+	}
+	
+	public List<PIP> conPIPs(Connection<Node> con){
+		List<PIP> conPIPs = new ArrayList<>();
+		
+		for(int i = con.rnodes.size() -1; i > 0; i--){
+			Node nodeFormer = con.rnodes.get(i).getNode();
+			Node nodeLatter = con.rnodes.get(i-1).getNode();
+			
+			Wire startWire = this.findEndWireIndexOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
+			
+			PIP pip = new PIP(startWire.getTile(), startWire.getWireIndex(), nodeLatter.getWire());
+			
+			
+			conPIPs.add(pip);
+		}
+		return conPIPs;
+	}
+	
+	public Wire findEndWireIndexOfNode(Wire[] wires, Tile tile){
+		Wire w = null;
+		for(Wire wire:wires){
+			if(wire.getTile().equals(tile)){
+				w = wire;
+				break;
+			}
+		}
+		return w;
 	}
 	
 	public void findAverBaseCosts(){
@@ -280,5 +330,9 @@ public class PFRouterNodeBased{
 	
 	public void printInfo(String s){
 		System.out.println("  --- " + s + " --- ");
+	}
+
+	public Design getDesign() {
+		return this.design;
 	}
 }

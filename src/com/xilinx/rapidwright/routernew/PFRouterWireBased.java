@@ -179,11 +179,6 @@ public class PFRouterWireBased {
 			if (validRouting) {
 				//TODO generate and assign a list of PIPs for each Net net
 				this.printInfo("\tvalid routing - no congested rnodes");
-				
-				/*this.routerTimer.pipsAssignment.start();
-				this.pipsAssignment();
-				this.routerTimer.pipsAssignment.finish();*/
-				
 				this.router.getDesign().writeCheckpoint(dcpFileName,t);
 				return;
 			}
@@ -200,37 +195,6 @@ public class PFRouterWireBased {
 		this.router.getDesign().writeCheckpoint(dcpFileName,t);
 		
 		return;
-	}
-	
-	public void pipsAssignment(){
-		for(Netplus<Wire> np:this.sortedListOfNetplus){
-			if(np.getNet().getName().equals("n22c")){
-				System.out.println(np.getNet().toStringFull());
-				Set<PIP> netPIPs = new HashSet<>();
-				for(Connection<Wire> c:np.getConnection()){
-					netPIPs.addAll(this.conPIPs(c));
-				}
-				np.getNet().setPIPs(netPIPs);
-				
-			}
-		}
-	}
-	
-	public List<PIP> conPIPs(Connection<Wire> con){
-		List<PIP> conPIPs = new ArrayList<>();
-		RNode<Wire> rn = con.getSinkRNode().rnodeData.getPrev();//this is a wire, add sink pin SitePinInst?
-		while(rn != null){
-			RNode<Wire> rnprev = rn.rnodeData.getPrev(); 
-			PIP pip = new PIP(rn.getTile(), rnprev.getWire(), rn.getWire());//NullPointerException when creating PIPs between two INT tiles
-			conPIPs.add(pip);
-			System.out.println(pip.toString());
-			if(rnprev.rnodeData.getPrev().type == RoutableType.SOURCERNODE){
-				break;
-			}
-			rn = rnprev;
-		}
-		
-		return conPIPs;
 	}
 	
 	public void findCongestion(){
@@ -287,6 +251,10 @@ public class PFRouterWireBased {
 		router.finishRoutingACon(con);
 		
 		router.printConRNodes(con);
+	}
+	
+	public Design getDesign(){
+		return this.design;
 	}
 	
 	public void printInfo(String s){

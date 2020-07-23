@@ -14,7 +14,7 @@ public class Netplus<E>{
 	 * a PathFinder-based router development
 	 */
 	private List<Connection<E>> connections;
-	private Net net;
+	public Net net;
 	private NetType type;
 	private int id;
 	public int x_min_b, x_max_b;//short better

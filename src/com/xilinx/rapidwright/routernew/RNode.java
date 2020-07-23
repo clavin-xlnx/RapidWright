@@ -12,6 +12,8 @@ public class RNode<E>{
 	public int index;	
 	public RoutableType type;
 	
+	//private E 
+	
 	//RNode<Wire>
 	private Tile tile;
 	private int wire;
@@ -254,15 +256,7 @@ public class RNode<E>{
 	public TimingGroup getTimingGroup(){
 		return this.timingGroup;
 	}
-	
-	public boolean isTarget() {
-		return this.target;
-	}
-	
-	public void setTarget(boolean target) {
-		this.target = target;
-	}
-	
+		
 	public void updatePresentCongestionPenalty(float pres_fac) {
 		RNodeData<E> data = this.rnodeData;
 		
