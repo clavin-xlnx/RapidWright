@@ -30,7 +30,8 @@ public class PFRouterNodeBased{
 	public PFRouter<Node> router;
 	public List<Connection<Node>> sortedListOfConnection;
 	public List<Netplus<Node>> sortedListOfNetplus;
-	public ChildRNodesCreation childRNodesGeneration;
+	public ChildRNodesCreation childRNodesCreation;
+	public Set<Node> usedNodes;
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -81,7 +82,7 @@ public class PFRouterNodeBased{
 		
 		this.globalRNodeIndex = this.router.initializeNetsCons(RoutingGranularityOpt.NODE);
 		
-		this.childRNodesGeneration = new ChildRNodesCreation(null, this.rnodesCreated, null, base_cost_fac);
+		this.childRNodesCreation = new ChildRNodesCreation(null, this.rnodesCreated, null, base_cost_fac);
 		
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -214,11 +215,73 @@ public class PFRouterNodeBased{
 			}
 			np.getNet().setPIPs(netPIPs);
 		}
-		
-		for(Net n:this.design.getNets()){
-			if(n.getName().equals("n689"))
-			System.out.println(n.getFanOut());
+		this.checkInvalidlyRoutedNets("n199");
+//		this.checkPIPsUsage();
+//		this.checkNetRoutedPins();
+	}
+	
+	public void checkPIPsUsage(){
+		Map<PIP, Integer> pipsUsage = new HashMap<>();
+		for(Net net:this.design.getNets()){
+			for(PIP pip:net.getPIPs()){
+				if(!pipsUsage.containsKey(pip)){
+					pipsUsage.put(pip, 1);
+				}else{
+					pipsUsage.put(pip, pipsUsage.get(pip) + 1);
+				}
+			}
 		}
+		for(PIP pip:pipsUsage.keySet()){
+			if(pipsUsage.get(pip) > 1){
+				System.out.println("pip " + pip + " usage = " + pipsUsage.get(pip));
+			}
+		}
+	}
+	
+	public void checkInvalidlyRoutedNets(String netname){
+		for(Netplus<Node> net:this.sortedListOfNetplus){
+			if(net.getNet().getName().equals(netname)){
+				System.out.println(net.getNet().toString());
+				for(Connection<Node> c: net.getConnection()){
+					System.out.println(c.getSourceRNode().name + "\t" + c.getSinkRNode().name);
+					for(PIP p:this.conPIPs(c)){
+						System.out.println("\t" + p.toString());
+					}
+					System.out.println();
+				}
+			}
+		}
+	}
+	
+	public void checkNetRoutedPins(){
+		Map<Net, Integer> netRoutedPins = new HashMap<>();
+		for(Net net:this.design.getNets()){
+			int routedPins = 0;
+			for(PIP pip:net.getPIPs()){
+				if(pip.getEndWireName().contains("IMUX_") && !pip.getEndWireName().contains("_IMUX_")){
+					routedPins++;
+				}
+			}
+			netRoutedPins.put(net, routedPins);
+		}
+		
+		int errorNetsRoutedLargeThanFanout = 0;
+		int errorNetsRoutedLessThanFanout = 0;
+		
+		for(Net net:this.design.getNets()){
+			if(net.getFanOut() < netRoutedPins.get(net)){
+				errorNetsRoutedLargeThanFanout++;
+
+				
+			}else if(net.getFanOut() > netRoutedPins.get(net)){
+//				System.out.println("error nets routed less than fanout");
+//				System.out.println(net.toStringFull());
+				errorNetsRoutedLessThanFanout++;
+			}
+		}
+		
+		System.out.println("error nets routed large than fanout = " + errorNetsRoutedLargeThanFanout);
+		System.out.println("error nets routed less than fanout = " + errorNetsRoutedLessThanFanout);
 	}
 	
 	public List<PIP> conPIPs(Connection<Node> con){
@@ -228,17 +291,19 @@ public class PFRouterNodeBased{
 			Node nodeFormer = con.rnodes.get(i).getNode();
 			Node nodeLatter = con.rnodes.get(i-1).getNode();
 			
-			Wire startWire = this.findEndWireIndexOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
+			Wire startWire = this.findEndWireOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
 			
-			PIP pip = new PIP(startWire.getTile(), startWire.getWireIndex(), nodeLatter.getWire());
-			
-			
-			conPIPs.add(pip);
+			if(startWire != null){
+				PIP pip = new PIP(nodeLatter.getTile(), startWire.getWireIndex(), nodeLatter.getWire());
+				conPIPs.add(pip);
+			}else{
+				System.out.println("pip start wire is null");
+			}			
 		}
 		return conPIPs;
 	}
 	
-	public Wire findEndWireIndexOfNode(Wire[] wires, Tile tile){
+	public Wire findEndWireOfNode(Wire[] wires, Tile tile){
 		Wire w = null;
 		for(Wire wire:wires){
 			if(wire.getTile().equals(tile)){
@@ -305,7 +370,7 @@ public class PFRouterNodeBased{
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.globalRNodeIndex = this.childRNodesGeneration.nodeBased(rnode, this.globalRNodeIndex);
+				this.globalRNodeIndex = this.childRNodesCreation.nodeBased(rnode, this.globalRNodeIndex);
 			}
 			this.routerTimer.rnodesCreation.finish();
 			

@@ -200,17 +200,20 @@ public class PFRouter<E>{
 		System.out.println("------------------------------------------------------------------------------");
 	}
 	
-	public void unrouteNetsReserveGndVccClock(){	
-		for (Netplus<E> nplus : this.nets){
-			if(!(nplus.getNet().isClockNet() || nplus.getNet().isStaticNet())){	
-				//unroute all the nets except for GND, VCC, and clocks
-				nplus.getNet().unroute();
+	public List<Net> unrouteNetsReserveGndVccClock(){
+		List<Net> reservedNets = new ArrayList<>();
+		for(Net net:this.design.getNets()){
+			if(net.isClockNet() || net.isStaticNet()){
+				System.out.println("\nRouted net reserved:\t\t" +  net.getName());
+				reservedNets.add(net);
+				System.out.println(net.toStringFull());
+				continue;
 			}else{
-				//for the current gnl designs the GLOABAL_LOGIC0 and GLOBAL_LOGIC1 has no pins (fanout = 0)
-				System.out.println(" Routed net reserved:\t\t" +  nplus.getNet().getName());
+				net.unroute();
 			}
-			
 		}
+		
+		return reservedNets;
 	}
 	
 	public void initializeRouter(float initial_pres_fac, float pres_fac_mult, float acc_fac){
@@ -312,7 +315,10 @@ public class PFRouter<E>{
 				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
 				this.addNodeToQueue(rnode, childRNode, con);
 				
-			}else if(childRNode.type == RoutableType.INTERRNODE){
+			}else if(childRNode.getNode().getTile().getName().startsWith("INT")){
+				//traverse INT tiles only, otherwise, the router would take CLB sites as next hop candidates
+				//TODO this childRNode.getNode().getTile method does not work for wire router
+				//TODO interface really needed
 				if(con.isInBoundingBoxLimit(childRNode)){
 					if(this.debugExpansion) this.printInfo("\t\t" + " add node to the queue");
 					this.addNodeToQueue(rnode, childRNode, con);
