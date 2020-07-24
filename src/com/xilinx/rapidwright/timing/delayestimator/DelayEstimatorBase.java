@@ -75,7 +75,16 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     enum TileSide {
         E,
         W,
-        M
+        M;
+
+        public TileSide getInverted() {
+            if (this == TileSide.E)
+                return TileSide.W;
+            else if (this == TileSide.W)
+                return TileSide.E;
+            else
+                return TileSide.M;
+        }
     };
 
         /**
@@ -450,6 +459,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         if (tg == null)
             return 0;
         short begLoc = loc.shortValue();
+        // although TileSide inversion was applied to backward net inverting, isBackward is need here to get the right d
         boolean isReverseDirection = e.isReverseDirection() ^ isBackward;
 
         int limit = 0;

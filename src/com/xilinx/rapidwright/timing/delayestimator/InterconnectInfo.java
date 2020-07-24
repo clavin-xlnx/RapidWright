@@ -203,14 +203,17 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_LONG);
         }});
         // LONG can drive quad, but that is incompatible with that LONG must go to SINGLE/DOUBLE to get to CLE_IN.
+        // it is not incompatible, if long go to quad it will eventually go to single/double because quad can't drive CLE_IN either.
         // To keep simple data structure, don't allow LONG -> QUAD
         ictHier.put(TimingGroup.HORT_LONG, new ArrayList<TimingGroup>() {{
 //          Don't use single, in general, it will be added in listPaths when dist is 1
 //            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
             add(TimingGroup.HORT_LONG);
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
             add(TimingGroup.VERT_LONG);
             add(TimingGroup.BOUNCE);
         }});
@@ -248,9 +251,11 @@ public class InterconnectInfo {
         ictHier.put(TimingGroup.VERT_LONG, new ArrayList<TimingGroup>() {{
             add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
+            add(TimingGroup.HORT_QUAD);
             add(TimingGroup.HORT_LONG);
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
+            add(TimingGroup.VERT_QUAD);
             add(TimingGroup.VERT_LONG);
             add(TimingGroup.BOUNCE);
         }});

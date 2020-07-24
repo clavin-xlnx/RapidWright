@@ -92,6 +92,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         this.height  = ictInfo.minTableHeight();
         buildTables();
     }
+    DelayEstimatorTable(Device device, T ictInfo, int verbose, boolean build) {
+        super(device, ictInfo, verbose);
+        this.width   = ictInfo.minTableWidth();
+        this.height  = ictInfo.minTableHeight();
+        if (build) {
+            buildTables();
+        }
+    }
     DelayEstimatorTable(String partName, T ictInfo, short width, short height, int verbose) {
         this(Device.getDevice(partName), ictInfo, width, height, verbose);
     }
@@ -387,10 +395,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 //      this should be done in lookupDelayBackToBackTile
 
                 // generate next possible TGs
-                if (((Math.abs(frEntry.loc + frEntry.tg.length() - dist) ==  1) || (Math.abs(frEntry.loc - frEntry.tg.length() - dist) ==  1))
-                        && (dir == T.Direction.HORIZONTAL) && (to == T.TimingGroup.CLE_IN)) {
+                if ((   (Math.abs(frEntry.loc + frEntry.tg.length() - dist) ==  1)
+                        || (Math.abs(frEntry.loc - frEntry.tg.length() - dist) ==  1)
+                    )
+                    && (dir == T.Direction.HORIZONTAL)
+                    && (to == T.TimingGroup.CLE_IN) ) {
 
-                    short cLoc = (short) (frEntry.loc + (frEntry.detour ? - frEntry.tg.length() : frEntry.tg.length()));
+                    short cLoc = (short) (frEntry.loc + (frEntry.detour ? -frEntry.tg.length() : frEntry.tg.length()));
 
                     // D,I to dstFarFar
                     if (frEntry.tg == T.TimingGroup.HORT_LONG) {
@@ -412,9 +423,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         g.addVertex(LSCleNode);
                         g.addEdge(frEntry.n, LSCleNode, new TimingGroupEdge(frEntry.tg, frEntry.detour));
 
-                        g.addEdge(LDCleNode, dstFarFar,   new TimingGroupEdge(toD, cLoc > dist));
-                        g.addEdge(LDCleNode, dstNearFar,  new TimingGroupEdge(toD, cLoc > dist));
-                        g.addEdge(LDCleNode, dstFarNear,  new TimingGroupEdge(toD, cLoc > dist));
+                        g.addEdge(LDCleNode, dstFarFar, new TimingGroupEdge(toD, cLoc > dist));
+                        g.addEdge(LDCleNode, dstNearFar, new TimingGroupEdge(toD, cLoc > dist));
+                        g.addEdge(LDCleNode, dstFarNear, new TimingGroupEdge(toD, cLoc > dist));
                         g.addEdge(LDCleNode, dstNearNear, new TimingGroupEdge(toD, cLoc > dist));
                         if (cLoc > dist) {
                             g.addEdge(LSCleNode, dstFarFar, new TimingGroupEdge(toS, cLoc > dist));
@@ -436,8 +447,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                                 g.addVertex(manEntry.node);
                             g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(frEntry.tg, frEntry.detour));
 
-                            short dLoc = (short) (cLoc + (cLoc > dist ? - T.TimingGroup.HORT_DOUBLE.length()
-                                                                      :   T.TimingGroup.HORT_DOUBLE.length()));
+                            short dLoc = (short) (cLoc + (cLoc > dist ? -T.TimingGroup.HORT_DOUBLE.length()
+                                    : T.TimingGroup.HORT_DOUBLE.length()));
                             T.TimingGroup toTg1 = T.TimingGroup.BOUNCE;
                             NodeManager.Entry manEntry1 = man.getOrCreateNode(dLoc, toTg1);
                             if (manEntry1.isJustCreated)
@@ -569,6 +580,80 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         }
 
                     }
+                }
+
+
+                // additional edges
+                if ((   (Math.abs(frEntry.loc + frEntry.tg.length() - dist) ==  0)
+                        || (Math.abs(frEntry.loc - frEntry.tg.length() - dist) ==  0)
+                    )
+                        && ((frEntry.tg == T.TimingGroup.HORT_DOUBLE) || (frEntry.tg == T.TimingGroup.HORT_SINGLE))
+                        && (dir == T.Direction.HORIZONTAL)
+                        && (to == T.TimingGroup.CLE_IN) ) {
+
+
+
+                    if (frEntry.tg == T.TimingGroup.HORT_SINGLE) {
+                        {   // S
+                            Object dstTarget = (frEntry.loc > dist) ? dstFarFar : dstNearNear;
+                            g.addEdge(frEntry.n, dstTarget, new TimingGroupEdge(frEntry.tg, frEntry.loc > dist));
+                        }
+                    } else { // HORT_DOUBLE
+                        {   // D
+                            g.addEdge(frEntry.n, dstFarNear, new TimingGroupEdge(frEntry.tg, frEntry.loc > dist));
+                            g.addEdge(frEntry.n, dstNearFar, new TimingGroupEdge(frEntry.tg, frEntry.loc > dist));
+                        }
+                        {   // DI
+                            Object dstTarget = (frEntry.loc > dist) ? dstNearNear : dstFarFar;
+                            T.TimingGroup toTg = T.TimingGroup.BOUNCE;
+                            NodeManager.Entry manEntry = man.getOrCreateNode((short)dist, toTg);
+                            if (manEntry.isJustCreated)
+                                g.addVertex(manEntry.node);
+                            g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(frEntry.tg, frEntry.loc > dist));
+                            g.addEdge(manEntry.node, dstTarget, new TimingGroupEdge(toTg, false));
+                        }
+//                                {   // D-I
+//                                    Object dstTarget = (cLoc > dist) ? dstNearNear : dstFarFar;
+//
+//                                    T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
+//                                    //short loc = (short) (frEntry.loc + (frEntry.detour ? -toTg.length() : toTg.length()));
+//                                    NodeManager.Entry manEntry = man.getOrCreateNode(cLoc, toTg);
+//                                    if (manEntry.isJustCreated)
+//                                        g.addVertex(manEntry.node);
+//                                    g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(frEntry.tg, frEntry.detour));
+//
+//                                    short dLoc = (short) (cLoc + (cLoc > dist ? -T.TimingGroup.HORT_DOUBLE.length()
+//                                            : T.TimingGroup.HORT_DOUBLE.length()));
+//                                    T.TimingGroup toTg1 = T.TimingGroup.BOUNCE;
+//                                    NodeManager.Entry manEntry1 = man.getOrCreateNode(dLoc, toTg1);
+//                                    if (manEntry1.isJustCreated)
+//                                        g.addVertex(manEntry1.node);
+//                                    g.addEdge(manEntry.node, manEntry1.node, new TimingGroupEdge(toTg, cLoc > dist));
+//                                    g.addEdge(manEntry1.node, dstTarget, new TimingGroupEdge(toTg1, false));
+//                                }
+//                                {   // S
+//                                    Object dstTarget = (cLoc > dist) ? dstFarFar : dstNearNear;
+//
+//                                    T.TimingGroup toTg = T.TimingGroup.HORT_SINGLE;
+//                                    NodeManager.Entry manEntry = man.getOrCreateNode(cLoc, toTg);
+//                                    if (manEntry.isJustCreated)
+//                                        g.addVertex(manEntry.node);
+//                                    g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(frEntry.tg, frEntry.detour));
+//                                    g.addEdge(manEntry.node, dstTarget, new TimingGroupEdge(toTg, cLoc > dist));
+//                                }
+//                                {   // D to dstFarNear and dstNearFar
+//                                    T.TimingGroup toTg = T.TimingGroup.HORT_DOUBLE;
+//                                    NodeManager.Entry manEntry = man.getOrCreateNode(cLoc, toTg);
+//                                    if (manEntry.isJustCreated)
+//                                        g.addVertex(manEntry.node);
+//                                    g.addEdge(frEntry.n, manEntry.node, new TimingGroupEdge(frEntry.tg, frEntry.detour));
+//                                    g.addEdge(manEntry.node, dstFarNear, new TimingGroupEdge(toTg, cLoc > dist));
+//                                    g.addEdge(manEntry.node, dstNearFar, new TimingGroupEdge(toTg, cLoc > dist));
+//                                }
+                    }
+
+                    onlyOneDst = false;
+                    reachable = true;
                 }
             }
 
@@ -702,7 +787,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         }
     }
 
-    private void buildTables() {
+    void buildTables() {
         int verbose = 1;
         boolean plot    = true;
 
@@ -778,6 +863,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         String route = null;
 
 
+        List<Boolean> notSwitchSide = new ArrayList<Boolean>(Collections.nCopies(1, false));
         List<T.TimingGroup> begTgs = new ArrayList<T.TimingGroup>() {{add(begTg);}};
         List<T.TimingGroup> endTgs = new ArrayList<T.TimingGroup>() {{add(endTg);}};
 
@@ -790,17 +876,17 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     route = "i";
             }
         } else if (begX == endX) {
-            Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delayY =
-                    findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, endTgs, begY, endY, begSide, endSide);
+            Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> delayY =
+                    findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, notSwitchSide, endTgs, begY, endY, begSide, endSide);
             delay = delayY.get(begTg).get(endTg).getFirst();
             if (verbose == -1)
-                route = delayY.get(begTg).get(endTg).getSecond();
+                route = delayY.get(begTg).get(endTg).getSecond().getSecond();
         } else if (begY == endY) {
-            Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delayY =
-                    findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, endTgs, begX, endX, begSide, endSide);
+            Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> delayY =
+                    findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, notSwitchSide, endTgs, begX, endX, begSide, endSide);
             delay = delayY.get(begTg).get(endTg).getFirst();
             if (verbose == -1)
-                route = delayY.get(begTg).get(endTg).getSecond();
+                route = delayY.get(begTg).get(endTg).getSecond().getSecond();
         } else {
             // The key TimingGroups are used to connect between vertical and horizontal sections.
             // The direction of the key TimingGroup is not used.
@@ -809,37 +895,66 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             {
                 if (verbose > 0)
                     System.out.println("getMinDelayToSinkPin hor->ver");
-                List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
-                        (T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL));
-                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay1 =
-                        findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, keyTgs, begX, endX, begSide, endSide);
-                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay2 =
-                        findMinDelayOneDirection(this::findMinVerticalDelay, keyTgs, endTgs, begY, endY, begSide, endSide);
-                for (T.TimingGroup tg : keyTgs) {
-                    pathDelays.add(new Pair<>(
-                            (short) (delay1.get(begTg).get(tg).getFirst() + delay2.get(tg).get(endTg).getFirst()),
-                            delay1.get(begTg).get(tg).getSecond() + delay2.get(tg).get(endTg).getSecond())
-                    );
-                }
+                pathDelays = findMinDelayHorThenVer(begTg, endTg, begX, begY,
+                                 endX, endY, begSide, endSide,  pathDelays);
             }
 
             {
                 if (verbose > 0)
                     System.out.println("getMinDelayToSinkPin ver->hor");
-                List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
-                        (T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL));
-                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay1 =
-                        findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, keyTgs, begY, endY, begSide, endSide);
-                Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> delay2 =
-                        findMinDelayOneDirection(this::findMinHorizontalDelay, keyTgs, endTgs, begX, endX, begSide, endSide);
+                pathDelays = findMinDelayVerThenHor(begTg, endTg, begX, begY,
+                        endX, endY, begSide, endSide,  pathDelays);
+            }
+            {   // Allow turning in the middle to long
+                // Turning at the corner of the bounding box may not have the requiresite for long.
+                // Consider using the first as quad after begTg.
+                // TODO: this should come from interconectInfo
+                // if x dir can use long and y dir can afford quad
+                int detourLength = T.TimingGroup.HORT_QUAD.length()-1;
+                if ((begTg.direction() == T.Direction.OUTPUT || begTg.direction() == T.Direction.VERTICAL)
+                        && (Math.abs(endX-begX)+detourLength >= T.TimingGroup.HORT_LONG.length())
+                        && (Math.abs(endY-begY) != T.TimingGroup.VERT_QUAD.length() + begTg.length())
+                ) {
+                        // if (Math.abs(endY-begY) == T.TimingGroup.VERT_QUAD.length() + begTg.length()
+                        // VERT_QUAD would have considered already by ver->hor or hor->ver above
+                        // <= allow detour using Q
 
-                for (T.TimingGroup tg : keyTgs) {
-                    pathDelays.add(new Pair<>(
-                            (short) (delay1.get(begTg).get(tg).getFirst() + delay2.get(tg).get(endTg).getFirst()),
-                            delay1.get(begTg).get(tg).getSecond() + delay2.get(tg).get(endTg).getSecond())
-                    );
+                    pathDelays = findMinDelayTwoBendsFromTg(begTg, T.TimingGroup.VERT_QUAD, T.TimingGroup.HORT_LONG, endTg,
+                            begX, begY, endX, endY, begSide, endSide, pathDelays );
+                }
+
+                detourLength = T.TimingGroup.VERT_QUAD.length()-1;
+                if ((begTg.direction() == T.Direction.OUTPUT || begTg.direction() == T.Direction.HORIZONTAL)
+                        && (Math.abs(endY-begY)+detourLength >= T.TimingGroup.VERT_LONG.length())
+                        && (Math.abs(endX-begX) != T.TimingGroup.HORT_QUAD.length() + begTg.length())
+                ) {
+                    pathDelays = findMinDelayTwoBendsFromTg(begTg, T.TimingGroup.HORT_QUAD, T.TimingGroup.VERT_LONG, endTg,
+                            begX, begY, endX, endY, begSide, endSide, pathDelays );
                 }
             }
+
+            {   // Allow turning in the middle from long to the end
+                // Turning at the corner of the bounding box may not have the requiresite for long.
+                // Consider using the first as quad after begTg.
+                // TODO: this should come from interconectInfo
+                // if x dir can use long and y dir can afford quad
+                if ((endTg.direction() == T.Direction.INPUT || endTg.direction() == T.Direction.VERTICAL)
+                        && (Math.abs(endX-begX) >= T.TimingGroup.HORT_LONG.length())
+                        && (Math.abs(endY-begY) != T.TimingGroup.VERT_SINGLE.length() + endTg.length())
+                ) {
+                    pathDelays = findMinDelayTwoBendsToTg(begTg, T.TimingGroup.VERT_SINGLE, T.TimingGroup.HORT_LONG, endTg,
+                            begX, begY, endX, endY, begSide, endSide, pathDelays );
+                }
+
+                if ((endTg.direction() == T.Direction.INPUT || endTg.direction() == T.Direction.HORIZONTAL)
+                        && (Math.abs(endY-begY) >= T.TimingGroup.VERT_LONG.length())
+                        && (Math.abs(endX-begX) != T.TimingGroup.HORT_SINGLE.length() + endTg.length())
+                ) {
+                    pathDelays = findMinDelayTwoBendsToTg(begTg, T.TimingGroup.HORT_SINGLE, T.TimingGroup.VERT_LONG, endTg,
+                            begX, begY, endX, endY, begSide, endSide, pathDelays );
+                }
+            }
+
             Pair<Short,String> minEntry = Collections.min(pathDelays, new PairUtil.CompareFirst<>());
             delay = minEntry.getFirst();
             route = minEntry.getSecond();
@@ -849,31 +964,192 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return new Pair<>((short) (delay + K0.get(InterconnectInfo.Direction.INPUT).get(GroupDelayType.PINFEED)),route);
     }
 
+    private List<Pair<Short,String>> findMinDelayTwoBendsToTg (T.TimingGroup begTg, T.TimingGroup stubTg,
+                T.TimingGroup tg, T.TimingGroup endTg, short begX, short begY, short endX, short endY,
+                TileSide begSide, TileSide endSide, List<Pair<Short,String>> pathDelays ) {
+
+
+        List<Pair<Short,String>> subPathDelays = new ArrayList<>();
+
+        short beg = (tg.direction() == T.Direction.HORIZONTAL) ? begY : begX;
+        short end = (tg.direction() == T.Direction.HORIZONTAL) ? endY : endX;
+
+        short stubLength = (short) (stubTg.length() + endTg.length());                 //
+        short newEnd     = (short) (end + ((end > beg) ?  -stubLength : stubLength));  //
+
+        if (tg.direction() == T.Direction.HORIZONTAL) {
+            subPathDelays = findMinDelayHorThenVer(begTg, tg, begX, begY,             //
+                    endX, newEnd, begSide, endSide,  subPathDelays);
+        } else {
+            subPathDelays = findMinDelayVerThenHor(begTg, tg, begX, begY,             //
+                    newEnd, endY, begSide, endSide,  subPathDelays);
+        }
+
+        short stubEnd = (short) (end + ((end > beg) ?  -endTg.length() : -endTg.length()));   //
+        short stubDelay = (short) calcTimingGroupDelay(stubTg, newEnd, stubEnd, 0d);
+        short endTgDelay = (short) calcTimingGroupDelay(endTg, stubEnd, end, 0d);       //
+
+        for (Pair<Short,String> subPath : subPathDelays) {
+            String subRoute = null;
+            if (verbose == -1)
+                subRoute = subPath.getSecond() + stubTg.abbr() + endTg.abbr();   //
+
+            pathDelays.add(new Pair<>((short) (subPath.getFirst() + stubDelay + endTgDelay), subRoute));  //
+        }
+
+        return pathDelays;
+    }
+
+    private List<Pair<Short,String>> findMinDelayTwoBendsFromTg (T.TimingGroup begTg, T.TimingGroup stubTg,
+                T.TimingGroup tg, T.TimingGroup endTg, short begX, short begY, short endX, short endY,
+                TileSide begSide, TileSide endSide, List<Pair<Short,String>> pathDelays ) {
+
+
+        List<Pair<Short,String>> subPathDelays = new ArrayList<>();
+
+        short beg = (tg.direction() == T.Direction.HORIZONTAL) ? begY : begX;
+        short end = (tg.direction() == T.Direction.HORIZONTAL) ? endY : endX;
+
+        short stubLength = (short) (stubTg.length() + begTg.length());
+        short newBeg     = (short) (beg + ((end > beg) ?  stubLength : -stubLength));
+
+        if (tg.direction() == T.Direction.HORIZONTAL) {
+            subPathDelays = findMinDelayHorThenVer(tg, endTg, begX, newBeg,
+                                endX, endY, begSide, endSide,  subPathDelays);
+        } else {
+            subPathDelays = findMinDelayVerThenHor(tg, endTg, newBeg, begY,
+                                endX, endY, begSide, endSide,  subPathDelays);
+        }
+
+        short stubBeg = (short) (beg + ((end > beg) ?  begTg.length() : -begTg.length()));
+        short stubDelay = (short) calcTimingGroupDelay(stubTg, stubBeg, newBeg, 0d);
+        short begTgDelay = (short) calcTimingGroupDelay(begTg, beg, stubBeg, 0d);
+
+        for (Pair<Short,String> subPath : subPathDelays) {
+            String subRoute = null;
+            if (verbose == -1 || verbose == 6)
+                subRoute = "" + begTg.abbr() + stubTg.abbr() + subPath.getSecond();
+
+            pathDelays.add(new Pair<>((short) (subPath.getFirst() + stubDelay + begTgDelay), subRoute));
+        }
+
+        return pathDelays;
+    }
+
+
+    List<Boolean> createSwitchSideList(List<T.TimingGroup> keyTgs, Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>> delayTos) {
+        List<Boolean> res = new ArrayList<>();
+        for (T.TimingGroup tg : keyTgs) {
+            Pair<Short,Pair<Boolean,String>> delay = delayTos.get(tg);
+            res.add(delay.getSecond().getFirst());
+        }
+        return res;
+    }
+
+    private List<Pair<Short,String>> findMinDelayVerThenHor(T.TimingGroup begTg, T.TimingGroup endTg,short begX, short begY,
+                 short endX, short endY, TileSide begSide, TileSide endSide, List<Pair<Short,String>> pathDelays ) {
+
+        List<T.TimingGroup> begTgs = new ArrayList<T.TimingGroup>() {{add(begTg);}};
+        List<T.TimingGroup> endTgs = new ArrayList<T.TimingGroup>() {{add(endTg);}};
+
+        List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
+                (T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL));
+        List<Boolean> notSwitchSide = new ArrayList<Boolean>(Collections.nCopies(keyTgs.size(), false));
+        Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> delay1 =
+                findMinDelayOneDirection(this::findMinVerticalDelay, begTgs, notSwitchSide, keyTgs, begY, endY, begSide, endSide);
+        List<Boolean> fromSwitchSide = createSwitchSideList(keyTgs, delay1.get(begTg));
+        Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> delay2 =
+                findMinDelayOneDirection(this::findMinHorizontalDelay, keyTgs, fromSwitchSide, endTgs, begX, endX, begSide, endSide);
+
+        Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> delay3 = null;
+        // if the table is longer than long, need to find delay3 for ~begSide also.
+        // then in the for loop below when the last tg of delay1 entry is long, get the min between delay2 and delay3.
+        // TODO: should get form interconnectInfo
+        if (begTg == InterconnectInfo.TimingGroup.VERT_LONG) {
+            delay3 = findMinDelayOneDirection(this::findMinHorizontalDelay, keyTgs, notSwitchSide, endTgs, begX, endX, begSide.getInverted(), endSide);
+        }
+
+        for (T.TimingGroup tg : keyTgs) {
+            pathDelays.add(new Pair<>(
+                    (short) (delay1.get(begTg).get(tg).getFirst() + delay2.get(tg).get(endTg).getFirst()),
+                    delay1.get(begTg).get(tg).getSecond().getSecond() + delay2.get(tg).get(endTg).getSecond().getSecond())
+            );
+            // TODO: should get form interconnectInfo
+            if (begTg == InterconnectInfo.TimingGroup.VERT_LONG) {
+                pathDelays.add(new Pair<>(
+                        (short) (delay1.get(begTg).get(tg).getFirst() + delay3.get(tg).get(endTg).getFirst()),
+                        delay1.get(begTg).get(tg).getSecond().getSecond() + delay3.get(tg).get(endTg).getSecond().getSecond())
+                );
+            }
+        }
+
+        return pathDelays;
+    }
+
+    private List<Pair<Short,String>> findMinDelayHorThenVer(T.TimingGroup begTg, T.TimingGroup endTg,short begX, short begY,
+                 short endX, short endY, TileSide begSide, TileSide endSide, List<Pair<Short,String>> pathDelays ) {
+
+        List<T.TimingGroup> begTgs = new ArrayList<T.TimingGroup>() {{add(begTg);}};
+        List<T.TimingGroup> endTgs = new ArrayList<T.TimingGroup>() {{add(endTg);}};
+
+        List<T.TimingGroup> keyTgs = ictInfo.getTimingGroup(
+                (T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL));
+        List<Boolean> notSwitchSide = new ArrayList<Boolean>(Collections.nCopies(keyTgs.size(), false));
+        Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> delay1 =
+                findMinDelayOneDirection(this::findMinHorizontalDelay, begTgs, notSwitchSide, keyTgs, begX, endX, begSide, endSide);
+        List<Boolean> fromSwitchSide = createSwitchSideList(keyTgs, delay1.get(begTg));
+        Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> delay2 =
+                findMinDelayOneDirection(this::findMinVerticalDelay, keyTgs, fromSwitchSide, endTgs, begY, endY, begSide, endSide);
+        for (T.TimingGroup tg : keyTgs) {
+            pathDelays.add(new Pair<>(
+                    (short) (delay1.get(begTg).get(tg).getFirst() + delay2.get(tg).get(endTg).getFirst()),
+                    delay1.get(begTg).get(tg).getSecond().getSecond() + delay2.get(tg).get(endTg).getSecond().getSecond())
+            );
+        }
+
+        return pathDelays;
+    }
+
     /**
      *
+     * @param computeOnDir
      * @param fromTgs
+//     * @param fromSwitchSide When this method is called for the second leg of a route, the first leg might switch side as indicated with tihs param.
      * @param toTgs
      * @param s
      * @param t
+     * @param begSide
+     * @param endSide
      * @return
      */
-    private Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> findMinDelayOneDirection(findMinDelayInterface computeOnDir,
-            List<T.TimingGroup> fromTgs, List<T.TimingGroup> toTgs, short s, short t, TileSide begSide, TileSide endSide) {
+    private Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> findMinDelayOneDirection(findMinDelayInterface computeOnDir,
+            List<T.TimingGroup> fromTgs, List<Boolean> fromSwitchSide, List<T.TimingGroup> toTgs, short s, short t, TileSide begSide, TileSide endSide) {
 
         short dist = (short) (t - s);
 
+
         // separate building this to declutter the compute logic below.
-        Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,String>>> res = new HashMap<>();
+        Map<T.TimingGroup,Map<T.TimingGroup,Pair<Short,Pair<Boolean,String>>>> res = new HashMap<>();
         for (T.TimingGroup fromTg : fromTgs) {
-            Map<T.TimingGroup, Pair<Short,String>> resToTgs = new HashMap<>();
+            Map<T.TimingGroup, Pair<Short,Pair<Boolean,String>>> resToTgs = new HashMap<>();
             res.put(fromTg, resToTgs);
         }
 
-
         List<Short> pathDelays = new ArrayList<>();
-        for (T.TimingGroup fromTg : fromTgs) {
+//        for (T.TimingGroup fromTg : fromTgs) {
+        for (int i = 0; i < fromTgs.size(); ++i){
+            T.TimingGroup fromTg = fromTgs.get(i);
+            TileSide fromSide = begSide;
+            if (fromSwitchSide.get(i)) {
+                if (dist > 0) {
+                    fromSide = TileSide.E;
+                } else if (dist < 0) {
+                    fromSide = TileSide.W;
+                }
+            }
+
             for (T.TimingGroup toTg : toTgs) {
-                res.get(fromTg).put(toTg,computeOnDir.execute(fromTg, toTg, s, dist, begSide, endSide));
+                res.get(fromTg).put(toTg,computeOnDir.execute(fromTg, toTg, s, dist, fromSide, endSide));
             }
         }
 
@@ -882,7 +1158,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     @FunctionalInterface
     private interface findMinDelayInterface<T extends InterconnectInfo> {
-        public Pair<Short,String> execute(T.TimingGroup s, T.TimingGroup t, short sY, short distY, TileSide begSide, TileSide endSide);
+        public Pair<Short,Pair<Boolean,String>> execute(T.TimingGroup s, T.TimingGroup t, short sY, short distY, TileSide begSide, TileSide endSide);
     }
 
     /**
@@ -896,7 +1172,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @return Delay of the route in ps
      */
     // The return delay do not include that of the dst
-    private Pair<Short,String> findMinVerticalDelay(T.TimingGroup s, T.TimingGroup t, short loc, short dist, TileSide begSide, TileSide endSide) {
+    private Pair<Short,Pair<Boolean,String>> findMinVerticalDelay(T.TimingGroup s, T.TimingGroup t, short loc, short dist, TileSide begSide, TileSide endSide) {
 
         short limit = height;
         T.TimingGroup extendingTg = T.TimingGroup.VERT_LONG;
@@ -911,24 +1187,23 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 route = res.getSecond().getSecond();
                 route = route + T.TimingGroup.BOUNCE.abbr();
             }
-            return new Pair<>((short) (res.getFirst() + bounceDelay),route);
+            return new Pair<>((short) (res.getFirst() + bounceDelay),new Pair<>(res.getSecond().getFirst(),route));
         } else {
-            return new Pair<>(res.getFirst(),res.getSecond().getSecond());
+            return res;
         }
     }
     /**
      * Find min delay of horizontal route between the given source and sink.
      * see findMinVerticalDelay for descriptions of parameters
      */
-    private Pair<Short,String> findMinHorizontalDelay(T.TimingGroup s, T.TimingGroup t, short loc, short dist, TileSide begSide, TileSide endSide) {
+    private Pair<Short,Pair<Boolean,String>> findMinHorizontalDelay(T.TimingGroup s, T.TimingGroup t, short loc, short dist, TileSide begSide, TileSide endSide) {
 
         short limit = width;
         T.TimingGroup extendingTg = T.TimingGroup.HORT_LONG;
         ArrayList<Map<T.TimingGroup,Map<T.TimingGroup,DelayGraphEntry>>> table = TgToTgHorizontally;
 
-        Pair<Short,Pair<Boolean,String>> res = findMinDelay(table, limit, extendingTg, s, t, loc, dist, begSide, endSide,
+        return  findMinDelay(table, limit, extendingTg, s, t, loc, dist, begSide, endSide,
                 InterconnectInfo.Direction.HORIZONTAL);
-        return new Pair<>(res.getFirst(), res.getSecond().getSecond());
     }
 
 
@@ -1170,9 +1445,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         verbose = 6;
         Pair<Short,String> res = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN,
                 (short) sx, (short) sy, (short) tx, (short) ty, TileSide.valueOf(sSide), TileSide.valueOf(tSide));
-        System.out.println(sx + " " + tx + " " + sy + " " + ty + " " + res.getFirst());
-
-        System.out.println("path " + res.getSecond());
+        System.out.println();
+        System.out.println(sx + " " + tx + " " + sy + " " + ty + " " + res.getFirst() + " path " + res.getSecond());
     }
 
     void testCases(String fname) {
@@ -1291,7 +1565,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                             refRoute = matcher.group(9);
 
                             // TBD
-                            System.out.println(String.format("%3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
+//                            System.out.println(String.format("%3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
 
                             Pair<Short,String> res = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, sx, sy, tx, ty,
                                     TileSide.valueOf(sSide), TileSide.valueOf(tSide));
@@ -1438,34 +1712,37 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 0);
-
-        //est.testLookup();
-        // vert in table
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, 0, false);
+        if (false) {
+            double dAtSource = 3.0d;
+            short  dist      = 1;
+            short  detour    = 2;
+            InterconnectInfo.Direction dir = InterconnectInfo.Direction.HORIZONTAL;
+            InterconnectInfo.TimingGroup fr = InterconnectInfo.TimingGroup.HORT_DOUBLE;
+            InterconnectInfo.TimingGroup to = InterconnectInfo.TimingGroup.CLE_IN;
+            DelayGraphEntry sentry = est.listPaths(fr, to, dir, dist, detour, true, true);
+        } else {
+            est.buildTables();
+            //est.testLookup();
+            // vert in table
 //        est.testCases("est_dly_ref_81_81_121_139_E_E.txt");
 //        est.testCases("est_dly_ref_81_81_121_139_E_W.txt");
-        // hor in table
+            // hor in table
 //        est.testCases("est_dly_ref_44_53_80_80_E_E.txt");
 //       est.testCases("est_dly_ref_44_53_80_80_E_W.txt");
 //        est.testCases("est_dly_ref_44_53_80_80_W_E.txt");
 //        est.testCases("est_dly_ref_44_53_80_80_W_W.txt");
-        // diag in table
+            // diag in table
+//            est.zeroDistArrays();
         est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
 
-//        est.testOne(46,52,80,80,"W","E");
+//            est.testOne(46, 44, 123, 121, "E", "E");
+//            est.testOne(44, 49, 121, 136, "E", "E");
 //        est.testOne(52,46,80,80,"E","W");
 //        est.testOne(50,44,80,80,"E","W");
-
-
-        if (false) {
-            double dAtSource = 3.0d;
-            short  dist      = 1;
-            short  detour    = 5;
-            InterconnectInfo.Direction dir = InterconnectInfo.Direction.HORIZONTAL;
-            InterconnectInfo.TimingGroup fr = InterconnectInfo.TimingGroup.HORT_LONG;
-            InterconnectInfo.TimingGroup to = InterconnectInfo.TimingGroup.VERT_SINGLE;
-            DelayGraphEntry sentry = est.listPaths(fr, to, dir, dist, detour, true, true);
         }
+
+
 
     }
 
