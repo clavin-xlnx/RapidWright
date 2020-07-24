@@ -51,21 +51,26 @@ public class ChildRNodesCreation{
 		return globalRNodeIndex;
 	}
 	
-	public int nodeBased(RNode<Node> rnode, int globalRNodeIndex){
+	public int nodeBased(RNode<Node> rnode, int globalRNodeIndex, Set<Node> reserved){
 		Node rnodeNode = rnode.getNode();
 		List<RNode<Node>> childRNodes = new ArrayList<>();
 		for(Node node:rnodeNode.getAllDownhillNodes()){
-			RNode<Node> childRNode;
-			String key = node.toString();
-			if(!this.rnodesCreatedNode.containsKey(key)){
-				childRNode = new RNode<Node>(globalRNodeIndex, node);
-				childRNode.setBaseCost(this.base_cost_fac);
-				globalRNodeIndex++;
-				childRNodes.add(childRNode);
-				this.rnodesCreatedNode.put(key, childRNode);
-			}else{
-				childRNodes.add(this.rnodesCreatedNode.get(key));
+			if(node.getTile().getName().startsWith("INT")){
+				if(!reserved.contains(node)){
+					RNode<Node> childRNode;
+					String key = node.toString();
+					if(!this.rnodesCreatedNode.containsKey(key)){
+						childRNode = new RNode<Node>(globalRNodeIndex, node);
+						childRNode.setBaseCost(this.base_cost_fac);
+						globalRNodeIndex++;
+						childRNodes.add(childRNode);
+						this.rnodesCreatedNode.put(key, childRNode);
+					}else{
+						childRNodes.add(this.rnodesCreatedNode.get(key));
+					}
+				}
 			}
+			
 		}
 		rnode.setChildren(childRNodes);
 		

@@ -202,14 +202,20 @@ public class PFRouter<E>{
 	
 	public List<Net> unrouteNetsReserveGndVccClock(){
 		List<Net> reservedNets = new ArrayList<>();
+		System.out.println();
 		for(Net net:this.design.getNets()){
 			if(net.isClockNet() || net.isStaticNet()){
-				System.out.println("\nRouted net reserved:\t\t" +  net.getName());
+				System.out.println("Routed net reserved:\t" +  net.getName());
 				reservedNets.add(net);
-				System.out.println(net.toStringFull());
 				continue;
-			}else{
+			}else if(net.getFanOut() > 0){
 				net.unroute();
+			}else{
+//				System.out.println(net.toStringFull());
+				if(net.getName().equals("ip[29]")){
+					System.out.println("ip[29] has pips? " + net.hasPIPs());
+					System.out.println("ip[29] logic net? " + net.getLogicalNet().getName());
+				}
 			}
 		}
 		
@@ -315,10 +321,9 @@ public class PFRouter<E>{
 				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
 				this.addNodeToQueue(rnode, childRNode, con);
 				
-			}else if(childRNode.getNode().getTile().getName().startsWith("INT")){
+			}else{
 				//traverse INT tiles only, otherwise, the router would take CLB sites as next hop candidates
-				//TODO this childRNode.getNode().getTile method does not work for wire router
-				//TODO interface really needed
+				//this can be done by downsizing the created rnodes
 				if(con.isInBoundingBoxLimit(childRNode)){
 					if(this.debugExpansion) this.printInfo("\t\t" + " add node to the queue");
 					this.addNodeToQueue(rnode, childRNode, con);

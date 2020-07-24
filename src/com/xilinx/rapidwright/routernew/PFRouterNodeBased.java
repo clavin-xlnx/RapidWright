@@ -31,7 +31,7 @@ public class PFRouterNodeBased{
 	public List<Connection<Node>> sortedListOfConnection;
 	public List<Netplus<Node>> sortedListOfNetplus;
 	public ChildRNodesCreation childRNodesCreation;
-	public Set<Node> usedNodes;
+	public Set<Node> reservedNodes;
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -107,8 +107,14 @@ public class PFRouterNodeBased{
 		Collections.sort(this.sortedListOfNetplus, Comparators.FanoutNet);
 		
 		//unroute nets except GND VCC and clocK
-		this.router.unrouteNetsReserveGndVccClock();
-		
+		List<Net> reservedNets = this.router.unrouteNetsReserveGndVccClock();
+		this.reservedNodes = new HashSet<>();
+		for(Net net:reservedNets){
+			for(PIP pip:net.getPIPs()){
+				this.reservedNodes.add(pip.getStartNode());
+				this.reservedNodes.add(pip.getEndNode());
+			}
+		}
 		//initialize router
 		this.router.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
 				
@@ -184,7 +190,7 @@ public class PFRouterNodeBased{
 	
 			if (validRouting) {
 				//TODO generate and assign a list of PIPs for each Net net
-				this.printInfo("\tvalid routing - no congested rnodes");
+				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
 				
 				this.routerTimer.pipsAssignment.start();
 				this.pipsAssignment();
@@ -215,9 +221,16 @@ public class PFRouterNodeBased{
 			}
 			np.getNet().setPIPs(netPIPs);
 		}
-		this.checkInvalidlyRoutedNets("n199");
-//		this.checkPIPsUsage();
+//		this.checkInvalidlyRoutedNets("n199");
+		this.checkPIPsUsage();
 //		this.checkNetRoutedPins();
+//		this.printWrittenPIPs();
+	}
+	
+	public void printWrittenPIPs(){
+		for(Net net:this.design.getNets()){
+			System.out.println(net.toStringFull());
+		}
 	}
 	
 	public void checkPIPsUsage(){
@@ -370,7 +383,7 @@ public class PFRouterNodeBased{
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.globalRNodeIndex = this.childRNodesCreation.nodeBased(rnode, this.globalRNodeIndex);
+				this.globalRNodeIndex = this.childRNodesCreation.nodeBased(rnode, this.globalRNodeIndex, this.reservedNodes);
 			}
 			this.routerTimer.rnodesCreation.finish();
 			

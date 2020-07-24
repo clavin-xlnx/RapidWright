@@ -12,8 +12,6 @@ public interface Routable {
 	
 	public List<Routable> getChildren();
 	
-	public void setChildren(List<Routable> children);
-	
 	public void setBaseCost();
 	
 	public boolean overUsed();
