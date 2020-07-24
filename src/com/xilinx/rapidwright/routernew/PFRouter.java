@@ -210,12 +210,6 @@ public class PFRouter<E>{
 				continue;
 			}else if(net.getFanOut() > 0){
 				net.unroute();
-			}else{
-//				System.out.println(net.toStringFull());
-				if(net.getName().equals("ip[29]")){
-					System.out.println("ip[29] has pips? " + net.hasPIPs());
-					System.out.println("ip[29] logic net? " + net.getLogicalNet().getName());
-				}
 			}
 		}
 		

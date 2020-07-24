@@ -30,11 +30,15 @@ public class Main {
 	
 	public Main(String[] arguments) {
 		if(arguments.length < 2){
-			System.out.println("USAGE:\n <input.dcp>\n <output.dcp>");
+			System.out.println("USAGE:\n <input.dcp>\n <output .dcp folder>");
 		}
 		
-		this.design = Design.readCheckpoint(arguments[0]);	
-		this.toWriteDCPfileName = arguments[1];
+		this.design = Design.readCheckpoint(arguments[0]);
+		
+		int folderSep = arguments[0].lastIndexOf("/");
+		int extensionSep = arguments[0].lastIndexOf(".");
+		this.toWriteDCPfileName = arguments[1] + arguments[0].substring(folderSep, extensionSep) + ".dcp";
+		
 		this.t = new CodePerfTracker("Router", true);
 		
 		for(int i = 2; i < arguments.length; i++) {
