@@ -431,7 +431,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                             g.addEdge(LSCleNode, dstFarFar, new TimingGroupEdge(toS, cLoc > dist));
                             // somehow I don't see this in practice.
                             // see : 46 53 80 80 SLICE_X71Y80 E SLICE_X83Y80 E    1.13%    3.40   304.40  301.00 qld
-                            //g.addEdge(LSCleNode, dstNearFar, new TimingGroupEdge(toS, cLoc > dist));
+                            // need this for est_dly_ref_44_53_121_139_E_E #841 to get QLls instead of QLld +14
+                            g.addEdge(LSCleNode, dstNearFar, new TimingGroupEdge(toS, cLoc > dist));
                         } else {
                             g.addEdge(LSCleNode, dstFarNear, new TimingGroupEdge(toS, cLoc > dist));
                             g.addEdge(LSCleNode, dstNearNear, new TimingGroupEdge(toS, cLoc > dist));
@@ -1139,17 +1140,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        for (T.TimingGroup fromTg : fromTgs) {
         for (int i = 0; i < fromTgs.size(); ++i){
             T.TimingGroup fromTg = fromTgs.get(i);
-            TileSide fromSide = begSide;
-            if (fromSwitchSide.get(i)) {
-                if (dist > 0) {
-                    fromSide = TileSide.E;
-                } else if (dist < 0) {
-                    fromSide = TileSide.W;
-                }
-            }
-
             for (T.TimingGroup toTg : toTgs) {
-                res.get(fromTg).put(toTg,computeOnDir.execute(fromTg, toTg, s, dist, fromSide, endSide));
+                res.get(fromTg).put(toTg,computeOnDir.execute(fromTg, fromSwitchSide.get(i), toTg, s, dist, begSide, endSide));
             }
         }
 
@@ -1158,7 +1150,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     @FunctionalInterface
     private interface findMinDelayInterface<T extends InterconnectInfo> {
-        public Pair<Short,Pair<Boolean,String>> execute(T.TimingGroup s, T.TimingGroup t, short sY, short distY, TileSide begSide, TileSide endSide);
+        public Pair<Short,Pair<Boolean,String>> execute(T.TimingGroup s, boolean fromSwitchSide, T.TimingGroup t, short sY, short distY, TileSide begSide, TileSide endSide);
     }
 
     /**
@@ -1172,15 +1164,21 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @return Delay of the route in ps
      */
     // The return delay do not include that of the dst
-    private Pair<Short,Pair<Boolean,String>> findMinVerticalDelay(T.TimingGroup s, T.TimingGroup t, short loc, short dist, TileSide begSide, TileSide endSide) {
+    private Pair<Short,Pair<Boolean,String>> findMinVerticalDelay(T.TimingGroup s, boolean fromSwitchSide, T.TimingGroup t, short loc, short dist, TileSide begSide, TileSide endSide) {
 
         short limit = height;
         T.TimingGroup extendingTg = T.TimingGroup.VERT_LONG;
         ArrayList<Map<T.TimingGroup, Map<T.TimingGroup, DelayGraphEntry>>> table = TgToTgVertically;
 
-        Pair<Short,Pair<Boolean,String>> res = findMinDelay(table, limit, extendingTg, s, t, loc, dist, begSide, endSide,
+        TileSide fromSide = begSide;
+        if (fromSwitchSide) {
+            // always become the same side as sink
+            fromSide = endSide;
+        }
+
+        Pair<Short,Pair<Boolean,String>> res = findMinDelay(table, limit, extendingTg, s, t, loc, dist, fromSide, endSide,
                 InterconnectInfo.Direction.VERTICAL);
-        if ((begSide != endSide) && !res.getSecond().getFirst()) {
+        if ((fromSide != endSide) && !res.getSecond().getFirst()) {
             short bounceDelay = (short) calcTimingGroupDelay(T.TimingGroup.BOUNCE, (short) 0, (short) 0, 0d);
             String route = null;
             if (verbose > 4 || verbose == -1) {
@@ -1196,13 +1194,23 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * Find min delay of horizontal route between the given source and sink.
      * see findMinVerticalDelay for descriptions of parameters
      */
-    private Pair<Short,Pair<Boolean,String>> findMinHorizontalDelay(T.TimingGroup s, T.TimingGroup t, short loc, short dist, TileSide begSide, TileSide endSide) {
+    private Pair<Short,Pair<Boolean,String>> findMinHorizontalDelay(T.TimingGroup s, boolean fromSwitchSide, T.TimingGroup t, short loc, short dist, TileSide begSide, TileSide endSide) {
 
         short limit = width;
         T.TimingGroup extendingTg = T.TimingGroup.HORT_LONG;
         ArrayList<Map<T.TimingGroup,Map<T.TimingGroup,DelayGraphEntry>>> table = TgToTgHorizontally;
 
-        return  findMinDelay(table, limit, extendingTg, s, t, loc, dist, begSide, endSide,
+        TileSide fromSide = begSide;
+        if (fromSwitchSide) {
+            // always become the closer side
+            if (dist > 0) {
+                fromSide = TileSide.E;
+            } else if (dist < 0) {
+                fromSide = TileSide.W;
+            }
+        }
+
+        return  findMinDelay(table, limit, extendingTg, s, t, loc, dist, fromSide, endSide,
                 InterconnectInfo.Direction.HORIZONTAL);
     }
 
@@ -1734,9 +1742,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        est.testCases("est_dly_ref_44_53_80_80_W_W.txt");
             // diag in table
 //            est.zeroDistArrays();
-        est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+//        est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
 
-//            est.testOne(46, 44, 123, 121, "E", "E");
+            est.testOne(53, 44, 138, 123, "E", "E");
 //            est.testOne(44, 49, 121, 136, "E", "E");
 //        est.testOne(52,46,80,80,"E","W");
 //        est.testOne(50,44,80,80,"E","W");
