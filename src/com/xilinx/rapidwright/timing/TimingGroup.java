@@ -170,6 +170,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
                             break;
                         }
                     }
+                    if(nextNextPip == null) return null;//TODO better way to check earlier
                     nextNextNode = nextNextPip.getEndNode();
 
                     Wire[] nextNextWires = nextNextNode.getAllWiresInNode();
