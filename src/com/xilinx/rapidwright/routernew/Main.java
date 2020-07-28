@@ -8,6 +8,8 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.timing.TimingManager;
+import com.xilinx.rapidwright.timing.TimingModel;
 
 public class Main {
 	public Design design;
@@ -21,8 +23,8 @@ public class Main {
 	private int nrOfTrials = 100;
 	private int bbRange = 5;
 	private boolean isINTtileRange = false;//TODO
-	private float mdWeight = 1;
-	private float hopWeight = 1;
+	private float mdWeight = 1.5f;
+	private float hopWeight = 0.5f;
 	private float initial_pres_fac = 0.5f; 
 	private float pres_fac_mult = 2f; 
 	private float acc_fac = 1;
@@ -181,6 +183,48 @@ public class Main {
 						router.sortedListOfConnection.size(),
 						router.router.getNodesExpanded(),
 						router.routerTimer);
+			}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
+				
+				TimingManager tm = new TimingManager(this.design);
+				TimingModel timingModel = tm.getTimingModel();
+				
+				PFRouterTimingGroupBased router = new PFRouterTimingGroupBased(this.design, 
+						timingModel,
+						this.toWriteDCPfileName,
+						this.nrOfTrials,
+						this.t,
+						this.bbRange,
+						this.mdWeight,
+						this.hopWeight,
+						this.initial_pres_fac,
+						this.pres_fac_mult,
+						this.acc_fac,
+						this.base_cost_fac);
+				router.router.designInfo();
+				this.routerConfigurationInfo();
+				
+				this.t.start("Route Design");
+				routingRuntime = router.routingRuntime();
+				this.t.stop();
+				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
+				
+				router.router.getAllHopsAndManhattanD();
+				
+				this.rnodesInfo(router.router.getManhattanD(),
+						router.router.getHops(),
+						router.firstIterRNodes,
+						router.globalRNodeIndex,
+						router.router.getUsedRNodes(),
+						router.checkAverageNumWires(),
+						router.checkAverageNumNodes());
+				
+				this.runtimeInfoPrinting(routingRuntime, 
+						router.router.getItry(), 
+						router.router.getConnectionsRouted(),
+						router.sortedListOfConnection.size(),
+						router.router.getNodesExpanded(),
+						router.routerTimer);
+				
 			}
 		}
 	}

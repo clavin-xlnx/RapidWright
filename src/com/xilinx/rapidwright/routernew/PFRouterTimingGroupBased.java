@@ -17,21 +17,23 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.timing.TimingGroup;
+import com.xilinx.rapidwright.timing.TimingModel;
 
-public class PFRouterNodeBased{
+public class PFRouterTimingGroupBased{
 	public Design design;
-	public PriorityQueue<QueueElement<Node>> queue;
-	public Collection<RNodeData<Node>> rnodesTouched;
-	public Map<String, RNode<Node>> rnodesCreated;//name and rnode pair
+	public PriorityQueue<QueueElement<TimingGroup>> queue;
+	public Collection<RNodeData<TimingGroup>> rnodesTouched;
+	public Map<String, RNode<TimingGroup>> rnodesCreated;//name and rnode pair
 	public String dcpFileName;
 	public int nrOfTrials;
 	public CodePerfTracker t;
 	
-	public PFRouter<Node> router;
-	public List<Connection<Node>> sortedListOfConnection;
-	public List<Netplus<Node>> sortedListOfNetplus;
+	public PFRouter<TimingGroup> router;
+	public List<Connection<TimingGroup>> sortedListOfConnection;
+	public List<Netplus<TimingGroup>> sortedListOfNetplus;
 	public ChildRNodesCreation childRNodesCreation;
-	public Set<Node> reservedNodes;
+	public Set<TimingGroup> reservedNodes;
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -44,9 +46,12 @@ public class PFRouterNodeBased{
 	public int globalRNodeIndex;
 	public int firstIterRNodes;
 	
-	public boolean trial = false;
+	public TimingModel timingModel;
 	
-	public PFRouterNodeBased(Design design,
+	public boolean trial = true;
+	
+	public PFRouterTimingGroupBased(Design design,
+			TimingModel timingModel,
 			String dcpFileName,
 			int nrOfTrials,
 			CodePerfTracker t,
@@ -70,8 +75,10 @@ public class PFRouterNodeBased{
 		this.pres_fac_mult = pres_fac_mult;
 		this.acc_fac = acc_fac;
 		
+		this.timingModel = timingModel;
+		
 		this.routerTimer = new RouterTimer();
-		this.router = new PFRouter<Node>(this.design, 
+		this.router = new PFRouter<TimingGroup>(this.design, 
 				this.queue, 
 				this.rnodesTouched, 
 				this.rnodesCreated, 
@@ -80,9 +87,9 @@ public class PFRouterNodeBased{
 				hopWeight,
 				base_cost_fac);
 		
-		this.globalRNodeIndex = this.router.initializeNetsCons(RoutingGranularityOpt.NODE);
+		this.globalRNodeIndex = this.router.initializeNetsCons(this.timingModel);
 		
-		this.childRNodesCreation = new ChildRNodesCreation(null, this.rnodesCreated, null, base_cost_fac);
+		this.childRNodesCreation = new ChildRNodesCreation(null, null, rnodesCreated, base_cost_fac);
 		
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -108,22 +115,22 @@ public class PFRouterNodeBased{
 		
 		//unroute nets except GND VCC and clocK
 		List<Net> reservedNets = this.router.unrouteNetsReserveGndVccClock();
-		this.reservedNodes = new HashSet<>();
+		/*this.reservedNodes = new HashSet<>();
 		for(Net net:reservedNets){
 			for(PIP pip:net.getPIPs()){
 				this.reservedNodes.add(pip.getStartNode());
 				this.reservedNodes.add(pip.getEndNode());
 			}
-		}
+		}*/
 		//initialize router
 		this.router.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
 				
 		//do routing
 		boolean validRouting;
-        List<Netplus<Node>> trialNets = new ArrayList<>();
-        for(Netplus<Node> net : this.sortedListOfNetplus){
-//        	if(net.getNet().getName().equals("n767") || net.getNet().getName().equals("n761")){
-        	if(net.getNet().getName().equals("n775") || net.getNet().getName().equals("n689")){
+        List<Netplus<TimingGroup>> trialNets = new ArrayList<>();
+        for(Netplus<TimingGroup> net : this.sortedListOfNetplus){
+        	if(net.getNet().getName().equals("n2a9")){// || net.getNet().getName().equals("n2ab")){
+        		System.out.println("trial net fanout" + net.getNet().getFanOut());
         		trialNets.add(net);
         	}
         }
@@ -136,7 +143,7 @@ public class PFRouterNodeBased{
 			if(this.trial) this.printInfo("iteration " + this.router.getItry() + " begins");
 			
 			if(!this.trial){
-				for(Connection<Node> con:this.sortedListOfConnection){
+				for(Connection<TimingGroup> con:this.sortedListOfConnection){
 					if(this.router.getItry() == 1){
 						this.routerTimer.firstIteration.start();
 						this.routeACon(con);
@@ -148,8 +155,8 @@ public class PFRouterNodeBased{
 					}
 				}
 			}else{
-				for(Netplus<Node> np : trialNets){
-					for(Connection<Node> c : np.getConnection()){
+				for(Netplus<TimingGroup> np : trialNets){
+					for(Connection<TimingGroup> c : np.getConnection()){
 						if(this.router.getItry() == 1){
 							this.routerTimer.firstIteration.start();
 							this.routeACon(c);
@@ -192,9 +199,9 @@ public class PFRouterNodeBased{
 				//TODO generate and assign a list of PIPs for each Net net
 				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
 				
-				this.routerTimer.pipsAssignment.start();
+				/*this.routerTimer.pipsAssignment.start();
 				this.pipsAssignment();
-				this.routerTimer.pipsAssignment.finish();
+				this.routerTimer.pipsAssignment.finish();*/
 				
 				return;
 			}
@@ -214,9 +221,9 @@ public class PFRouterNodeBased{
 	}
 	
 	public void pipsAssignment(){
-		for(Netplus<Node> np:this.sortedListOfNetplus){
+		for(Netplus<TimingGroup> np:this.sortedListOfNetplus){
 			Set<PIP> netPIPs = new HashSet<>();
-			for(Connection<Node> c:np.getConnection()){
+			for(Connection<TimingGroup> c:np.getConnection()){
 				netPIPs.addAll(this.conPIPs(c));
 			}
 			np.getNet().setPIPs(netPIPs);
@@ -258,10 +265,10 @@ public class PFRouterNodeBased{
 	}
 	
 	public void checkInvalidlyRoutedNets(String netname){
-		for(Netplus<Node> net:this.sortedListOfNetplus){
+		for(Netplus<TimingGroup> net:this.sortedListOfNetplus){
 			if(net.getNet().getName().equals(netname)){
 				System.out.println(net.getNet().toString());
-				for(Connection<Node> c: net.getConnection()){
+				for(Connection<TimingGroup> c: net.getConnection()){
 					System.out.println(c.getSourceRNode().name + "\t" + c.getSinkRNode().name);
 					for(PIP p:this.conPIPs(c)){
 						System.out.println("\t" + p.toString());
@@ -303,11 +310,11 @@ public class PFRouterNodeBased{
 		System.out.println("error nets routed less than fanout = " + errorNetsRoutedLessThanFanout);
 	}
 	
-	public List<PIP> conPIPs(Connection<Node> con){
+	public List<PIP> conPIPs(Connection<TimingGroup> con){
 		List<PIP> conPIPs = new ArrayList<>();
 		
 		for(int i = con.rnodes.size() -1; i > 0; i--){
-			Node nodeFormer = con.rnodes.get(i).getNode();
+			Node nodeFormer = con.rnodes.get(i).getNode();//TODO un-checked
 			Node nodeLatter = con.rnodes.get(i-1).getNode();
 			
 			Wire startWire = this.findEndWireOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
@@ -337,7 +344,7 @@ public class PFRouterNodeBased{
 		Set<Float> costs = new HashSet<>();
 		float aver = 0;
 		float sum = 0;
-		for(RNode<Node> rn:this.rnodesCreated.values()){
+		for(RNode<TimingGroup> rn:this.rnodesCreated.values()){
 			sum += rn.base_cost;
 			costs.add(rn.base_cost);
 		}
@@ -351,9 +358,9 @@ public class PFRouterNodeBased{
 				System.out.println(rn.toString());
 			}
 		}*/
-		Set<Connection<Node>> congestedCons = new HashSet<>();
+		Set<Connection<TimingGroup>> congestedCons = new HashSet<>();
 //		Map<Netplus<Node>, Integer> congestedNets = new HashMap<>();
-		for(Connection<Node> con:this.sortedListOfConnection){
+		for(Connection<TimingGroup> con:this.sortedListOfConnection){
 			if(con.congested()){
 				congestedCons.add(con);
 				/*Netplus<Node> np = con.getNet();
@@ -364,16 +371,16 @@ public class PFRouterNodeBased{
 				}*/
 			}
 		}
-		for(Connection<Node> con:congestedCons){
+		for(Connection<TimingGroup> con:congestedCons){
 			System.out.println(con.toString());
-			for(RNode<Node> rn : con.rnodes){
+			for(RNode<TimingGroup> rn : con.rnodes){
 				if(rn.overUsed()) System.out.println("\t"+ rn.toString());
 			}
 			System.out.println();
 		}
 	}
 
-	public void routeACon(Connection<Node> con){
+	public void routeACon(Connection<TimingGroup> con){
 		this.router.prepareForRoutingACon(con);
 		if(this.router.debugRoutingCon) this.printInfo("routing for " + con.toString());
 		
@@ -385,11 +392,11 @@ public class PFRouterNodeBased{
 				throw new RuntimeException("Queue is empty: target unreachable?");
 			}
 			
-			RNode<Node> rnode = queue.poll().rnode;
+			RNode<TimingGroup> rnode = queue.poll().rnode;
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.globalRNodeIndex = this.childRNodesCreation.nodeBased(rnode, this.globalRNodeIndex, this.reservedNodes);
+				this.globalRNodeIndex = this.childRNodesCreation.timingGroupBased(rnode, this.globalRNodeIndex, this.timingModel);
 			}
 			this.routerTimer.rnodesCreation.finish();
 			
@@ -404,10 +411,30 @@ public class PFRouterNodeBased{
 	public float checkAverageNumWires(){
 		float aver = 0;
 		float sum = 0;
-		for(RNode<Node> rn:this.rnodesCreated.values()){
-			sum += rn.getNode().getAllWiresInNode().length;
+		float allInter = 0;
+		for(RNode<TimingGroup> rntg:this.rnodesCreated.values()){
+			if(rntg.type == RoutableType.INTERRR){
+				for(Node node:rntg.getTimingGroup().getNodes()){
+					sum += node.getAllWiresInNode().length;
+				}
+				allInter++;
+			}
 		}
-		aver = sum / this.rnodesCreated.values().size();
+		aver = sum / allInter;
+		
+		return aver;
+	}
+	public float checkAverageNumNodes(){
+		float aver = 0;
+		float sum = 0;
+		float allInter = 0;
+		for(RNode<TimingGroup> rntg:this.rnodesCreated.values()){
+			if(rntg.type == RoutableType.INTERRR){
+				sum += rntg.getTimingGroup().getNodes().size();
+				allInter++;
+			}
+		}
+		aver = sum / allInter;
 		
 		return aver;
 	}

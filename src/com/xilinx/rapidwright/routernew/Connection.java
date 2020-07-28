@@ -8,7 +8,7 @@ import com.xilinx.rapidwright.timing.TimingModel;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.routernew.RNode;
 
-public class Connection<E> implements Comparable<Connection<E>>{
+public class Connection<E> implements Comparable<Connection<E>>{//E extends Routable
 	public final int id;
 	
 	public final SitePinInst source;

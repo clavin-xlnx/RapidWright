@@ -7,6 +7,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.timing.TimingGroup;
+import com.xilinx.rapidwright.timing.TimingModel;
 
 public class RNode<E>{
 	public int index;	
@@ -23,6 +24,7 @@ public class RNode<E>{
 	
 	//RNode<TimingGroup>
 	private TimingGroup timingGroup;
+	private TimingModel timingModel;
 	
 	public String name;
 	
@@ -63,9 +65,20 @@ public class RNode<E>{
 //			System.out.println(this.node);
 //			System.out.println(this.name);
 			this.name = this.node.toString();
-			this.setCenterXYNode();
+			this.setCenterXYNode(this.node);
 		}
 
+		this.rnodeData = new RNodeData<E>(this.index);
+		this.childrenSet = false;
+	}
+	
+	public RNode(int index, SitePinInst sitePinInst, RoutableType type, TimingModel tmodel){
+		this.index = index;
+		this.type = type;
+		this.timingGroup =  new TimingGroup(sitePinInst, tmodel);
+		if(this.timingGroup == null) System.out.println("true null");
+		this.name = this.timingGroup.getLastNode().toString();
+		this.setCenterXYTimingGroup(this.timingGroup);
 		this.rnodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 	}
@@ -74,7 +87,7 @@ public class RNode<E>{
 		this.index = index;
 		this.tile = tile;
 		this.wire = wire;
-		this.type = RoutableType.INTERRNODE;
+		this.type = RoutableType.INTERRR;
 		this.name = this.tile.getName() + "/" + this.wire;
 		this.rnodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
@@ -83,24 +96,25 @@ public class RNode<E>{
 	}
 	public RNode(int index, Node node){
 		this.index = index;
-		this.type = RoutableType.INTERRNODE;
+		this.type = RoutableType.INTERRR;
 		this.node = node;
 		this.name = this.node.toString();
 		
 		this.rnodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		//different base cost for different routing resources
-		this.setCenterXYNode();
+		this.setCenterXYNode(this.node);
 	}
 	
-	public RNode(int index, TimingGroup timingGroup){//, TimingModel timingModel){
+	public RNode(int index, TimingGroup timingGroup){
 		this.index = index;
-		this.type = RoutableType.INTERRNODE;
+		this.type = RoutableType.INTERRR;
 		this.timingGroup = timingGroup;
+		this.name = this.timingGroup.getLastNode().toString();
 		this.rnodeData = new RNodeData<E>(this.index);
 		this.childrenSet = false;
 		
-		//TODO set centerXY
+		this.setCenterXYTimingGroup(timingGroup);
 	}
 	
 	public void setCenterXYWire(){
@@ -113,12 +127,36 @@ public class RNode<E>{
 		this.centery = (this.yhigh + this.ylow) / 2;
 	}
 	
-	public void setCenterXYNode(){
-		int length = this.node.getAllWiresInNode().length;
+	public void setCenterXYTimingGroup(TimingGroup tg){
+		int nodeSize = tg.getNodes().size();
+		short[] xMaxCoordinates = new short[nodeSize];
+		short[] xMinCoordinates = new short[nodeSize];
+		short[] yMaxCoordinates = new short[nodeSize];
+		short[] yMinCoordinates = new short[nodeSize];
+		short nodeId = 0;
+		for(Node node:timingGroup.getNodes()){
+			this.setCenterXYNode(node);
+			xMaxCoordinates[nodeId] = this.xhigh;
+			xMinCoordinates[nodeId] = this.xlow;
+			yMaxCoordinates[nodeId] = this.yhigh;
+			yMinCoordinates[nodeId] = this.ylow;
+		}
+		
+		this.xlow = this.min(xMinCoordinates);
+		this.xhigh = this.max(xMaxCoordinates);
+		this.ylow = this.min(yMinCoordinates);
+		this.yhigh = this.max(yMaxCoordinates);
+		
+		this.centerx = (this.xhigh + this.xlow) / 2;
+		this.centery = (this.yhigh + this.ylow) / 2;
+	}
+	
+	public void setCenterXYNode(Node node){
+		int length = node.getAllWiresInNode().length;
 		short[] xCoordinates = new short[length];
 		short[] yCoordinates = new short[length];
 		short id = 0;
-		for(Wire w : this.node.getAllWiresInNode()){
+		for(Wire w : node.getAllWiresInNode()){
 			xCoordinates[id] = (short) w.getTile().getColumn();
 			yCoordinates[id] = (short) w.getTile().getRow();
 			id++;
@@ -190,16 +228,16 @@ public class RNode<E>{
 	//default 1, 1, 0.95 are picked up from Vaughn's book page 77
 	public void setBaseCost(){
 		//base cost of different types of routing resource
-		if(this.type == RoutableType.SOURCERNODE){
+		if(this.type == RoutableType.SOURCERR){
 			this.base_cost = 1;
 			
-		}else if(this.type == RoutableType.INTERRNODE){
+		}else if(this.type == RoutableType.INTERRR){
 			//TODO aver cost around 4 when using deltaX + deltaY +1 
 			//(most (deltaX + deltaY +1 ) values range from 1 to 90+, maximum can be 176)
 			//(deltaX + deltaY +1 ) normalized to the maximum , does not work
 			this.base_cost = 1;
 			
-		}else if(this.type == RoutableType.SINKRNODE){//this is for faster maze expansion convergence to the sink
+		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
 			this.base_cost = 0.95f;//virtually the same to the logic block input pin, since no alternative ipins are considered
 		}
 	}

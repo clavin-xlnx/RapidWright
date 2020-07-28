@@ -10,6 +10,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.timing.TimingGroup;
+import com.xilinx.rapidwright.timing.TimingModel;
 
 public class ChildRNodesCreation{	
 	public Map<String, RNode<Wire>> rnodesCreatedWire;
@@ -30,20 +31,24 @@ public class ChildRNodesCreation{
 	}
 	
 	//TODO check
-	public int timingGroupBased(RNode<TimingGroup> rnode, int globalRNodeIndex){
-		TimingGroup rnodeNode = rnode.getTimingGroup();
+	public int timingGroupBased(RNode<TimingGroup> rnode, int globalRNodeIndex, TimingModel tmodel){
+		TimingGroup rnodeTimingGroup = rnode.getTimingGroup();
 		List<RNode<TimingGroup>> childRNodes = new ArrayList<>();
-		for(TimingGroup timingGroup:rnodeNode.getNextTimingGroups()){
-			RNode<TimingGroup> childRNode;
-			String key = timingGroup.toString();
-			if(!this.rnodesCreatedTimingGroup.containsKey(key)){
-				childRNode = new RNode<TimingGroup>(globalRNodeIndex, timingGroup);
-				childRNode.setBaseCost(this.base_cost_fac);
-				globalRNodeIndex++;
-				childRNodes.add(childRNode);
-				this.rnodesCreatedTimingGroup.put(key, childRNode);
-			}else{
-				childRNodes.add(this.rnodesCreatedTimingGroup.get(key));
+//		System.out.println(rnode.name + " " + rnode.type);
+		if(rnodeTimingGroup.getNextTimingGroups() != null){
+			for(TimingGroup timingGroup:rnodeTimingGroup.getNextTimingGroups()){
+				RNode<TimingGroup> childRNode;
+//				System.out.println(timingGroup.getNodes().size());
+				String key = timingGroup.getLastNode().toString();//TimingGroup toString/hashCode is not unique,
+				if(!this.rnodesCreatedTimingGroup.containsKey(key)){
+					childRNode = new RNode<TimingGroup>(globalRNodeIndex, timingGroup);
+					childRNode.setBaseCost(this.base_cost_fac);
+					globalRNodeIndex++;
+					childRNodes.add(childRNode);
+					this.rnodesCreatedTimingGroup.put(key, childRNode);
+				}else{
+					childRNodes.add(this.rnodesCreatedTimingGroup.get(key));
+				}
 			}
 		}
 		rnode.setChildren(childRNodes);

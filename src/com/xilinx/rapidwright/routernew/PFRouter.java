@@ -46,8 +46,6 @@ public class PFRouter<E>{
 	private Set<Integer> overUsedRNodes;
 	private Set<Integer> usedRNodes;
 	private Set<Integer> illegalRNodes;//nodes that have multiple drivers in a net
-//	private int usedRNodes;
-//	private int illegalRNodes;
 	
 	private int connectionsRouted;
 	private long nodesExpanded;
@@ -112,7 +110,7 @@ public class PFRouter<E>{
 				inet++;
 				
 				SitePinInst source = n.getSource();
-				RNode<E> sourceRNode = new RNode<E>(this.rnodeId, source, RoutableType.SOURCERNODE, opt);
+				RNode<E> sourceRNode = new RNode<E>(this.rnodeId, source, RoutableType.SOURCERR, opt);
 				sourceRNode.setBaseCost(this.base_cost_fac);
 				this.rnodesCreated.put(sourceRNode.name, sourceRNode);	
 				this.rnodeId++;
@@ -126,7 +124,7 @@ public class PFRouter<E>{
 					c.setSourceRNode(sourceRNode);
 					
 					//create RNode of the sink pin external wire up front 
-					RNode<E> sinkRNode = new RNode<E>(this.rnodeId, sink, RoutableType.SINKRNODE, opt);
+					RNode<E> sinkRNode = new RNode<E>(this.rnodeId, sink, RoutableType.SINKRR, opt);
 					sinkRNode.setBaseCost(this.base_cost_fac);
 					c.setSinkRNodeAndTargetName(sinkRNode);
 					this.rnodesCreated.put(sinkRNode.name, sinkRNode);
@@ -139,7 +137,52 @@ public class PFRouter<E>{
 					np.addCons(c);
 					icon++;
 				}
-			}
+					
+			}/*else
+				System.out.println(n.getLogicalNet().getPortInsts().toString());*/	
+			if(n.getFanOut() == 1)
+				this.fanout1Net++;
+		}
+		return this.rnodeId;
+	}
+	
+	public int initializeNetsCons(TimingModel tmodel){
+		int inet = 0;
+		int icon = 0;
+		for(Net n:this.design.getNets()){
+			if(n.getFanOut() > 0){//ignore nets that have no pins
+				
+				Netplus<E> np = new Netplus<E>(inet, this.bbRange, n);
+				this.nets.add(np);
+				inet++;
+				
+				SitePinInst source = n.getSource();
+				RNode<E> sourceRNode = new RNode<E>(this.rnodeId, source, RoutableType.SOURCERR, tmodel);
+				sourceRNode.setBaseCost(this.base_cost_fac);
+				this.rnodesCreated.put(sourceRNode.name, sourceRNode);	
+				this.rnodeId++;
+				
+				for(SitePinInst sink:n.getSinkPins()){
+					Connection<E> c = new Connection<E>(icon, source, sink, this.tmodel);	
+					c.setSourceRNode(sourceRNode);
+					
+					//create RNode of the sink pin external wire up front 
+					RNode<E> sinkRNode = new RNode<E>(this.rnodeId, sink, RoutableType.SINKRR, tmodel);
+					sinkRNode.setBaseCost(this.base_cost_fac);
+					c.setSinkRNodeAndTargetName(sinkRNode);
+					this.rnodesCreated.put(sinkRNode.name, sinkRNode);
+					this.rnodeId++;
+					
+//					Tile adjacentTile = this.findSinkPinAdjacentINTtile(sink);
+					
+					this.connections.add(c);
+					c.setNet(np);//TODO new and set its TimingEdge for timing-driven version
+					np.addCons(c);
+					icon++;
+				}
+					
+			}/*else
+				System.out.println(n.getLogicalNet().getPortInsts().toString());*/	
 			if(n.getFanOut() == 1)
 				this.fanout1Net++;
 		}
@@ -399,7 +442,7 @@ public class PFRouter<E>{
 		float expected_distance_cost = 0;
 		float expected_wire_cost;
 		
-		if(childRNode.type == RoutableType.INTERRNODE){
+		if(childRNode.type == RoutableType.INTERRR){
 			
 //			if(this.debugExpansion) this.printInfo("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
 			expected_distance_cost = this.expectMahatD(childRNode, con);
@@ -483,7 +526,7 @@ public class PFRouter<E>{
 		
 		//Bias cost
 		float bias_cost = 0;
-		if(rnode.type == RoutableType.INTERRNODE) {
+		if(rnode.type == RoutableType.INTERRR) {
 			Netplus<E> net = con.getNet();
 			bias_cost = 0.5f * rnode.base_cost / net.fanout * 
 					(Math.abs(rnode.centerx - net.x_geo) + Math.abs(rnode.centery - net.y_geo)) / net.hpwl;
@@ -667,66 +710,6 @@ public class PFRouter<E>{
 				}
 			}
 		}	
-	}
-
-	/********************************
-	 * print PIPs info of routed nets
-	 ********************************/
-	public void checkPIPsInfo(){
-		for(Netplus<E> netp:this.nets){
-			if(netp.getNet().hasPIPs() && netp.getNet().getPIPs().size() == 4){
-				System.out.println(netp.getNet().toStringFull());
-				for(PIP p:netp.getNet().getPIPs()){
-					Wire start = p.getStartWire();
-					Wire end = p.getEndWire();
-					
-					System.out.println("str wire tile: " + start.getTile().getColumn() + " " 
-											+ start.getTile().getRow() + " " + start.getIntentCode());
-					System.out.println("end wire tile: " + end.getTile().getColumn() + " " 
-							+ end.getTile().getRow() + " " + end.getIntentCode());
-				}
-				System.out.println("\n");
-			}
-			
-		}
-	}
-	/********************************
-	 * nets with bi-directional pips
-	 ********************************/
-	public void netsWithBidirecPips(){
-		List<Netplus<E>> netsWithBidirectionalPIPs = new ArrayList<>();
-		for(Netplus<E> netp:this.nets){
-			if(netp.getNet().hasPIPs()){
-				boolean bidire = false;
-				List<PIP> pips = netp.getNet().getPIPs();
-				for(PIP p:pips){
-					if(p.isBidirectional()){
-						bidire = true;
-					}
-				}
-				if(bidire){
-					netsWithBidirectionalPIPs.add(netp);
-				}
-			}
-		}
-	}
-	/********************************
-	 * print net info
-	 ********************************/
-	public void printNetInfo(){
-		for(Netplus<E> n:this.nets){
-			if(n.getNet().getSource() != null){
-				System.out.println("-------------------------------------------");
-				System.out.println("srce tile -> (" + n.getNet().getSource().getTile().getColumn() + ", " 
-				+ n.getNet().getSource().getTile().getRow() + ") type: "	+ n.getNet().getSource().getTile().getName());
-				for(SitePinInst sink:n.getNet().getSinkPins()){
-					System.out.println("sink tile -> (" + sink.getTile().getColumn() + ", " 
-				+ sink.getTile().getRow() + ") type: " + sink.getTile().getName());
-				}
-				
-			}
-			System.out.println(n.getNet().toStringFull());
-		}
 	}
 	
 	public List<Netplus<E>> getNets() {
