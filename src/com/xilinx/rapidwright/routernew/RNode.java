@@ -13,8 +13,6 @@ public class RNode<E>{
 	public int index;	
 	public RoutableType type;
 	
-	//private E 
-	
 	//RNode<Wire>
 	private Tile tile;
 	private int wire;
@@ -57,13 +55,6 @@ public class RNode<E>{
 			this.setCenterXYWire();
 		}else if(opt == RoutingGranularityOpt.NODE){
 			this.node = sitePinInst.getConnectedNode();
-			
-//			this.tile = sitePinInst.getSiteInst().getTile();
-//			this.wire = sitePinInst.getSiteExternalWireIndex();
-//			this.name = this.tile.getName() + "/" + this.wire;
-//			
-//			System.out.println(this.node);
-//			System.out.println(this.name);
 			this.name = this.node.toString();
 			this.setCenterXYNode(this.node);
 		}
@@ -214,11 +205,6 @@ public class RNode<E>{
 		return min;
 	}
 	
-	/*public void setBaseCostNode(){
-		this.setBaseCost();
-		this.base_cost *= (this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
-	}*/
-	
 	//increasing base_cost only will hurt the runtime a lot
 	public void setBaseCost(float fac){
 		this.setBaseCost();
@@ -332,8 +318,6 @@ public class RNode<E>{
 		s.append(String.format("basecost = %.2e", this.base_cost));
 		s.append(", ");
 		s.append(String.format("capacity = %d", this.capacity));
-//		s.append(", ");
-//		s.append(String.format("children = %d", this.children.size()));
 		s.append(", ");
 		s.append(String.format("occupation = %d", this.rnodeData.getOccupation()));
 		s.append(", ");

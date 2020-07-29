@@ -6,50 +6,49 @@ import java.util.List;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.routernew.RNode;
 
-public class RNetplus<E>{
+public class RNetplus{
 	/**
 	 * Netplus is a class with additional information of a net for 
 	 * a PathFinder-based router development
 	 */
-	private List<Connection<E>> connections;
+	private List<RConnection> connections;
 	public Net net;
 	private NetType type;
 	private int id;
-	public int x_min_b, x_max_b;//short better
-	public int y_min_b, y_max_b;
+	public short x_min_b, x_max_b;//short better
+	public short y_min_b, y_max_b;
 	public float x_geo, y_geo;
-	public int hpwl;
-	public int bbRange;
-	public int fanout;
+	public short hpwl;
+	public short bbRange;
+	public short fanout;
 	
-	public RNetplus(int id, int bbRange, Net net){
+	public RNetplus(int id, short bbRange, Net net){
 		this.id = id;
 		this.bbRange = bbRange;
 		this.net = net;
 		this.type = net.getType();
 		this.connections = new ArrayList<>();
-		this.fanout = this.net.getFanOut();
-		this.getBoundingXYs(net);	
+		this.fanout = (short) this.net.getFanOut();
+		this.getBoundingXYs(net);
 	}
 	//TODO some tiles has more than one sites, needed to distinguish those cases?
-	//or roughly computation does not impact the accuracy a lot?
+	//rough computation does not impact the accuracy a lot?
 	public void getBoundingXYs(Net net){
-		int x_min = 1<<20;
-		int x_max = 0;
-		int y_min = 1<<20;
-		int y_max = 0;
-		int x_geo_sum = 0;
-		int y_geo_sum = 0;
+		short x_min = 1<<10;
+		short x_max = 0;
+		short y_min = 1<<10;
+		short y_max = 0;
+		short x_geo_sum = 0;
+		short y_geo_sum = 0;
 		
-		int numPins = net.getFanOut() + 1;
+		short numPins = (short) (net.getFanOut() + 1);
 		
-		int[] xArray = new int[numPins];
-		int[] yArray = new int[numPins];
+		short[] xArray = new short[numPins];
+		short[] yArray = new short[numPins];
 		
-		xArray[0] = net.getSource().getTile().getColumn();
-		yArray[0] = net.getSource().getTile().getRow();
+		xArray[0] = (short) net.getSource().getTile().getColumn();
+		yArray[0] = (short) net.getSource().getTile().getRow();
 		
 		x_geo_sum += xArray[0];
 		y_geo_sum += yArray[0];
@@ -57,8 +56,8 @@ public class RNetplus<E>{
 		
 		int iPin = 1;
 		for(SitePinInst sink:net.getSinkPins()){
-			xArray[iPin] = sink.getTile().getColumn();
-			yArray[iPin] = sink.getTile().getRow();
+			xArray[iPin] = (short) sink.getTile().getColumn();
+			yArray[iPin] = (short) sink.getTile().getRow();
 			x_geo_sum += xArray[iPin];
 			y_geo_sum += yArray[iPin];
 			iPin++;
@@ -79,14 +78,14 @@ public class RNetplus<E>{
 			}
 		}
 		
-		this.hpwl = (x_max - x_min + 1) + (y_max - y_min + 1);
+		this.hpwl = (short) ((x_max - x_min + 1) + (y_max - y_min + 1));
 		this.x_geo = x_geo_sum / numPins;
 		this.y_geo = y_geo_sum / numPins;
 		
-		this.x_min_b = x_min - this.bbRange;
-		this.x_max_b = x_max + this.bbRange;
-		this.y_min_b = y_min - this.bbRange;
-		this.y_max_b = y_max + this.bbRange;
+		this.x_min_b = (short) (x_min - this.bbRange);
+		this.x_max_b = (short) (x_max + this.bbRange);
+		this.y_min_b = (short) (y_min - this.bbRange);
+		this.y_max_b = (short) (y_max + this.bbRange);
 		
 	}
 	
@@ -100,16 +99,16 @@ public class RNetplus<E>{
 	public int getId() {
 		return id;
 	}
-	public void addCons(Connection<E> c){
+	public void addCons(RConnection c){
 		this.connections.add(c);
 	}
-	public List<Connection<E>> getConnection(){
+	public List<RConnection> getConnection(){
 		return this.connections;
 	}
 	
-	public RNode<E> getIllegalNode() {
-		for(Connection<E> con : this.connections) {
-			for(RNode<E> rnode : con.rnodes) {
+	public Routable getIllegalNode() {
+		for(RConnection con : this.connections) {
+			for(Routable rnode : con.rnodes) {
 				if(rnode.illegal()) {
 					return rnode;
 				}

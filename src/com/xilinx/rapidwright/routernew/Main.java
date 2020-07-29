@@ -53,6 +53,8 @@ public class Main {
 					this.opt = RoutingGranularityOpt.NODE;
 				}else if(optNum == 3){
 					this.opt = RoutingGranularityOpt.TIMINGGROUP;
+				}else if(optNum == 4){
+					this.opt = RoutingGranularityOpt.ROUTABLENODE;
 				}
 				
 			}else if(arguments[i].contains("bbRange")){
@@ -225,6 +227,45 @@ public class Main {
 						router.router.getNodesExpanded(),
 						router.routerTimer);
 				
+			}else{
+				RoutableNodeRouter router = new RoutableNodeRouter(this.design, 
+						this.toWriteDCPfileName,
+						this.nrOfTrials,
+						this.t,
+						(short) this.bbRange,
+						this.mdWeight,
+						this.hopWeight,
+						this.initial_pres_fac,
+						this.pres_fac_mult,
+						this.acc_fac,
+						this.base_cost_fac);
+				
+				router.designInfo();
+				this.routerConfigurationInfo();
+				
+				this.t.start("Route Design");
+				routingRuntime = router.routingRuntime();
+				this.t.stop();
+				
+				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
+				
+				router.getAllHopsAndManhattanD();
+				
+				this.rnodesInfo(router.manhattanD,
+						router.hops,
+						router.firstIterRNodes,
+						router.globalRNodeIndex,
+						router.usedRNodes.size(),
+						router.checkAverageNumWires(),
+						1);
+				
+				this.runtimeInfoPrinting(routingRuntime, 
+						router.itry, 
+						router.connectionsRouted,
+						router.sortedListOfConnection.size(),
+						router.nodesExpanded,
+						router.routerTimer);
+				
 			}
 		}
 	}
@@ -287,7 +328,7 @@ public class Main {
 		System.out.printf("Rnodes created 1st iter: %d\n", firstIterRNodes);
 		System.out.printf("Total rnodes created: %d\n", totalRNodes);
 		System.out.printf("Total rnodes used: %d\n", totalUsage);
-		if(this.opt == RoutingGranularityOpt.NODE){
+		if(this.opt == RoutingGranularityOpt.NODE || this.opt == RoutingGranularityOpt.ROUTABLENODE){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
