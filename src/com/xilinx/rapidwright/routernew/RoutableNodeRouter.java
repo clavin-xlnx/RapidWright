@@ -60,6 +60,7 @@ public class RoutableNodeRouter{
 	public long nodesExpanded;
 	public int connectionsRoutedIteration;
 	
+	Set<Node> vccNodes = new HashSet<>();//TODO
 	public Set<Integer> overUsedRNodes;
 	public Set<Integer> usedRNodes;
 	public Set<Integer> illegalRNodes;//nodes that have multiple drivers in a net
@@ -122,9 +123,9 @@ public class RoutableNodeRouter{
 		this.nets = new ArrayList<>();
 		this.connections = new ArrayList<>();
 		
-		for(Net n:this.design.getNets()){
-			DesignTools.createMissingSitePinInsts(this.design, n);
-			
+		DesignTools.createMissingSitePinInsts(this.design);
+		
+		for(Net n:this.design.getNets()){	
 			if(n.getPins().size() == 1){
 				for(SitePinInst pin:n.getPins()){
 					Node node = pin.getConnectedNode();
@@ -139,7 +140,8 @@ public class RoutableNodeRouter{
 					this.rnodesCreated.put(node, reservedRRGNode);
 					rrgNodeId++;			
 				}
-			}else if(n.isClockNet() || n.isStaticNet() || n.getName().equals("clk")){
+			} else if(n.isClockNet() || n.isStaticNet() || n.getName().equals("clk")){
+				
 				for(PIP pip:n.getPIPs()){
 					Node nodeStart = pip.getStartNode();
 					RoutableNode startRRGNode = new RoutableNode(rrgNodeId, nodeStart, RoutableType.RESERVED);//INTERRR not accurate
@@ -147,14 +149,32 @@ public class RoutableNodeRouter{
 					this.rnodesCreated.put(nodeStart, startRRGNode);
 					rrgNodeId++;
 					
+					if(n.getName().equals("GLOBAL_LOGIC1")){
+						this.vccNodes.add(nodeStart);
+					}
+					
 					Node nodeEnd = pip.getEndNode();
 					RoutableNode endRRGNode = new RoutableNode(rrgNodeId, nodeEnd, RoutableType.RESERVED);//INTERRR not accurate
 					endRRGNode.setBaseCost(Float.MAX_VALUE - 1);
 					this.rnodesCreated.put(nodeEnd, endRRGNode);
 					rrgNodeId++;
+					
+					if(n.getName().equals("GLOBAL_LOGIC1")){
+						this.vccNodes.add(nodeStart);
+					}
 				}
 				
+				/*for(SitePinInst sitepin : n.getPins()){
+					Node alsoToBeReserved = sitepin.getConnectedNode();
+					this.vccNodes.add(alsoToBeReserved);
+					RoutableNode endRRGNode = new RoutableNode(rrgNodeId, alsoToBeReserved, RoutableType.RESERVED);//INTERRR not accurate
+					endRRGNode.setBaseCost(Float.MAX_VALUE - 1);
+					this.rnodesCreated.put(alsoToBeReserved, endRRGNode);
+					rrgNodeId++;
+				}*/
+				
 			}
+			
 			if(n.getSource() != null && n.getSinkPins().size() > 0){
 				n.unroute();
 				RNetplus np = new RNetplus(inet, bbRange, n);
@@ -193,37 +213,71 @@ public class RoutableNodeRouter{
 	public void findNodesConflicts(){
 		Map<Node, Integer> nodesUsage = new HashMap<>();
 		Set<Net> conflictedNets = new HashSet<>();
+		Set<Node> conflictedNodes = new HashSet<>();
 		for(Net net:this.design.getNets()){
 			Map<Node, Integer> nodesUsageNet = new HashMap<>();
-			for(PIP p: net.getPIPs()){
-				Node startNode = p.getStartNode();
-				if(!nodesUsage.containsKey(startNode)){
-					nodesUsage.put(startNode, 1);
-					nodesUsageNet.put(startNode, 1);
-				}else{
-					nodesUsage.put(startNode, nodesUsage.get(startNode) + 1);
-					nodesUsageNet.put(startNode, nodesUsage.get(startNode) + 1);
+			if(net.hasPIPs()){
+				for(PIP p: net.getPIPs()){
+					Node startNode = p.getStartNode();
+					if(!nodesUsage.containsKey(startNode)){
+						nodesUsage.put(startNode, 1);
+						nodesUsageNet.put(startNode, 1);
+					}else{
+						nodesUsage.put(startNode, nodesUsage.get(startNode) + 1);
+						nodesUsageNet.put(startNode, nodesUsage.get(startNode) + 1);
+					}
+					Node endNode = p.getEndNode();
+					if(!nodesUsage.containsKey(endNode)){
+						nodesUsage.put(endNode, 1);
+						nodesUsageNet.put(endNode, 1);
+					}else{
+						nodesUsage.put(endNode, nodesUsage.get(endNode) + 1);
+						nodesUsageNet.put(endNode, nodesUsage.get(endNode) + 1);
+					}
 				}
-				Node endNode = p.getEndNode();
-				if(!nodesUsage.containsKey(endNode)){
-					nodesUsage.put(endNode, 1);
-					nodesUsageNet.put(endNode, 1);
-				}else{
-					nodesUsage.put(endNode, nodesUsage.get(endNode) + 1);
-					nodesUsageNet.put(endNode, nodesUsage.get(endNode) + 1);
+			}else{
+				for(SitePinInst spi : net.getPins()){
+					Node spiNode = spi.getConnectedNode();
+					if(!nodesUsage.containsKey(spiNode)){
+						nodesUsage.put(spiNode, 1);
+						nodesUsageNet.put(spiNode, 1);
+					}else{
+						nodesUsage.put(spiNode, nodesUsage.get(spiNode) + 1);
+						nodesUsageNet.put(spiNode, nodesUsage.get(spiNode) + 1);
+					}
 				}
 			}
+			
 			for(Node n:nodesUsageNet.keySet()){
-				if(nodesUsageNet.get(n) > 1)
+				if(nodesUsageNet.get(n) > 1){
 					conflictedNets.add(net);
+					conflictedNodes.add(n);
+					System.out.println(n.toString());
+				}
+			}
+		}
+		
+		System.out.println("vccNodes from pips: " + this.vccNodes.size() + ", conflicted nodes " + conflictedNodes.size());
+		
+		Set<Node> vccPinNodes = new HashSet<>();
+		for(SitePinInst pin : this.design.getNet("GLOBAL_LOGIC1").getPins()){
+			vccPinNodes.add(pin.getConnectedNode());
+		}
+		
+		System.out.println("vcc nodes from site pins: " + vccPinNodes.size());
+		
+		for(Node cfn:conflictedNodes){
+			if(!cfn.toString().contains("VCC_WIRE")){
+				System.out.println(cfn.toString());
 			}
 		}
 		
 		for(Net errNet:conflictedNets){
-			System.out.println(errNet.toString());
+			System.out.println("conflicted net: " +errNet.toString() + " " + errNet.hasPIPs() + " fanout " 
+								+ errNet.getFanOut() + " pinsize " + errNet.getPins().size() + "\n");
 		}
 	}
-	
+
 	public void initializeRouter(float initial_pres_fac, float pres_fac_mult, float acc_fac){
 		this.rnodesTouched.clear();
     	this.queue.clear();
@@ -346,7 +400,7 @@ public class RoutableNodeRouter{
 				//generate and assign a list of PIPs for each Net net
 				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
 				
-				 this.findNodesConflicts();//TODO
+//				 this.findNodesConflicts();//TODO
 				
 				this.routerTimer.pipsAssignment.start();
 				this.pipsAssignment();
