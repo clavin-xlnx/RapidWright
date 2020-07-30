@@ -31,5 +31,7 @@ import com.xilinx.rapidwright.timing.TimingGroup;
 public interface DelayEstimator {
     // TODO: Define what is this TimingGroup.
     public short getMinDelayToSinkPin (TimingGroup TG, TimingGroup sinkPin);
+    public boolean load (String fileName);
+    public boolean store (String fileName);
 }
 

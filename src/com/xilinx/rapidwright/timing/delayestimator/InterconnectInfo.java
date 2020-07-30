@@ -20,6 +20,37 @@ import java.util.function.Predicate;
  */
 public class InterconnectInfo {
 
+    public static enum TileSide {
+        E,
+        W,
+        M;
+
+        public TileSide getInverted() {
+            if (this == TileSide.E)
+                return TileSide.W;
+            else if (this == TileSide.W)
+                return TileSide.E;
+            else
+                return TileSide.M;
+        }
+    };
+
+    // up is in increasing INT tile coordinate direction
+    public static enum Orientation {
+        U, // up
+        D, // down
+        S; // same place
+
+        public Orientation getInverted() {
+            if (this == Orientation.U)
+                return Orientation.D;
+            else if (this == Orientation.D)
+                return Orientation.U;
+            else
+                return Orientation.S;
+        }
+    }
+
     // override must be a superset
     public static enum Direction {
         VERTICAL,
@@ -29,6 +60,14 @@ public class InterconnectInfo {
         LOCAL
     };
 
+    public static enum Behavior {
+        STATIONARY, // like CLE_IN/OUT
+        SWITCH_SIDE_INTERNAL, // like BOUNCE/internal HORT_SINGLE E going W and W going E
+        SWITCH_SIDE_EXTERNAL, // like HORT_SINGLE E going E and W going W
+        GO_BOTH_SIDES,  // like HORT_LONG/VERT_LONG
+        SAME_SIDE // like HORT/VERT DOUBLE/QUAD, VERT_SINGLE
+    }
+
     // Enum ensure there is no duplication of each type stored in the tables.
     // Break these up if they are never used together to avoid filtering.
     // Need to distinguish between ver and hor. Thus can't use GroupDelayType.
@@ -36,34 +75,136 @@ public class InterconnectInfo {
     // override must be a superset. length and index can be changed.
     public static enum TimingGroup {
         // direction, length and index (to lookup d)
-        VERT_SINGLE (Direction.VERTICAL, GroupDelayType.SINGLE,(short) 1,(short) 0,'S'),
-        VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 2,(short) 0,'D'),
-        VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 4,(short) 1,'Q'),
-        VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 12,(short) 2,'L'),
+        VERT_SINGLE (Direction.VERTICAL, GroupDelayType.SINGLE,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'S'),
+        VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 2, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'D'),
+        VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 4, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'Q'),
+        VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 12, Behavior.GO_BOTH_SIDES, new TileSide[]{TileSide.M},'L'),
+//        VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'D'),
+//        VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'Q'),
+//        VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 1, Behavior.GO_BOTH_SIDES, new TileSide[]{TileSide.M},'L'),
 
-        HORT_SINGLE  (Direction.HORIZONTAL, GroupDelayType.SINGLE,(short) 1,(short) 0,'s'),
-        HORT_DOUBLE  (Direction.HORIZONTAL, GroupDelayType.DOUBLE,(short) 1,(short) 0,'d'),
-        HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 2,(short) 1,'q'),
-        HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 6,(short) 2,'l'),
+        HORT_SINGLE  (Direction.HORIZONTAL, GroupDelayType.SINGLE,(short) 1, Behavior.SWITCH_SIDE_EXTERNAL, new TileSide[]{TileSide.E,TileSide.W},'s'),
+        HORT_DOUBLE  (Direction.HORIZONTAL, GroupDelayType.DOUBLE,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'d'),
+        HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 2, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'q'),
+        HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 6, Behavior.GO_BOTH_SIDES, new TileSide[]{TileSide.M},'l'),
+//        HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'q'),
+//        HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 1, Behavior.GO_BOTH_SIDES, new TileSide[]{TileSide.M},'l'),
 
-        CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0,(short) -1,'-'),
-        CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0,(short) -1,'-'),
-        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0,(short) -1,'i');
+        CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0, Behavior.STATIONARY, new TileSide[]{TileSide.E,TileSide.W}, '-'),
+        CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0, Behavior.STATIONARY, new TileSide[]{TileSide.E,TileSide.W}, '-'),
+        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0, Behavior.SWITCH_SIDE_INTERNAL, new TileSide[]{TileSide.E,TileSide.W}, 'i');
 
 
         private final Direction direction;
         private final GroupDelayType type;
         private final short length;
-        private final short index;
+        private final Behavior behavior;
+        private final TileSide[] exsistence;
+        private Map<TileSide,List<Orientation>> orientation;
+        private Map<TileSide,List<TileSide>> toSide;
         private final char  abbr;
+//        private Map<TileSide,Map<Orientation,Orientation>> orientationMap;
 
 
-        TimingGroup(Direction direction, GroupDelayType type, short length, short index, char abbr) {
+
+        TimingGroup(Direction direction, GroupDelayType type, short length, Behavior behavior, TileSide[] existence, char abbr) {
             this.direction = direction;
-            this.type      = type;
-            this.length    = length;
-            this.index     = index;
-            this.abbr      = abbr;
+            this.type = type;
+            this.length = length;
+            this.behavior = behavior;
+            this.exsistence = existence;
+            this.abbr = abbr;
+
+            populateOrientation();
+            populateToSide();
+//            populateOrientationMap();
+        }
+
+        private void populateToSide() {
+            this.toSide = new EnumMap<>(TileSide.class);
+            if (behavior == Behavior.SWITCH_SIDE_INTERNAL || behavior == Behavior.SWITCH_SIDE_EXTERNAL) {
+                this.toSide.put(TileSide.W, new ArrayList<TileSide>(){{add(TileSide.E);}});
+                this.toSide.put(TileSide.E, new ArrayList<TileSide>(){{add(TileSide.W);}});
+            } else if (behavior == Behavior.GO_BOTH_SIDES) {
+                this.toSide.put(TileSide.M, new ArrayList<TileSide>(){{add(TileSide.W);add(TileSide.E);add(TileSide.M);}});
+            } else {
+                // M is for Quad to connect to Long. Others won't have long as their child and won't matter.
+                this.toSide.put(TileSide.W, new ArrayList<TileSide>(){{add(TileSide.W);add(TileSide.M);}});
+                this.toSide.put(TileSide.E, new ArrayList<TileSide>(){{add(TileSide.E);add(TileSide.M);}});
+            }
+        }
+
+//        private void populateOrientationMap() {
+//            this.orientationMap = new EnumMap<>(TileSide.class);
+//            if (behavior == Behavior.STATIONARY) {
+//                Map<Orientation, Orientation> temp = new EnumMap<>(Orientation.class);
+//                temp.put(Orientation.U, Orientation.S);
+//                temp.put(Orientation.D, Orientation.S);
+//                temp.put(Orientation.S, Orientation.S);
+//                this.orientationMap.put(TileSide.W, temp);
+//                this.orientationMap.put(TileSide.E, temp);
+//            } else if (behavior == Behavior.SWITCH_SIDE_INTERNAL) {
+//                Map<Orientation, Orientation> tempW = new EnumMap<>(Orientation.class);
+//                tempW.put(Orientation.U, Orientation.U);
+//                tempW.put(Orientation.D, Orientation.U);
+//                tempW.put(Orientation.S, Orientation.U);
+//                this.orientationMap.put(TileSide.W, tempW);
+//                Map<Orientation, Orientation> tempE = new EnumMap<>(Orientation.class);
+//                tempE.put(Orientation.U, Orientation.D);
+//                tempE.put(Orientation.D, Orientation.D);
+//                tempE.put(Orientation.S, Orientation.D);
+//                this.orientationMap.put(TileSide.E, tempE);
+//            } else if (behavior == Behavior.SWITCH_SIDE_EXTERNAL) {
+//                Map<Orientation, Orientation> tempW = new EnumMap<>(Orientation.class);
+//                tempW.put(Orientation.U, Orientation.D);
+//                tempW.put(Orientation.D, Orientation.D);
+//                tempW.put(Orientation.S, Orientation.D);
+//                this.orientationMap.put(TileSide.W, tempW);
+//                Map<Orientation, Orientation> tempE = new EnumMap<>(Orientation.class);
+//                tempE.put(Orientation.U, Orientation.U);
+//                tempE.put(Orientation.D, Orientation.U);
+//                tempE.put(Orientation.S, Orientation.U);
+//                this.orientationMap.put(TileSide.E, tempE);
+//            } else if (behavior == Behavior.GO_BOTH_SIDES) {
+//                // TODO GO_BOTH_SIDES should be controlled from here not from Table
+//            } else {
+//                Map<Orientation, Orientation> temp = new EnumMap<>(Orientation.class);
+//                temp.put(Orientation.U, Orientation.U);
+//                temp.put(Orientation.D, Orientation.D);
+//                temp.put(Orientation.S, Orientation.S);
+//                this.orientationMap.put(TileSide.W, temp);
+//                this.orientationMap.put(TileSide.E, temp);
+//            }
+//        }
+
+        private void populateOrientation() {
+            List<Orientation> emptyOrientation = new ArrayList<Orientation>();
+
+            this.orientation = new EnumMap<>(TileSide.class);
+            if (behavior == Behavior.STATIONARY) {
+                List<Orientation> tempOrientation = new ArrayList<Orientation>(){{add(Orientation.S);}};
+                this.orientation.put(TileSide.W, tempOrientation);
+                this.orientation.put(TileSide.E, tempOrientation);
+                this.orientation.put(TileSide.M, emptyOrientation);
+            } else if (behavior == Behavior.SWITCH_SIDE_INTERNAL) {
+                this.orientation.put(TileSide.W, new ArrayList<Orientation>(){{add(Orientation.U);}});
+                this.orientation.put(TileSide.E, new ArrayList<Orientation>(){{add(Orientation.D);}});
+                this.orientation.put(TileSide.M, emptyOrientation);
+            } else if (behavior == Behavior.SWITCH_SIDE_EXTERNAL) {
+                this.orientation.put(TileSide.W, new ArrayList<Orientation>(){{add(Orientation.D);}});
+                this.orientation.put(TileSide.E, new ArrayList<Orientation>(){{add(Orientation.U);}});
+                this.orientation.put(TileSide.M, emptyOrientation);
+            } else if (behavior == Behavior.GO_BOTH_SIDES) {
+                List<Orientation> tempOrientation = new ArrayList<Orientation>(){{add(Orientation.U);add(Orientation.D);}};
+                this.orientation.put(TileSide.W, emptyOrientation);
+                this.orientation.put(TileSide.E, emptyOrientation);
+                this.orientation.put(TileSide.M, tempOrientation);
+            } else {
+                List<Orientation> tempOrientation = new ArrayList<Orientation>(){{add(Orientation.U);add(Orientation.D);}};
+                this.orientation.put(TileSide.W, tempOrientation);
+                this.orientation.put(TileSide.E, tempOrientation);
+                this.orientation.put(TileSide.M, emptyOrientation);
+            }
         }
 
         public Direction direction() {
@@ -77,6 +218,21 @@ public class InterconnectInfo {
         }
         public char abbr() {
             return abbr;
+        }
+//        public Orientation getToOrientation(TileSide side, Orientation orient) {
+//            return orientationMap.get(side).get(orient);
+//        }
+
+        public List<Orientation> getOrientation(TileSide side) {
+            return orientation.get(side);
+        }
+
+        public TileSide[] getExsistence() {
+            return exsistence;
+        }
+
+        public List<TileSide> toSide(TileSide side) {
+            return toSide.get(side);
         }
     }
 
@@ -163,7 +319,7 @@ public class InterconnectInfo {
         ictHier.put(TimingGroup.CLE_OUT, new ArrayList<TimingGroup>() {{
             add(TimingGroup.CLE_IN);
 //          Don't use single, in general, it will be added in listPaths when dist is 1
-//            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
             add(TimingGroup.VERT_SINGLE);
@@ -182,7 +338,7 @@ public class InterconnectInfo {
         }});
         ictHier.put(TimingGroup.HORT_DOUBLE, new ArrayList<TimingGroup>() {{
 //          Don't use single, in general, it will be added in listPaths when dist is 1
-//            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
             add(TimingGroup.CLE_IN);
@@ -193,7 +349,7 @@ public class InterconnectInfo {
         }});
         ictHier.put(TimingGroup.HORT_QUAD, new ArrayList<TimingGroup>() {{
 //          Don't use single, in general, it will be added in listPaths when dist is 1
-//            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
             add(TimingGroup.HORT_LONG);
@@ -201,13 +357,13 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
             add(TimingGroup.VERT_LONG);
+            add(TimingGroup.BOUNCE);
         }});
         // LONG can drive quad, but that is incompatible with that LONG must go to SINGLE/DOUBLE to get to CLE_IN.
         // it is not incompatible, if long go to quad it will eventually go to single/double because quad can't drive CLE_IN either.
         // To keep simple data structure, don't allow LONG -> QUAD
         ictHier.put(TimingGroup.HORT_LONG, new ArrayList<TimingGroup>() {{
-//          Don't use single, in general, it will be added in listPaths when dist is 1
-//            add(TimingGroup.HORT_SINGLE);
+            add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.HORT_QUAD);
             add(TimingGroup.HORT_LONG);

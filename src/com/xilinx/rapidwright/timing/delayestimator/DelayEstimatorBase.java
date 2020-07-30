@@ -72,20 +72,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 
     protected int   verbose;
 
-    enum TileSide {
-        E,
-        W,
-        M;
 
-        public TileSide getInverted() {
-            if (this == TileSide.E)
-                return TileSide.W;
-            else if (this == TileSide.W)
-                return TileSide.E;
-            else
-                return TileSide.M;
-        }
-    };
 
         /**
          * Constructor from a device.
@@ -412,27 +399,34 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     /**
      * Compute the location of the target node of the edge. This is called once when the target node is first seen.
      * @param e The edge
-     * @param loc Location at the source of the edge
+     * @param x x coordinate of the source of the edge leading to this node
+     * @param x y coordinate of the source of the edge leading to this node
      * @param isBackward Direction of the edge
      * @return Location at the targetof the edge
      */
-    protected double discoverVertex(TimingGroupEdge e, Double loc, Double dly, boolean isBackward) {
-        // TRY
-        if (e.getTimingGroup() == null)
-            return loc;
+    protected short[] discoverVertex(TimingGroupEdge e, short x, short y, Double dly, boolean isBackward) {
+//        // TRY
+//        if (e.getTimingGroup() == null)
+//            return loc;
 
-
+        short[] newXY = new short[2];
         boolean isReverseDirection =  e.isReverseDirection() ^ isBackward;
-        Double newLoc = loc + (isReverseDirection ? -e.getTimingGroup().length() : e.getTimingGroup().length());
+        if (e.getTimingGroup().direction() == T.Direction.VERTICAL) {
+            newXY[0] = x;
+            newXY[1] = (short) (y + (isReverseDirection ? -e.getTimingGroup().length() : e.getTimingGroup().length()));
+        } else {
+            newXY[0] = (short) (x + (isReverseDirection ? -e.getTimingGroup().length() : e.getTimingGroup().length()));
+            newXY[1] = y;
+        }
         if (verbose > 4) {
             T.TimingGroup tg = e.getTimingGroup();
 
             System.out.printf("          findVtx fr e %11s   rev %5s  bwd %5s" +
-                    "                                len %2d  begLoc %3d  endLoc %3d   dly %4d\n",
+                    "                                len %2d  begLoc %3d,%3d  endLoc %3d,%3d   dly %4d\n",
                     tg.name(),  e.isReverseDirection(), isBackward,
-                    tg.length(), loc.shortValue(), newLoc.shortValue(), dly.shortValue());
+                    tg.length(), x,y,newXY[0],newXY[0], dly.shortValue());
         }
-        return newLoc;
+        return newXY;
     }
     /**
      * Compute delay of an edge
@@ -446,51 +440,56 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * Compute delay of an edge
      * @param e The edge
      * @param u The target of this edge
-     * @param dst
-     * @param loc
+     * @param dst The final destination
+     * @param x x coordinate of the source of the edge
+     * @param x y coordinate of the source of the edge
+     * @param dly delay from the start to the source of the edge
      * @param isBackward
      * @return
      */
-    protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, Double loc, Double dly,
-                                                boolean isBackward, InterconnectInfo.Direction dir) {
+    protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, short x, short y, Double dly,
+                                                boolean isBackward) {
+        // For testing, to not explore known high delay
+        if (dly > 444) {
+            return Short.MAX_VALUE / 2;
+        }
+
 
         // return calcTimingGroupDelay(e.getTimingGroup(), loc.shortValue(), e.isReverseDirection() ^ isBackward);
         T.TimingGroup tg = e.getTimingGroup();
         if (tg == null)
             return 0;
-        short begLoc = loc.shortValue();
+//        short begLoc = loc.shortValue();
         // although TileSide inversion was applied to backward net inverting, isBackward is need here to get the right d
         boolean isReverseDirection = e.isReverseDirection() ^ isBackward;
+//
 
-        int limit = 0;
-        if (tg.direction() == InterconnectInfo.Direction.VERTICAL) {
-            limit = numRow;
-        } else if (tg.direction() == InterconnectInfo.Direction.HORIZONTAL) {
-            limit = numCol;
-        } else {
-            limit = Math.max(numRow,numCol);
-        }
-
+//        int limit = 0;
+//        if (tg.direction() == InterconnectInfo.Direction.VERTICAL) {
+//            limit = numRow;
+//        } else if (tg.direction() == InterconnectInfo.Direction.HORIZONTAL) {
+//            limit = numCol;
+//        } else {
+//            limit = Math.max(numRow,numCol);
+//        }
+//
         if (verbose > 4) {
             System.out.printf("          examineEdge  %11s   rev %5s  bwd %5s        ",
                     tg.name(), e.isReverseDirection(), isBackward);
         }
-
-        short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
-        if ((endLoc >= limit) || (endLoc < 0)) {
-            // Can't do MAX_VALUE as adding that to other value will become negative.
-            // TODO: consider using INT as intemediate computation
-            if (verbose > 4)
-                System.out.println("endLoc " + endLoc + " is out of range (0," + limit);
-            return Short.MAX_VALUE/2;
-        }
-
-        // Assume bounce happen only before CLE_IN
-//        if (tg == InterconnectInfo.TimingGroup.BOUNCE && dir == InterconnectInfo.Direction.VERTICAL) {
+//
+//        short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
+//        if ((endLoc >= limit) || (endLoc < 0)) {
+//            // Can't do MAX_VALUE as adding that to other value will become negative.
+//            // TODO: consider using INT as intemediate computation
 //            if (verbose > 4)
-//                System.out.println("skip BOUNCE is not allowed in Vvertical");
+//                System.out.println("endLoc " + endLoc + " is out of range (0," + limit);
 //            return Short.MAX_VALUE/2;
 //        }
+
+        // TODO remove this and call directly
+        short begLoc = (tg.direction() == T.Direction.VERTICAL) ? y : x;
+        short endLoc = (short) (begLoc + (isReverseDirection ? -tg.length() : tg.length()));
 
         return calcTimingGroupDelay(tg, begLoc, endLoc, dly);
     }

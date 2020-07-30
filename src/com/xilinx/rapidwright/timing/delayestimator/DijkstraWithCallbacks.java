@@ -25,10 +25,10 @@ import java.util.function.Predicate;
  */
 public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> {
     public static interface ExamineEdge<V,E> {
-        void apply(Graph<V,E> g, V v, E e, double val, double dist);
+        void apply(Graph<V,E> g, V v, E e, short x, short y, double dist);
     }
     public static interface DiscoverVertex<V, E> {
-        double apply(Graph<V,E> g, V v, E e, double d, double dist);
+        short[] apply(Graph<V,E> g, V v, E e, short x, short y, double dist);
     }
     public static interface UpdateVertex<V, E> {
         double apply(Graph<V,E> g, V v, E e, double dist);
@@ -37,7 +37,8 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
     protected DiscoverVertex<V,E> discoverVertex;
     protected UpdateVertex<V,E> updateVertex;
     protected Predicate<E> edgePredicate;
-    protected Double dAtSource;
+    protected short srcX;
+    protected short srcY;
 
     protected final Graph<V, E> graph;
     private final static double radius = Double.POSITIVE_INFINITY; // unlimited depth
@@ -53,7 +54,7 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
             return this.createEmptyPath(source, sink);
         } else {
             DijkstraClosestFirstIterator it = new DijkstraClosestFirstIterator(this.graph, source, this.radius,
-                    dAtSource, examineEdge, discoverVertex, updateVertex);
+                    srcX, srcY, examineEdge, discoverVertex, updateVertex);
 
             while(it.hasNext()) {
                 V vertex = (V) it.next();
@@ -93,7 +94,7 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
             throw new IllegalArgumentException("Graph must contain the source vertex!");
         } else {
             DijkstraClosestFirstIterator it = new DijkstraClosestFirstIterator(this.graph, source, this.radius,
-                    dAtSource, examineEdge, discoverVertex, updateVertex);
+                    srcX, srcY, examineEdge, discoverVertex, updateVertex);
 
             while(it.hasNext()) {
                 it.next();
@@ -108,37 +109,39 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
         return source.equals(sink) ? GraphWalk.singletonWalk(this.graph, source, 0.0D) : null;
     }
 
-    public static <V, E> GraphPath<V, E> findPathBetween(Graph<V, E> graph, V source, V sink, Double dAtSource,
+    public static <V, E> GraphPath<V, E> findPathBetween(Graph<V, E> graph, V source, V sink, short srcX, short srcY,
                                          ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
                                          UpdateVertex<V,E> updateVertex) {
-        return (new DijkstraWithCallbacks(graph, dAtSource, examineEdge, discoverVertex, updateVertex)).getPath(source, sink);
+        return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex)).getPath(source, sink);
     }
-    public static <V,E> Pair<Double,Boolean> findMinWeightBetween(Graph<V, E> graph, V source, V sink, Double dAtSource,
+    public static <V,E> Pair<Double,Boolean> findMinWeightBetween(Graph<V, E> graph, V source, V sink, short srcX, short srcY,
                                                     ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
                                                     UpdateVertex<V,E> updateVertex, Predicate<E> edgePredicate) {
-        return (new DijkstraWithCallbacks(graph, dAtSource, examineEdge, discoverVertex, updateVertex,
+        return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex,
                                           edgePredicate)).getPathWeightWithPredicate(source, sink);
     }
-    public static <V,E> Double findMinWeightBetween(Graph<V, E> graph, V source, V sink, Double dAtSource,
+    public static <V,E> Double findMinWeightBetween(Graph<V, E> graph, V source, V sink, short srcX, short srcY,
                                ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
                                UpdateVertex<V,E> updateVertex) {
-            return (new DijkstraWithCallbacks(graph, dAtSource, examineEdge, discoverVertex, updateVertex)).getPathWeight(source, sink);
+            return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex)).getPathWeight(source, sink);
     }
-    public DijkstraWithCallbacks(Graph<V, E> graph, Double dAtSource,
+    public DijkstraWithCallbacks(Graph<V, E> graph, short srcX, short srcY,
                                  ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex, UpdateVertex<V,E> updateVertex) {
         this.graph = (Graph) Objects.requireNonNull(graph, "Graph is null");
         this.examineEdge    = examineEdge;
         this.discoverVertex = discoverVertex;
-        this.dAtSource      = dAtSource;
+        this.srcX           = srcX;
+        this.srcY           = srcY;
         this.edgePredicate  = null;
     }
-    public DijkstraWithCallbacks(Graph<V, E> graph, Double dAtSource,
+    public DijkstraWithCallbacks(Graph<V, E> graph, short srcX, short srcY,
                                  ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
                                  UpdateVertex<V,E> updateVertex, Predicate<E> edgePredicate) {
         this.graph = (Graph) Objects.requireNonNull(graph, "Graph is null");
         this.examineEdge    = examineEdge;
         this.discoverVertex = discoverVertex;
-        this.dAtSource      = dAtSource;
+        this.srcX           = srcX;
+        this.srcY           = srcY;
         this.edgePredicate  = edgePredicate;
     }
 }
