@@ -3,14 +3,17 @@ package com.xilinx.rapidwright.routernew;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.timing.TimingGroup;
+import com.xilinx.rapidwright.timing.TimingModel;
 
-public class RoutableNode implements Routable{
+public class RoutableTimingGroup implements Routable{
 	public int index;
-	private Node node;
+	private TimingGroup timingGroup;
 	public RoutableType type;
 	
 	public short xlow, xhigh;
@@ -21,47 +24,49 @@ public class RoutableNode implements Routable{
 	public final RoutableData rnodeData;
 	
 	public boolean target;
-	public List<RoutableNode> children;
+	public List<RoutableTimingGroup> children;
 	public boolean childrenSet;
 	
-	public RoutableNode(int index, SitePinInst sitePinInst, RoutableType type){
+	public RoutableTimingGroup(int index, SitePinInst sitePinInst, RoutableType type, TimingModel tmodel){
 		this.index = index;
 		this.type = type;
-		this.node = sitePinInst.getConnectedNode();
+		this.timingGroup =  new TimingGroup(sitePinInst, tmodel);
+		if(this.timingGroup == null) System.out.println("null timing group");
+		this.setXY();
 		this.rnodeData = new RoutableData(this.index);
 		this.childrenSet = false;
-		this.target = false;
+	}
+	
+	public RoutableTimingGroup(int index, TimingGroup timingGroup){
+		this.index = index;
+		this.type = RoutableType.INTERRR;
+		this.timingGroup = timingGroup;
+		this.rnodeData = new RoutableData(this.index);
+		this.childrenSet = false;
+		
 		this.setXY();
 	}
 	
-	public RoutableNode(int index, Node node, RoutableType type){
-		this.index = index;
-		this.type = type;
-		this.node = node;
-		this.rnodeData = new RoutableData(this.index);
-		this.childrenSet = false;
-		this.target = false;
-		this.setXY();
-	}
-	
-	public int setChildren(int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable){
+	public int setChildren(int globalIndex, float base_cost_fac, Map<TimingGroup, RoutableTimingGroup> createdRoutable, Set<Node> reserved){
 		this.children = new ArrayList<>();
-		for(Node node:this.node.getAllDownhillNodes()){
-			if(node.getTile().getName().startsWith("INT_")){//TODO "routethru" is not allowed in this way
-				if(!createdRoutable.containsKey(node)){
-					RoutableNode child;
-					child = new RoutableNode(globalIndex, node, RoutableType.INTERRR);
-					child.setBaseCost(base_cost_fac);
+
+		if(this.timingGroup.getNextTimingGroups() != null){
+			for(TimingGroup timingGroup:this.timingGroup.getNextTimingGroups()){
+				RoutableTimingGroup childRNode;
+				//TimingGroup toString/hashCode is not unique,
+				if(!createdRoutable.containsKey(timingGroup)){
+					childRNode = new RoutableTimingGroup(globalIndex, timingGroup);
+					childRNode.setBaseCost(base_cost_fac);
 					globalIndex++;
-					this.children.add(child);
-					createdRoutable.put(node, child);
+					children.add(childRNode);
+					createdRoutable.put(timingGroup, childRNode);
 				}else{
-					this.children.add(createdRoutable.get(node));//the sink routable a target created up-front 
-				}		
+					children.add(createdRoutable.get(timingGroup));
+				}
 			}
 		}
 		this.childrenSet = true;
-		return globalIndex++;
+		return globalIndex;
 	}
 	
 	@Override
@@ -82,8 +87,6 @@ public class RoutableNode implements Routable{
 			
 		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
 			base_cost = 0.95f;//virtually the same to the logic block input pin, since no alternative ipins are considered
-		}else{
-			base_cost = 1;
 		}
 	}
 
@@ -104,11 +107,32 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public void setXY() {
-		int length = this.node.getAllWiresInNode().length;
+		int nodeSize = this.timingGroup.getNodes().size();
+		short[] xMaxCoordinates = new short[nodeSize];
+		short[] xMinCoordinates = new short[nodeSize];
+		short[] yMaxCoordinates = new short[nodeSize];
+		short[] yMinCoordinates = new short[nodeSize];
+		short nodeId = 0;
+		for(Node node:this.timingGroup.getNodes()){
+			this.setCenterXYNode(node);
+			xMaxCoordinates[nodeId] = this.xhigh;
+			xMinCoordinates[nodeId] = this.xlow;
+			yMaxCoordinates[nodeId] = this.yhigh;
+			yMinCoordinates[nodeId] = this.ylow;
+		}
+		
+		this.xlow = this.min(xMinCoordinates);
+		this.xhigh = this.max(xMaxCoordinates);
+		this.ylow = this.min(yMinCoordinates);
+		this.yhigh = this.max(yMaxCoordinates);
+	}
+	
+	public void setCenterXYNode(Node node){
+		int length = node.getAllWiresInNode().length;
 		short[] xCoordinates = new short[length];
 		short[] yCoordinates = new short[length];
 		short id = 0;
-		for(Wire w : this.node.getAllWiresInNode()){
+		for(Wire w : node.getAllWiresInNode()){
 			xCoordinates[id] = (short) w.getTile().getColumn();
 			yCoordinates[id] = (short) w.getTile().getRow();
 			id++;
@@ -234,8 +258,8 @@ public class RoutableNode implements Routable{
 		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
 	}
 
-	public Node getNode() {
-		return this.node;
+	public TimingGroup getTimingGroup() {
+		return this.timingGroup;
 	}
 
 }

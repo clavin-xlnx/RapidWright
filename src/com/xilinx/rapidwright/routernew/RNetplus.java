@@ -32,8 +32,7 @@ public class RNetplus{
 		this.fanout = (short) this.net.getFanOut();
 		this.getBoundingXYs(net);
 	}
-	//TODO some tiles has more than one sites, needed to distinguish those cases?
-	//rough computation does not impact the accuracy a lot?
+	
 	public void getBoundingXYs(Net net){
 		short x_min = 1<<10;
 		short x_max = 0;

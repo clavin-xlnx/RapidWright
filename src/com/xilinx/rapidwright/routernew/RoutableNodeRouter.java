@@ -11,6 +11,7 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -29,7 +30,7 @@ public class RoutableNodeRouter{
 	public List<RConnection> connections;
 	public int fanout1Net;
 	
-	public Set<Node> reservedNodes;
+//	public Map<Net, List<Node>> netsReservedNodes;
 	public PriorityQueue<RQueueElement> queue;
 	public Collection<RoutableData> rnodesTouched;
 	public Map<Node, RoutableNode> rnodesCreated;//node and rnode pair
@@ -52,7 +53,7 @@ public class RoutableNodeRouter{
 	public float mdWeight;
 	public float hopWeight;
 	
-	public int globalRNodeIndex;
+	public int rrgNodeId;
 	public int firstIterRNodes;
 	
 	public int connectionsRouted;
@@ -99,8 +100,8 @@ public class RoutableNodeRouter{
 		
 		this.routerTimer = new RouterTimer();
 		this.fanout1Net = 0;
-		this.globalRNodeIndex = 0;
-		this.globalRNodeIndex = this.initializeNetsCons(bbRange, this.globalRNodeIndex, this.base_cost_fac);
+		this.rrgNodeId = 0;
+		this.rrgNodeId = this.initializeNetsCons(bbRange, this.rrgNodeId, this.base_cost_fac);
 				
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -114,7 +115,7 @@ public class RoutableNodeRouter{
 		this.illegalRNodes = new HashSet<>();
 	}
 	
-	public int initializeNetsCons(short bbRange, int rnodeId, float base_cost_fac){
+	public int initializeNetsCons(short bbRange, int rrgNodeId, float base_cost_fac){
 		int inet = 0;
 		int icon = 0;
 		
@@ -122,61 +123,105 @@ public class RoutableNodeRouter{
 		this.connections = new ArrayList<>();
 		
 		for(Net n:this.design.getNets()){
-			if(n.getFanOut() > 0){//ignore nets that have no sinks
+			DesignTools.createMissingSitePinInsts(this.design, n);
+			
+			if(n.getPins().size() == 1){
+				for(SitePinInst pin:n.getPins()){
+					Node node = pin.getConnectedNode();
+					/*RoutableType type;
+					if(pin.isOutPin()){
+						type = RoutableType.SOURCERR;
+					}else{
+						type = RoutableType.SINKRR;
+					}*/
+					RoutableNode reservedRRGNode = new RoutableNode(rrgNodeId, node, RoutableType.RESERVED);
+					reservedRRGNode.setBaseCost(Float.MAX_VALUE - 1);
+					this.rnodesCreated.put(node, reservedRRGNode);
+					rrgNodeId++;			
+				}
+			}else if(n.isClockNet() || n.isStaticNet() || n.getName().equals("clk")){
+				for(PIP pip:n.getPIPs()){
+					Node nodeStart = pip.getStartNode();
+					RoutableNode startRRGNode = new RoutableNode(rrgNodeId, nodeStart, RoutableType.RESERVED);//INTERRR not accurate
+					startRRGNode.setBaseCost(Float.MAX_VALUE - 1);
+					this.rnodesCreated.put(nodeStart, startRRGNode);
+					rrgNodeId++;
+					
+					Node nodeEnd = pip.getEndNode();
+					RoutableNode endRRGNode = new RoutableNode(rrgNodeId, nodeEnd, RoutableType.RESERVED);//INTERRR not accurate
+					endRRGNode.setBaseCost(Float.MAX_VALUE - 1);
+					this.rnodesCreated.put(nodeEnd, endRRGNode);
+					rrgNodeId++;
+				}
 				
+			}
+			if(n.getSource() != null && n.getSinkPins().size() > 0){
+				n.unroute();
 				RNetplus np = new RNetplus(inet, bbRange, n);
 				this.nets.add(np);
 				inet++;
 				
 				SitePinInst source = n.getSource();
-				RoutableNode sourceRNode = new RoutableNode(rnodeId, source, RoutableType.SOURCERR);
+				RoutableNode sourceRNode = new RoutableNode(rrgNodeId, source, RoutableType.SOURCERR);
 				sourceRNode.setBaseCost(base_cost_fac);
 				this.rnodesCreated.put(sourceRNode.getNode(), sourceRNode);	
-				rnodeId++;
+				rrgNodeId++;
 				
 				for(SitePinInst sink:n.getSinkPins()){
-					
-					int wire1 = sink.getSiteInst().getSite().getTileWireIndexFromPinName(sink.getName());
-					int wire2 = sink.getSiteExternalWireIndex();
-					if(wire1 != wire2) System.out.println("not the same");
 					RConnection c = new RConnection(icon, source, sink);	
 					c.setSourceRNode(sourceRNode);
 					
 					//create RNode of the sink pin external wire up front 
-					RoutableNode sinkRNode = new RoutableNode(rnodeId, sink, RoutableType.SINKRR);
+					RoutableNode sinkRNode = new RoutableNode(rrgNodeId, sink, RoutableType.SINKRR);
 					sinkRNode.setBaseCost(base_cost_fac);
 					c.setSinkRNode(sinkRNode);
 					this.rnodesCreated.put(sinkRNode.getNode(), sinkRNode);
-					rnodeId++;
+					rrgNodeId++;
 					
 					this.connections.add(c);
 					c.setNet(np);//TODO new and set its TimingEdge for timing-driven version
 					np.addCons(c);
 					icon++;
 				}
-					
-			}/*else
-				System.out.println(n.getLogicalNet().getPortInsts().toString());*/	
-			if(n.getFanOut() == 1)
-				this.fanout1Net++;
+				if(n.getFanOut() == 1)
+					this.fanout1Net++;
+			}	
 		}
-		return rnodeId;
+		return rrgNodeId;
 	}
 	
-	public List<Net> unrouteNetsReserveGndVccClock(){
-		List<Net> reservedNets = new ArrayList<>();
-		System.out.println();
+	public void findNodesConflicts(){
+		Map<Node, Integer> nodesUsage = new HashMap<>();
+		Set<Net> conflictedNets = new HashSet<>();
 		for(Net net:this.design.getNets()){
-			if(net.isClockNet() || net.isStaticNet()){
-				System.out.println("Routed net reserved:\t" +  net.getName());
-				reservedNets.add(net);
-				continue;
-			}else if(net.getFanOut() > 0){
-				net.unroute();
+			Map<Node, Integer> nodesUsageNet = new HashMap<>();
+			for(PIP p: net.getPIPs()){
+				Node startNode = p.getStartNode();
+				if(!nodesUsage.containsKey(startNode)){
+					nodesUsage.put(startNode, 1);
+					nodesUsageNet.put(startNode, 1);
+				}else{
+					nodesUsage.put(startNode, nodesUsage.get(startNode) + 1);
+					nodesUsageNet.put(startNode, nodesUsage.get(startNode) + 1);
+				}
+				Node endNode = p.getEndNode();
+				if(!nodesUsage.containsKey(endNode)){
+					nodesUsage.put(endNode, 1);
+					nodesUsageNet.put(endNode, 1);
+				}else{
+					nodesUsage.put(endNode, nodesUsage.get(endNode) + 1);
+					nodesUsageNet.put(endNode, nodesUsage.get(endNode) + 1);
+				}
+			}
+			for(Node n:nodesUsageNet.keySet()){
+				if(nodesUsageNet.get(n) > 1)
+					conflictedNets.add(net);
 			}
 		}
 		
-		return reservedNets;
+		for(Net errNet:conflictedNets){
+			System.out.println(errNet.toString());
+		}
 	}
 	
 	public void initializeRouter(float initial_pres_fac, float pres_fac_mult, float acc_fac){
@@ -224,15 +269,6 @@ public class RoutableNodeRouter{
 		this.sortedListOfNetplus.addAll(this.nets);
 		Collections.sort(this.sortedListOfNetplus, RComparators.FanoutNet);
 		
-		//unroute nets except GND VCC and clocK
-		List<Net> reservedNets = this.unrouteNetsReserveGndVccClock();
-		this.reservedNodes = new HashSet<>();
-		for(Net net:reservedNets){
-			for(PIP pip:net.getPIPs()){
-				this.reservedNodes.add(pip.getStartNode());
-				this.reservedNodes.add(pip.getEndNode());
-			}
-		}
 		//initialize router
 		this.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
 				
@@ -300,15 +336,17 @@ public class RoutableNodeRouter{
 			this.routerTimer.calculateStatistics.start();
 			this.staticticsInfo(this.sortedListOfConnection, 
 					this.iterationStart, this.iterationEnd, 
-					this.globalRNodeIndex, this.routerTimer.rnodesCreation.getTime());
+					this.rrgNodeId, this.routerTimer.rnodesCreation.getTime());
 			this.routerTimer.calculateStatistics.finish();;
 			//if the routing is valid /realizable return, the routing completed successfully
 	
 			if(this.itry == 1) this.firstIterRNodes = this.rnodesCreated.size();
 	
 			if (validRouting) {
-				//TODO generate and assign a list of PIPs for each Net net
+				//generate and assign a list of PIPs for each Net net
 				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
+				
+				 this.findNodesConflicts();//TODO
 				
 				this.routerTimer.pipsAssignment.start();
 				this.pipsAssignment();
@@ -567,6 +605,7 @@ public class RoutableNodeRouter{
 	public void pipsAssignment(){
 		for(RNetplus np:this.sortedListOfNetplus){
 			Set<PIP> netPIPs = new HashSet<>();
+			
 			for(RConnection c:np.getConnection()){
 				netPIPs.addAll(this.conPIPs(c));
 			}
@@ -609,8 +648,10 @@ public class RoutableNodeRouter{
 	}
 	
 	public void checkInvalidlyRoutedNets(String netname){
+		boolean foundInRWrouter = false;
 		for(RNetplus net:this.sortedListOfNetplus){
 			if(net.getNet().getName().equals(netname)){
+				foundInRWrouter = true;
 				System.out.println(net.getNet().toString());
 				for(RConnection c: net.getConnection()){
 					
@@ -621,37 +662,13 @@ public class RoutableNodeRouter{
 				}
 			}
 		}
-	}
-	
-	public void checkNetRoutedPins(){
-		Map<Net, Integer> netRoutedPins = new HashMap<>();
-		for(Net net:this.design.getNets()){
-			int routedPins = 0;
-			for(PIP pip:net.getPIPs()){
-				if(pip.getEndWireName().contains("IMUX_") && !pip.getEndWireName().contains("_IMUX_")){
-					routedPins++;
-				}
-			}
-			netRoutedPins.put(net, routedPins);
+		
+		if(!foundInRWrouter){
+			System.out.println("not processded by rw router");
+			Net net = this.design.getNet(netname);
+			System.out.println(net.toStringFull());
+			System.out.println(net.getSource().toString() + " " + net.getSinkPins().size());
 		}
-		
-		int errorNetsRoutedLargeThanFanout = 0;
-		int errorNetsRoutedLessThanFanout = 0;
-		
-		for(Net net:this.design.getNets()){
-			if(net.getFanOut() < netRoutedPins.get(net)){
-				errorNetsRoutedLargeThanFanout++;
-
-				
-			}else if(net.getFanOut() > netRoutedPins.get(net)){
-//				System.out.println("error nets routed less than fanout");
-//				System.out.println(net.toStringFull());
-				errorNetsRoutedLessThanFanout++;
-			}
-		}
-		
-		System.out.println("error nets routed large than fanout = " + errorNetsRoutedLargeThanFanout);
-		System.out.println("error nets routed less than fanout = " + errorNetsRoutedLessThanFanout);
 	}
 	
 	public List<PIP> conPIPs(RConnection con){
@@ -661,10 +678,10 @@ public class RoutableNodeRouter{
 			Node nodeFormer = ((RoutableNode) (con.rnodes.get(i))).getNode();
 			Node nodeLatter = ((RoutableNode) (con.rnodes.get(i-1))).getNode();
 			
-			Wire startWire = this.findEndWireOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
+			Wire pipStartWire = this.findEndWireOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
 			
-			if(startWire != null){
-				PIP pip = new PIP(nodeLatter.getTile(), startWire.getWireIndex(), nodeLatter.getWire());
+			if(pipStartWire != null){
+				PIP pip = new PIP(nodeLatter.getTile(), pipStartWire.getWireIndex(), nodeLatter.getWire());
 				conPIPs.add(pip);
 			}else{
 				System.out.println("pip start wire is null");
@@ -697,11 +714,11 @@ public class RoutableNodeRouter{
 	}
 	
 	public void findCongestion(){
-		/*for(RNode<Node> rn : this.rnodesCreated.values()){
+		for(RoutableNode rn : this.rnodesCreated.values()){
 			if(rn.overUsed()){
 				System.out.println(rn.toString());
 			}
-		}*/
+		}
 		Set<RConnection> congestedCons = new HashSet<>();
 //		Map<Netplus<Node>, Integer> congestedNets = new HashMap<>();
 		for(RConnection con:this.sortedListOfConnection){
@@ -742,6 +759,7 @@ public class RoutableNodeRouter{
 			this.nodesExpanded++;
 			
 			if(this.queue.isEmpty()){
+				System.out.println(this.nodesExpanded);
 				System.out.println(con.getNet().getNet().getName() + " " + con.source.getName() + " " + con.sink.getName());
 				throw new RuntimeException("Queue is empty: target unreachable?");
 			}
@@ -750,7 +768,7 @@ public class RoutableNodeRouter{
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.globalRNodeIndex = rnode.setChildren(this.globalRNodeIndex, this.base_cost_fac, this.rnodesCreated, this.reservedNodes);
+				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated);
 			}
 			this.routerTimer.rnodesCreation.finish();
 			
@@ -809,7 +827,7 @@ public class RoutableNodeRouter{
 				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
 				this.addNodeToQueue(rnode, childRNode, con);
 				
-			}else{
+			}else if(childRNode.type.equals(RoutableType.INTERRR)){
 				//traverse INT tiles only, otherwise, the router would take CLB sites as next hop candidates
 				//this can be done by downsizing the created rnodes
 				if(childRNode.isInBoundingBoxLimit(con)){

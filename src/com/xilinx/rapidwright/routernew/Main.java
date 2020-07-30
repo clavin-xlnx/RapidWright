@@ -254,7 +254,7 @@ public class Main {
 				this.rnodesInfo(router.manhattanD,
 						router.hops,
 						router.firstIterRNodes,
-						router.globalRNodeIndex,
+						router.rrgNodeId,
 						router.usedRNodes.size(),
 						router.checkAverageNumWires(),
 						1);

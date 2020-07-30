@@ -20,8 +20,6 @@ public class RConnection{
 	private Routable sinkRNode;
 	public List<Routable> rnodes;
 	
-	public String targetName;//remove target name save memory?
-	
 	public RConnection(int id, SitePinInst source, SitePinInst sink){
 		this.id = id;
 		
@@ -109,13 +107,13 @@ public class RConnection{
 		s.append(", ");
 		s.append(String.format("net fanout = %3s", this.net.fanout));
 		s.append(", ");
-		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getTile().getName() + "/" + this.source.getSiteExternalWireIndex()));
+		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getConnectedNode().toString()));
 		s.append(", ");
-		s.append(String.format("sink = %26s", this.sink.getTile().getName() + "/" + this.sink.getSiteExternalWireIndex() + " -> " +  this.sink.getName()));
+		s.append(String.format("sink = %26s", this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName()));
 		s.append(", ");
 		s.append(String.format("mahattan d = %4d ", this.getManhattanDistance()));
 		
-		return s.toString();	
+		return s.toString();
 		
 	}
 	
