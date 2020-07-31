@@ -14,6 +14,9 @@ public interface Routable {
 	public float getCenterX();
 	public float getCenterY();
 	
+	public boolean isTarget();
+	public void setTarget(boolean isTarget);
+	
 	public void updatePresentCongestionPenalty(float pres_fac);
 	public float getManhattanD();
 	public boolean isInBoundingBoxLimit(RConnection con);

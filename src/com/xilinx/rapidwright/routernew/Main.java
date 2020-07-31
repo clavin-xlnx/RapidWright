@@ -55,6 +55,8 @@ public class Main {
 					this.opt = RoutingGranularityOpt.TIMINGGROUP;
 				}else if(optNum == 4){
 					this.opt = RoutingGranularityOpt.ROUTABLENODE;
+				}else if(optNum == 5){
+					this.opt = RoutingGranularityOpt.ROUTABLEWIRE;
 				}
 				
 			}else if(arguments[i].contains("bbRange")){
@@ -227,7 +229,7 @@ public class Main {
 						router.router.getNodesExpanded(),
 						router.routerTimer);
 				
-			}else{
+			}else if(this.opt == RoutingGranularityOpt.ROUTABLENODE){
 				RoutableNodeRouter router = new RoutableNodeRouter(this.design, 
 						this.toWriteDCPfileName,
 						this.nrOfTrials,
@@ -266,7 +268,50 @@ public class Main {
 						router.nodesExpanded,
 						router.routerTimer);
 				
+			}else if(this.opt == RoutingGranularityOpt.ROUTABLEWIRE){
+				RoutableWireRouter router = new RoutableWireRouter(this.design, 
+						this.toWriteDCPfileName,
+						this.nrOfTrials,
+						this.t,
+						(short) this.bbRange,
+						this.mdWeight,
+						this.hopWeight,
+						this.initial_pres_fac,
+						this.pres_fac_mult,
+						this.acc_fac,
+						this.base_cost_fac);
+				
+				router.designInfo();
+				this.routerConfigurationInfo();
+				
+				this.t.start("Route Design");
+				routingRuntime = router.routingRuntime();
+				this.t.stop();
+				
+				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
+				
+				router.getAllHopsAndManhattanD();
+				
+				this.rnodesInfo(router.manhattanD,
+						router.hops,
+						router.firstIterRNodes,
+						router.rrgNodeId,
+						router.usedRNodes.size(),
+						1,
+						0);
+				
+				this.runtimeInfoPrinting(routingRuntime, 
+						router.itry, 
+						router.connectionsRouted,
+						router.sortedListOfConnection.size(),
+						router.nodesExpanded,
+						router.routerTimer);
+				
 			}
+			
+			
+			
+			
 		}
 	}
 	

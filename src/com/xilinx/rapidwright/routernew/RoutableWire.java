@@ -11,9 +11,8 @@ import com.xilinx.rapidwright.device.Wire;
 
 public class RoutableWire implements Routable{
 	public int index;
-	public Tile tile;
-	private int wire;
-	private RoutableType type;
+	public Wire wire;
+	public RoutableType type;
 	
 	public short xlow, xhigh;
 	public short ylow, yhigh;
@@ -28,8 +27,8 @@ public class RoutableWire implements Routable{
 	
 	public RoutableWire(int index, SitePinInst sitePinInst, RoutableType type){
 		this.index = index;
+		this.wire = new Wire(sitePinInst.getTile(), sitePinInst.getConnectedWireIndex());		
 		this.type = type;
-		this.tile = sitePinInst.getTile();
 		this.rnodeData = new RoutableData(this.index);
 		this.childrenSet = false;
 		this.target = false;
@@ -39,18 +38,18 @@ public class RoutableWire implements Routable{
 	public RoutableWire(int index, Wire wire, RoutableType type){
 		this.index = index;
 		this.type = type;
-		this.tile = wire.getTile();
+		this.wire = wire;
 		this.rnodeData = new RoutableData(this.index);
 		this.childrenSet = false;
 		this.target = false;
 		this.setXY();
 	}
 	
-	public int setChildren(int globalIndex, float base_cost_fac, Map<Wire, RoutableWire> createdRoutable, Set<Routable> reserved){
+	public int setChildren(int globalIndex, float base_cost_fac, Map<Wire, RoutableWire> createdRoutable){
 		this.children = new ArrayList<>();
-		List<Wire> wires = this.tile.getWireConnections(this.wire);
+		List<Wire> wires = this.wire.getTile().getWireConnections(this.wire.getWireIndex());
 		for(Wire wire:wires){
-			if(wire.getTile().getName().startsWith("INT_")){
+//			if(wire.getTile().getName().startsWith("INT_")){
 				if(!createdRoutable.containsKey(wire)){
 					RoutableWire child;
 					child = new RoutableWire(globalIndex, wire, RoutableType.INTERRR);
@@ -61,7 +60,7 @@ public class RoutableWire implements Routable{
 				}else{
 					this.children.add(createdRoutable.get(wire));//the sink routable a target created up-front 
 				}
-			}
+//			}
 		}
 		this.childrenSet = true;
 		return globalIndex;
@@ -105,9 +104,9 @@ public class RoutableWire implements Routable{
 
 	@Override
 	public void setXY() {
-		this.xlow = (short) this.tile.getColumn();
+		this.xlow = (short) this.wire.getTile().getColumn();
 		this.xhigh = this.xlow;
-		this.ylow = (short) this.tile.getRow();
+		this.ylow = (short) this.wire.getTile().getRow();
 		this.yhigh = this.ylow;
 	}
 
@@ -182,6 +181,16 @@ public class RoutableWire implements Routable{
 	
 	public boolean isInBoundingBoxLimit(RConnection con) {		
 		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
+	}
+
+	@Override
+	public boolean isTarget() {
+		return this.target;
+	}
+
+	@Override
+	public void setTarget(boolean isTarget) {
+		this.target = isTarget;	
 	}
 
 }

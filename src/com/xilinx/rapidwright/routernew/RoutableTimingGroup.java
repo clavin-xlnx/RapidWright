@@ -261,5 +261,15 @@ public class RoutableTimingGroup implements Routable{
 	public TimingGroup getTimingGroup() {
 		return this.timingGroup;
 	}
+	
+	@Override
+	public boolean isTarget() {
+		return this.target;
+	}
+
+	@Override
+	public void setTarget(boolean isTarget) {
+		this.target = isTarget;	
+	}
 
 }

@@ -238,4 +238,14 @@ public class RoutableNode implements Routable{
 		return this.node;
 	}
 
+	@Override
+	public boolean isTarget() {
+		return this.target;
+	}
+
+	@Override
+	public void setTarget(boolean isTarget) {
+		this.target = isTarget;	
+	}
+
 }
