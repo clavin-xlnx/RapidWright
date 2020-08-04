@@ -124,6 +124,20 @@ public class RoutableNodeRouter{
 		
 		DesignTools.createMissingSitePinInsts(this.design);
 		
+		int twoPinNetsWithaSource = 0;
+		for(Net n:this.design.getNets()){
+			if(n.getSource() != null && n.getSinkPins().size() == 1){
+				
+				this.printInfo(n.toString());
+				if(this.twoPinNetInternallyRouted(n)){
+					twoPinNetsWithaSource++;
+					this.printInfo("");
+				}
+				
+			}
+		}
+		this.printInfo("two-Pin Nets With source == sink: " + twoPinNetsWithaSource);
+		
 		for(Net n:this.design.getNets()){	
 			if(n.getPins().size() == 1|| (n.getSource() == null && n.getSinkPins().size() > 0)){
 				for(SitePinInst pin:n.getPins()){
@@ -156,6 +170,11 @@ public class RoutableNodeRouter{
 					
 				}
 			} else if(n.getSource() != null && n.getSinkPins().size() > 0){
+				/*if(n.getName().equals("n11b")){
+					System.out.println(n.getType());
+					System.out.println();
+					continue;
+				}*/
 				n.unroute();
 				RNetplus np = new RNetplus(inet, bbRange, n);
 				this.nets.add(np);
@@ -183,7 +202,7 @@ public class RoutableNodeRouter{
 					np.addCons(c);
 					icon++;
 				}
-				if(n.getFanOut() == 1)
+				if(n.getSinkPins().size() == 1)
 					this.fanout1Net++;
 			}	
 		}
@@ -378,9 +397,7 @@ public class RoutableNodeRouter{
 			if (validRouting) {
 				//generate and assign a list of PIPs for each Net net
 				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
-				
-				 this.findNodesConflicts();//TODO
-				
+							
 				this.routerTimer.pipsAssignment.start();
 				this.pipsAssignment();
 				this.routerTimer.pipsAssignment.finish();
@@ -644,7 +661,7 @@ public class RoutableNodeRouter{
 			}
 			np.getNet().setPIPs(netPIPs);
 		}
-//		this.checkInvalidlyRoutedNets("n199");
+		
 		this.checkPIPsUsage();
 //		this.checkNetRoutedPins();
 //		this.printWrittenPIPs();
@@ -654,6 +671,19 @@ public class RoutableNodeRouter{
 		for(Net net:this.design.getNets()){
 			System.out.println(net.toStringFull());
 		}
+	}
+	
+	public boolean twoPinNetInternallyRouted(Net n){
+		boolean internal = false;
+		SitePinInst source = n.getSource();
+		SitePinInst sink = n.getSinkPins().get(0);
+		
+		if(source.getSite().equals(sink.getSite())){
+			System.out.println(source.getSite().toString() + " " + sink.getSite().toString());
+			System.out.println(source.isLUTInputPin() + " " + sink.getBELPin().getBEL().toString());
+			internal = true;
+		}
+		return internal;
 	}
 	
 	public void checkPIPsUsage(){
@@ -687,7 +717,7 @@ public class RoutableNodeRouter{
 				foundInRWrouter = true;
 				System.out.println(net.getNet().toString());
 				for(RConnection c: net.getConnection()){
-					
+					System.out.println(((RoutableNode)c.getSinkRNode()).getNode().toString() + " - " + c.sink.getName());
 					for(PIP p:this.conPIPs(c)){
 						System.out.println("\t" + p.toString());
 					}

@@ -10,6 +10,7 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
@@ -102,8 +103,11 @@ public class PFRouter<E>{
 	public int initializeNetsCons(RoutingGranularityOpt opt){
 		int inet = 0;
 		int icon = 0;
+		
+		DesignTools.createMissingSitePinInsts(this.design);
+		
 		for(Net n:this.design.getNets()){
-			if(n.getFanOut() > 0){//ignore nets that have no pins
+			if(n.getSource() != null && n.getSinkPins().size() > 0){//ignore nets that have no pins
 				
 				Netplus<E> np = new Netplus<E>(inet, this.bbRange, n);
 				this.nets.add(np);
