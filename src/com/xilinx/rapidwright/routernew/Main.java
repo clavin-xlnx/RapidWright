@@ -14,7 +14,7 @@ public class Main {
 	private CodePerfTracker t;
 	
 	private boolean routerNew = true;
-	private RoutingGranularityOpt opt = RoutingGranularityOpt.NODE;
+	private RoutingGranularityOpt opt = RoutingGranularityOpt.ROUTABLENODE;
 	
 	//allowed number of routing iterations
 	private int nrOfTrials = 100;
@@ -224,11 +224,7 @@ public class Main {
 						router.nodesExpanded,
 						router.routerTimer);
 				
-			}
-			
-			
-			
-			
+			}		
 		}
 	}
 	
@@ -290,19 +286,19 @@ public class Main {
 		System.out.printf("Rnodes created 1st iter: %d\n", firstIterRNodes);
 		System.out.printf("Total rnodes created: %d\n", totalRNodes);
 		System.out.printf("Total rnodes used: %d\n", totalUsage);
-		if(this.opt == RoutingGranularityOpt.NODE || this.opt == RoutingGranularityOpt.ROUTABLENODE){
+		if(this.opt == RoutingGranularityOpt.ROUTABLENODE){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
-		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
+		}else if(this.opt == RoutingGranularityOpt.ROUTABLETIMINGGROUP){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #node in rnodes: %5.2f\n", averNode);
 		}
 	}
 	
 	public void runtimeInfoPrinting(int routingRuntime, 
-			int iterations, 
+			int iterations,
 			int consRouted,
-			int toalCons, 
-			long nodesExpanded, 
+			int toalCons,
+			long nodesExpanded,
 			RouterTimer timer){
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Routing took %.2f s\n", routingRuntime*1e-3);

@@ -7,12 +7,12 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 
-public class RNetplus{
+public class Netplus{
 	/**
 	 * Netplus is a class with additional information of a net for 
 	 * a PathFinder-based router development
 	 */
-	private List<RConnection> connections;
+	private List<Connection> connections;
 	public Net net;
 	private NetType type;
 	private int id;
@@ -23,7 +23,7 @@ public class RNetplus{
 	public short bbRange;
 	public short fanout;
 	
-	public RNetplus(int id, short bbRange, Net net){
+	public Netplus(int id, short bbRange, Net net){
 		this.id = id;
 		this.bbRange = bbRange;
 		this.net = net;
@@ -98,15 +98,15 @@ public class RNetplus{
 	public int getId() {
 		return id;
 	}
-	public void addCons(RConnection c){
+	public void addCons(Connection c){
 		this.connections.add(c);
 	}
-	public List<RConnection> getConnection(){
+	public List<Connection> getConnection(){
 		return this.connections;
 	}
 	
 	public Routable getIllegalNode() {
-		for(RConnection con : this.connections) {
+		for(Connection con : this.connections) {
 			for(Routable rnode : con.rnodes) {
 				if(rnode.illegal()) {
 					return rnode;

@@ -19,6 +19,6 @@ public interface Routable {
 	
 	public void updatePresentCongestionPenalty(float pres_fac);
 	public float getManhattanD();
-	public boolean isInBoundingBoxLimit(RConnection con);
+	public boolean isInBoundingBoxLimit(Connection con);
 	
 }

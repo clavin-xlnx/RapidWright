@@ -258,7 +258,7 @@ public class RoutableTimingGroup implements Routable{
 	}
 
 	
-	public boolean isInBoundingBoxLimit(RConnection con) {		
+	public boolean isInBoundingBoxLimit(Connection con) {		
 		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
 	}
 

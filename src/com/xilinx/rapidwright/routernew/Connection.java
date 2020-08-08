@@ -5,13 +5,13 @@ import java.util.List;
 
 import com.xilinx.rapidwright.design.SitePinInst;
 
-public class RConnection{
+public class Connection{
 	public final int id;
 	
 	public final SitePinInst source;
 	public final SitePinInst sink;
 	
-	public RNetplus net;
+	public Netplus net;
     public final short boundingBox;
 	
 	public final String sourceName;
@@ -20,7 +20,7 @@ public class RConnection{
 	private Routable sinkRNode;
 	public List<Routable> rnodes;
 	
-	public RConnection(int id, SitePinInst source, SitePinInst sink){
+	public Connection(int id, SitePinInst source, SitePinInst sink){
 		this.id = id;
 		
 		this.source = source;
@@ -58,11 +58,11 @@ public class RConnection{
 		return (short) ((max_x - min_x + 1) + (max_y - min_y + 1));
 	}
 	
-	public void setNet(RNetplus net){
+	public void setNet(Netplus net){
 		this.net = net;
 	}
 	
-	public RNetplus getNet(){
+	public Netplus getNet(){
 		return this.net;
 	}
 	

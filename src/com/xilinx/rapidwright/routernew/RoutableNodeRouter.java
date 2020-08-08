@@ -28,17 +28,17 @@ public class RoutableNodeRouter{
 	public int nrOfTrials;
 	public CodePerfTracker t;
 	
-	public List<RNetplus> nets;
-	public List<RConnection> connections;
+	public List<Netplus> nets;
+	public List<Connection> connections;
 	public int fanout1Net;
 	
 //	public Map<Net, List<Node>> netsReservedNodes;
-	public PriorityQueue<RQueueElement> queue;
+	public PriorityQueue<QueueElement> queue;
 	public Collection<RoutableData> rnodesTouched;
 	public Map<Node, RoutableNode> rnodesCreated;//node and rnode pair
 	
-	public List<RConnection> sortedListOfConnection;
-	public List<RNetplus> sortedListOfNetplus;
+	public List<Connection> sortedListOfConnection;
+	public List<Netplus> sortedListOfNetplus;
 
 	
 	public RouterTimer routerTimer;
@@ -85,7 +85,7 @@ public class RoutableNodeRouter{
 			float acc_fac,
 			float base_cost_fac){
 		this.design = design;
-		this.queue = new PriorityQueue<>(RComparators.PRIORITY_COMPARATOR);
+		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
 		
 		this.rnodesCreated = new HashMap<>();
@@ -161,7 +161,7 @@ public class RoutableNodeRouter{
 				}
 			} else if(n.getSource() != null && n.getSinkPins().size() > 0){
 				n.unroute();
-				RNetplus np = new RNetplus(inet, bbRange, n);
+				Netplus np = new Netplus(inet, bbRange, n);
 				this.nets.add(np);
 				inet++;
 				
@@ -172,7 +172,7 @@ public class RoutableNodeRouter{
 				rrgNodeId++;
 				
 				for(SitePinInst sink:n.getSinkPins()){
-					RConnection c = new RConnection(icon, source, sink);	
+					Connection c = new Connection(icon, source, sink);	
 					c.setSourceRNode(sourceRNode);
 					
 					//create RNode of the sink pin external wire up front 
@@ -246,26 +246,26 @@ public class RoutableNodeRouter{
 		//sorted nets and connections
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfConnection.addAll(this.connections);
-		Collections.sort(this.sortedListOfConnection, RComparators.FanoutBBConnection);	
+		Collections.sort(this.sortedListOfConnection, Comparators.FanoutBBConnection);	
 		
 		this.sortedListOfNetplus = new ArrayList<>();
 		this.sortedListOfNetplus.addAll(this.nets);
-		Collections.sort(this.sortedListOfNetplus, RComparators.FanoutNet);
+		Collections.sort(this.sortedListOfNetplus, Comparators.FanoutNet);
 		
 		//initialize router
 		this.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
 				
 		//do routing
 		boolean validRouting;
-        List<RNetplus> trialNets = new ArrayList<>();
-        for(RNetplus net : this.sortedListOfNetplus){
+        List<Netplus> trialNets = new ArrayList<>();
+        for(Netplus net : this.sortedListOfNetplus){
         	if(net.getId() == 417){
         		trialNets.add(net);
 //        		System.out.println(net.getNet().getName());
         	}
         }
-        List<RConnection> trialCons = new ArrayList<>();
-        for(RConnection con : this.sortedListOfConnection){
+        List<Connection> trialCons = new ArrayList<>();
+        for(Connection con : this.sortedListOfConnection){
         	if(con.id == 1216){
         		trialCons.add(con);
         	}
@@ -279,7 +279,7 @@ public class RoutableNodeRouter{
 			if(this.trial) this.printInfo("iteration " + this.itry + " begins");
 			
 			if(!this.trial){
-				for(RConnection con:this.sortedListOfConnection){
+				for(Connection con:this.sortedListOfConnection){
 					if(this.itry == 1){
 						this.routerTimer.firstIteration.start();
 						this.routeACon(con);
@@ -291,8 +291,8 @@ public class RoutableNodeRouter{
 					}
 				}
 			}else{
-				for(RNetplus np : trialNets){
-					for(RConnection c : np.getConnection()){
+				for(Netplus np : trialNets){
+					for(Connection c : np.getConnection()){
 //					for(RConnection c : trialCons){
 						if(this.itry == 1){
 							this.routerTimer.firstIteration.start();
@@ -371,7 +371,7 @@ public class RoutableNodeRouter{
 	/*
 	 * statistics output for each router iteration
 	 */
-	public void staticticsInfo(List<RConnection> connections, 
+	public void staticticsInfo(List<Connection> connections, 
 			long iterStart, long iterEnd,
 			int globalRNodeId, long rnodesT){
 		
@@ -434,8 +434,8 @@ public class RoutableNodeRouter{
 		this.hops = 0;
 		this.manhattanD = 0;
 		Set<RoutableNode> netRNodes = new HashSet<>();
-		for(RNetplus net:this.nets){	
-			for(RConnection c:net.getConnection()){
+		for(Netplus net:this.nets){	
+			for(Connection c:net.getConnection()){
 				netRNodes.addAll((Collection<? extends RoutableNode>) c.rnodes);
 				this.hops += c.rnodes.size() - 1;//hops for all sinks
 			}
@@ -446,11 +446,11 @@ public class RoutableNodeRouter{
 		}
 	}
 	
-	public void getOverusedAndIllegalRNodesInfo(List<RConnection> connections) {
+	public void getOverusedAndIllegalRNodesInfo(List<Connection> connections) {
 		this.usedRNodes.clear();
 		this.overUsedRNodes.clear();
 		this.illegalRNodes.clear();
-		for(RConnection conn : connections) {
+		for(Connection conn : connections) {
 			for(Routable rnode : conn.rnodes) {
 				if(rnode.used()){
 					this.usedRNodes.add(rnode.hashCode());
@@ -471,9 +471,9 @@ public class RoutableNodeRouter{
 		}
 	}
 	
-	public int getIllegalNumRNodes(List<RConnection> cons){
+	public int getIllegalNumRNodes(List<Connection> cons){
 		Set<Integer> illegal = new HashSet<>();	
-		for(RConnection c:cons){
+		for(Connection c:cons){
 			for(Routable rn:c.rnodes){
 				if(rn.illegal()){
 					illegal.add(rn.hashCode());
@@ -483,16 +483,16 @@ public class RoutableNodeRouter{
 		return illegal.size();	
 	}
 	
-	public void fixIllegalTree(List<RConnection> cons) {
+	public void fixIllegalTree(List<Connection> cons) {
 //		this.printInfo("checking if there is any illegal node");	
 		int numIllegal = this.getIllegalNumRNodes(cons);	
 		if(numIllegal > 0){
 //			this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
 			
-			List<RNetplus> illegalTrees = new ArrayList<>();
-			for(RNetplus net : this.nets) {
+			List<Netplus> illegalTrees = new ArrayList<>();
+			for(Netplus net : this.nets) {
 				boolean illegal = false;
-				for(RConnection con : net.getConnection()) {
+				for(Connection con : net.getConnection()) {
 					if(con.illegal()) {
 						illegal = true;
 					}
@@ -504,11 +504,11 @@ public class RoutableNodeRouter{
 			
 //			this.printInfo("There are " + illegalTrees.size() + " illegal trees");
 			//find the illegal connections and fix illegal trees
-			for(RNetplus illegalTree : illegalTrees){
+			for(Netplus illegalTree : illegalTrees){
 				Routable illegalRNode;
 				while((illegalRNode = illegalTree.getIllegalNode()) != null){
-					List<RConnection> illegalCons = new ArrayList<>();
-					for(RConnection con : illegalTree.getConnection()) {
+					List<Connection> illegalCons = new ArrayList<>();
+					for(Connection con : illegalTree.getConnection()) {
 						for(Routable rnode : con.rnodes) {
 							if(rnode.equals(illegalRNode)) {
 								illegalCons.add(con);
@@ -518,8 +518,8 @@ public class RoutableNodeRouter{
 					
 					//fixing the illegal trees, since there is no criticality info, use the hops info
 					//Find the illegal connection with maximum number of RNodes (hops)
-					RConnection maxCriticalConnection = illegalCons.get(0);
-					for(RConnection illegalConnection : illegalCons) {
+					Connection maxCriticalConnection = illegalCons.get(0);
+					for(Connection illegalConnection : illegalCons) {
 						if(illegalConnection.rnodes.size() > maxCriticalConnection.rnodes.size()) {
 							maxCriticalConnection = illegalConnection;
 						}
@@ -534,7 +534,7 @@ public class RoutableNodeRouter{
 					}
 					
 					//Replace the path of each illegal connection with the path from the connection with maximum hops
-					for(RConnection illegalConnection : illegalCons) {
+					for(Connection illegalConnection : illegalCons) {
 						this.ripup(illegalConnection);
 						
 						//Remove illegal path from routing tree
@@ -553,7 +553,7 @@ public class RoutableNodeRouter{
 		}
 	}
 	
-	public void ripup(RConnection con){
+	public void ripup(Connection con){
 		RoutableNode parent = null;
 		for(int i = con.rnodes.size() - 1; i >= 0; i--){
 			RoutableNode rnode = (RoutableNode) con.rnodes.get(i);
@@ -571,7 +571,7 @@ public class RoutableNodeRouter{
 			rnode.updatePresentCongestionPenalty(this.pres_fac);
 		}
 	}
-	public void add(RConnection con){
+	public void add(Connection con){
 		RoutableNode parent = null;
 		for(int i = con.rnodes.size()-1; i >= 0; i--){
 			RoutableNode rnode = (RoutableNode) con.rnodes.get(i);
@@ -591,10 +591,10 @@ public class RoutableNodeRouter{
 	}
 	
 	public void pipsAssignment(){
-		for(RNetplus np:this.sortedListOfNetplus){
+		for(Netplus np:this.sortedListOfNetplus){
 			Set<PIP> netPIPs = new HashSet<>();
 			
-			for(RConnection c:np.getConnection()){
+			for(Connection c:np.getConnection()){
 				netPIPs.addAll(this.conPIPs(c));
 			}
 			np.getNet().setPIPs(netPIPs);
@@ -638,11 +638,11 @@ public class RoutableNodeRouter{
 	
 	public void checkInvalidlyRoutedNets(String netname){
 		boolean foundInRWrouter = false;
-		for(RNetplus net:this.sortedListOfNetplus){
+		for(Netplus net:this.sortedListOfNetplus){
 			if(net.getNet().getName().equals(netname)){
 				foundInRWrouter = true;
 				System.out.println(net.getNet().toString() + ", out: " + net.getNet().getSource().getName());
-				for(RConnection c: net.getConnection()){
+				for(Connection c: net.getConnection()){
 					System.out.println(((RoutableNode)c.getSinkRNode()).getNode().toString() + " -> " + c.sink.getName());
 					for(PIP p:this.conPIPs(c)){
 						System.out.println("\t" + p.toString());
@@ -660,7 +660,7 @@ public class RoutableNodeRouter{
 		}
 	}
 	
-	public List<PIP> conPIPs(RConnection con){
+	public List<PIP> conPIPs(Connection con){
 		List<PIP> conPIPs = new ArrayList<>();
 		
 		for(int i = con.rnodes.size() -1; i > 0; i--){
@@ -708,9 +708,9 @@ public class RoutableNodeRouter{
 				System.out.println(rn.toString());
 			}
 		}
-		Set<RConnection> congestedCons = new HashSet<>();
+		Set<Connection> congestedCons = new HashSet<>();
 //		Map<Netplus<Node>, Integer> congestedNets = new HashMap<>();
-		for(RConnection con:this.sortedListOfConnection){
+		for(Connection con:this.sortedListOfConnection){
 			if(con.congested()){
 				congestedCons.add(con);
 				/*Netplus<Node> np = con.getNet();
@@ -721,7 +721,7 @@ public class RoutableNodeRouter{
 				}*/
 			}
 		}
-		for(RConnection con:congestedCons){
+		for(Connection con:congestedCons){
 			System.out.println(con.toString());
 			for(Routable rn : con.rnodes){
 				if(rn.overUsed()) System.out.println("\t"+ rn.toString());
@@ -730,7 +730,7 @@ public class RoutableNodeRouter{
 		}
 	}
 	
-	public boolean targetReached(RConnection con){
+	public boolean targetReached(Connection con){
 		if(this.queue.size() > 0){
 			return this.queue.peek().rnode.isTarget();
 		}else{//dealing with null pointer exception
@@ -741,7 +741,7 @@ public class RoutableNodeRouter{
 		}
 	}
 
-	public void routeACon(RConnection con){
+	public void routeACon(Connection con){
 		this.prepareForRoutingACon(con);
 		if(this.debugRoutingCon) this.printInfo("routing for " + con.toString());
 		
@@ -763,7 +763,7 @@ public class RoutableNodeRouter{
 		this.printConRNodes(con);
 	}
 	
-	public void printConRNodes(RConnection con){
+	public void printConRNodes(Connection con){
 		if(this.debugRoutingCon){
 			for(Routable rn:con.rnodes){
 				this.printInfo(((RoutableNode)(rn)).toString());
@@ -772,7 +772,7 @@ public class RoutableNodeRouter{
 		}	
 	}
 	
-	public void finishRoutingACon(RConnection con){
+	public void finishRoutingACon(Connection con){
 		//save routing in connection class
 		this.saveRouting(con);
 		((RoutableNode)con.getSinkRNode()).target = false;
@@ -782,7 +782,7 @@ public class RoutableNodeRouter{
 		this.add(con);
 	}
 	
-	public void saveRouting(RConnection con){
+	public void saveRouting(Connection con){
 		RoutableNode rn = (RoutableNode) con.getSinkRNode();
 		while (rn != null) {
 			con.addRNode(rn);
@@ -797,7 +797,7 @@ public class RoutableNodeRouter{
 		this.rnodesTouched.clear();	
 	}
 	
-	public void exploringAndExpansion(RoutableNode rnode, RConnection con){
+	public void exploringAndExpansion(RoutableNode rnode, Connection con){
 		this.nodesExpanded++;
 		
 		if(this.debugExpansion){
@@ -822,7 +822,7 @@ public class RoutableNodeRouter{
 		}
 	}
 	
-	private void addNodeToQueue(RoutableNode rnode, RoutableNode childRNode, RConnection con) {
+	private void addNodeToQueue(RoutableNode rnode, RoutableNode childRNode, Connection con) {
 		RoutableData data = childRNode.rnodeData;
 		int countSourceUses = data.countSourceUses(con.source);
 		if(this.debugExpansion){
@@ -863,7 +863,7 @@ public class RoutableNodeRouter{
 			data.setPartialPathCost(new_partial_path_cost);
 			data.setPrev(rnode);
 			if(rnode != null) data.setLevel(rnode.rnodeData.getLevel()+1);
-			this.queue.add(new RQueueElement(childRNode, new_lower_bound_total_path_cost));
+			this.queue.add(new QueueElement(childRNode, new_lower_bound_total_path_cost));
 			if(this.debugExpansion) this.printInfo("\t\t node added, queue size = " + this.queue.size());
 			
 		} else if (data.updateLowerBoundTotalPathCost(new_lower_bound_total_path_cost)) {
@@ -872,11 +872,11 @@ public class RoutableNodeRouter{
 			data.setPartialPathCost(new_partial_path_cost);
 			data.setPrev(rnode);
 			if(rnode != null) data.setLevel(rnode.rnodeData.getLevel()+1);
-			this.queue.add(new RQueueElement(childRNode, new_lower_bound_total_path_cost));
+			this.queue.add(new QueueElement(childRNode, new_lower_bound_total_path_cost));
 		}
 	}
 	
-	private float getRouteNodeCost(RoutableNode rnode, RConnection con, int countSourceUses) {
+	private float getRouteNodeCost(RoutableNode rnode, Connection con, int countSourceUses) {
 		RoutableData data = rnode.rnodeData;
 		
 		boolean containsSource = countSourceUses != 0;
@@ -896,7 +896,7 @@ public class RoutableNodeRouter{
 		//Bias cost
 		float bias_cost = 0;
 		if(rnode.type == RoutableType.INTERRR) {
-			RNetplus net = con.getNet();
+			Netplus net = con.getNet();
 			bias_cost = 0.5f * rnode.base_cost / net.fanout * 
 					(Math.abs(rnode.getCenterX() - net.x_geo) + Math.abs(rnode.getCenterY() - net.y_geo)) / net.hpwl;
 		}
@@ -907,7 +907,7 @@ public class RoutableNodeRouter{
 		return rnode.base_cost * data.getAcc_cost() * pres_cost / (1 + countSourceUses) + bias_cost;
 	}
 	
-	private float expectMahatD(RoutableNode childRNode, RConnection con){
+	private float expectMahatD(RoutableNode childRNode, Connection con){
 		float md;
 		if(this.itry == 1){
 			md = Math.abs(childRNode.getCenterX() - con.sink.getTile().getColumn()) + Math.abs(childRNode.getCenterY() - con.sink.getTile().getRow());
@@ -917,7 +917,7 @@ public class RoutableNodeRouter{
 		return md;
 	}
 	
-	public void prepareForRoutingACon(RConnection con){
+	public void prepareForRoutingACon(Connection con){
 		this.ripup(con);
 		
 		this.connectionsRouted++;
