@@ -66,6 +66,8 @@ public class TimingGroup implements Comparable<TimingGroup> {
     public float delay;
     public float cost;
     public int sameSpotCounter;
+    
+    public int index;
 
     /**
      * Default constructor used by the TimingModel to create a TimingGroup.
@@ -84,7 +86,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
 
     /**
      * Constructor used for Router example to create a TimingGroup, starting at a given SitePinInst.
-     * @param index A unique index
      * @param startPin Starting SitePinInst for the TimingGroup.
      * @param timingModel Reference to the current TimingModel.
      */
@@ -105,6 +106,38 @@ public class TimingGroup implements Comparable<TimingGroup> {
         }
         computeTypes();
         timingModel.calcDelay(this);
+    }
+    
+    /**
+     * Constructor used for Router example to create a TimingGroup, starting at a given SitePinInst.
+     * @param index A unique index
+     * @param startPin Starting SitePinInst for the TimingGroup.
+     * @param timingModel Reference to the current TimingModel.
+     */
+    public TimingGroup(int index, SitePinInst startPin, TimingModel timingModel) {
+    	this.index = index;
+        this.sameSpotCounter = 0;
+        this.timingModel = timingModel;
+        this.nodes = new LinkedList<>();
+        this.pips = new LinkedList<>();
+        this.nodeTypes = new LinkedList<>();
+        this.isInitialGroup = true;
+        this.isFinalGroup = false;
+        this.hasGlobalWire = false;
+        Node node = startPin.getConnectedNode();
+        if (node != null) {
+            Wire[] wires = node.getAllWiresInNode();
+            IntentCode ic = wires[0].getIntentCode();
+            add(startPin.getConnectedNode(),ic);
+        }
+        computeTypes();
+        timingModel.calcDelay(this);
+    }
+    
+    //TODO
+    @Override
+    public int hashCode(){
+    	return this.index;
     }
 
     /**

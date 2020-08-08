@@ -32,9 +32,10 @@ public class RoutableTimingGroup implements Routable{
 		this.type = type;
 		this.timingGroup =  new TimingGroup(sitePinInst, tmodel);
 		if(this.timingGroup == null) System.out.println("null timing group");
-		this.setXY();
 		this.rnodeData = new RoutableData(this.index);
+		this.target = false;
 		this.childrenSet = false;
+		this.setXY();
 	}
 	
 	public RoutableTimingGroup(int index, TimingGroup timingGroup){
@@ -42,12 +43,12 @@ public class RoutableTimingGroup implements Routable{
 		this.type = RoutableType.INTERRR;
 		this.timingGroup = timingGroup;
 		this.rnodeData = new RoutableData(this.index);
-		this.childrenSet = false;
-		
+		this.target= false;
+		this.childrenSet = false;	
 		this.setXY();
 	}
 	
-	public int setChildren(int globalIndex, float base_cost_fac, Map<TimingGroup, RoutableTimingGroup> createdRoutable, Set<Node> reserved){
+	public int setChildren(int globalIndex, float base_cost_fac, Map<TimingGroup, RoutableTimingGroup> createdRoutable){
 		this.children = new ArrayList<>();
 
 		if(this.timingGroup.getNextTimingGroups() != null){
@@ -64,6 +65,8 @@ public class RoutableTimingGroup implements Routable{
 					children.add(createdRoutable.get(timingGroup));
 				}
 			}
+		}else{
+			System.out.println("next timing group is null");
 		}
 		this.childrenSet = true;
 		return globalIndex;
@@ -119,6 +122,7 @@ public class RoutableTimingGroup implements Routable{
 			xMinCoordinates[nodeId] = this.xlow;
 			yMaxCoordinates[nodeId] = this.yhigh;
 			yMinCoordinates[nodeId] = this.ylow;
+			nodeId++;
 		}
 		
 		this.xlow = this.min(xMinCoordinates);

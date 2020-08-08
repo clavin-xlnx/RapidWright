@@ -789,7 +789,6 @@ public class RoutableWireRouter{
 	public void resetPathCost() {
 		for (RoutableData node : this.rnodesTouched) {
 			node.setTouched(false);
-			node.setLevel(0);
 		}
 		this.rnodesTouched.clear();	
 	}

@@ -103,7 +103,7 @@ public class RConnection{
 		s.append(", ");
 		s.append(String.format("%22s", coordinate));
 		s.append(", ");
-		s.append(String.format("net = %12s", this.net.getNet().getName()));
+		s.append(String.format("net = %5s", this.net.getId()));
 		s.append(", ");
 		s.append(String.format("net fanout = %3s", this.net.fanout));
 		s.append(", ");
@@ -175,5 +175,10 @@ public class RConnection{
 	
 	public void addRNode(Routable rn) {
 		this.rnodes.add(rn);	
+	}
+
+	public int getCriticality() {
+		// TODO Auto-generated method stub
+		return 0;
 	}
 }

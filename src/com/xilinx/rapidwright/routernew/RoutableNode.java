@@ -46,8 +46,11 @@ public class RoutableNode implements Routable{
 	
 	public int setChildren(int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable){
 		this.children = new ArrayList<>();
-		for(Node node:this.node.getAllDownhillNodes()){
-			if(node.getTile().getName().startsWith("INT_")){//TODO "routethru" is not allowed in this way
+		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
+//		if(allDownHillNodes.size() == 0) System.out.println(this.node.toString() + " has no children.");
+//		else System.out.println(this.index + ": # children = " + allDownHillNodes.size());
+		for(Node node:allDownHillNodes){
+//			if(node.getTile().getName().startsWith("INT_")){// || node.getTile().getName().startsWith("BRAM") || node.getTile().getName().startsWith("CLE")){//TODO "routethru" is not allowed in this way
 				if(!createdRoutable.containsKey(node)){
 					RoutableNode child;
 					child = new RoutableNode(globalIndex, node, RoutableType.INTERRR);
@@ -55,13 +58,28 @@ public class RoutableNode implements Routable{
 					globalIndex++;
 					this.children.add(child);
 					createdRoutable.put(node, child);
+//					System.out.println("new created");
 				}else{
+//					System.out.println("child RRG node " + node.toString() + " created upfront as a " + createdRoutable.get(node).type);
 					this.children.add(createdRoutable.get(node));//the sink routable a target created up-front 
 				}		
-			}
+//			}
 		}
 		this.childrenSet = true;
 		return globalIndex++;
+	}
+	
+	//TODO how to efficiently check if the routethru is available
+	public boolean containsAvailableRoutethru(Node n){
+		boolean containsRouthru = false;
+		for(Wire w:n.getAllWiresInNode()){
+			if(w.isRouteThru()){
+				containsRouthru = true;
+				System.out.println(w.getWireName() + " ");
+				break;
+			}
+		}
+		return containsRouthru;
 	}
 	
 	@Override
@@ -197,7 +215,7 @@ public class RoutableNode implements Routable{
 		
 		StringBuilder s = new StringBuilder();
 		s.append("RNode " + this.index + " ");
-		s.append(String.format("%-11s", coordinate));
+		s.append(String.format("%-23s", coordinate));
 		s.append(String.format("basecost = %.2e", this.base_cost));
 		s.append(", ");
 		s.append(String.format("capacity = %d", Routable.capacity));

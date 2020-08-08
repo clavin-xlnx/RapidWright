@@ -67,10 +67,9 @@ public class RComparators {
     	}
     };
    
-    @SuppressWarnings("rawtypes")
-	public static Comparator<Connection> ConnectionCriticality = new Comparator<Connection>() {
+	public static Comparator<RConnection> ConnectionCriticality = new Comparator<RConnection>() {
     	@Override
-    	public int compare(Connection a, Connection b) {
+    	public int compare(RConnection a, RConnection b) {
     		if(a.getCriticality() < b.getCriticality()){
     			return 1;
     		}else if(a.getCriticality() == b.getCriticality()) {
