@@ -257,23 +257,42 @@ public class InterconnectInfo {
         return res;
     }
 
+    protected static short maxTgLength(Direction dir) {
+        short length = 0;
+        for (TimingGroup tg : getTimingGroup((TimingGroup e) -> (e.direction() == dir))) {
+            if (length < tg.length())
+                length = tg.length();
+        }
+        return length;
+    }
+
 
     /**
      * Return a list of timingGroup driven by the fromTimingGroup.
      */
     public List<TimingGroup> nextTimingGroups(TimingGroup fromTimingGroup) {
-        return interconnectHier.get(fromTimingGroup);
+        return fanoutInterconnectHier.get(fromTimingGroup);
     }
 
     public List<TimingGroup> nextTimingGroups(TimingGroup fromTimingGroup,
                                                 Predicate<? super TimingGroup> filter) {
 
-        List<TimingGroup> tempList  =  new ArrayList<>(interconnectHier.get(fromTimingGroup));
+        List<TimingGroup> tempList  =  new ArrayList<>(fanoutInterconnectHier.get(fromTimingGroup));
         tempList.removeIf(filter.negate());
         return tempList;
-//        return Collections.unmodifiableList(tempList);
     }
 
+    public List<TimingGroup> prvTimingGroups(TimingGroup toTimingGroup) {
+        return faninInterconnectHier.get(toTimingGroup);
+    }
+
+    public List<TimingGroup> prvTimingGroups(TimingGroup toTimingGroup,
+                                              Predicate<? super TimingGroup> filter) {
+
+        List<TimingGroup> tempList  =  new ArrayList<>(faninInterconnectHier.get(toTimingGroup));
+        tempList.removeIf(filter.negate());
+        return tempList;
+    }
     public short minDetourFrTg(TimingGroup tg) {
         return minDetourMapFrTg.get(tg);
     }
@@ -284,7 +303,8 @@ public class InterconnectInfo {
      * List possible TG types that can be driven by a TG type.
      * It is immutable.
      */
-    private Map<TimingGroup, List<TimingGroup>> interconnectHier;
+    private Map<TimingGroup, List<TimingGroup>> fanoutInterconnectHier;
+    private Map<TimingGroup, List<TimingGroup>> faninInterconnectHier;
     private Map<TimingGroup, Short> minDetourMapFrTg;
     private Map<TimingGroup, Short> minDetourMapToTg;
 
@@ -325,6 +345,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
+            add(TimingGroup.BOUNCE);
         }});
         // HORT_SINGLE can't to another HORT_SINGLE , why ?
         ictHier.put(TimingGroup.HORT_SINGLE, new ArrayList<TimingGroup>() {{
@@ -426,14 +447,29 @@ public class InterconnectInfo {
         }});
         // No one has access to the modifiable version, ictHier.
         // Thus, the content of interconnectHier never changes.
-        interconnectHier = Collections.unmodifiableMap(ictHier);
+        fanoutInterconnectHier = Collections.unmodifiableMap(ictHier);
+
+
+        // build fanin from the fanout above
+        Map<TimingGroup, List<TimingGroup>> faninIctHier = new HashMap();
+        for (Map.Entry<TimingGroup, List<TimingGroup>> entry : fanoutInterconnectHier.entrySet()) {
+            TimingGroup frTg = entry.getKey();
+            for (TimingGroup toTg : entry.getValue()) {
+                if (!faninIctHier.containsKey(toTg))
+                    faninIctHier.put(toTg, new ArrayList<TimingGroup>());
+
+                faninIctHier.get(toTg).add(frTg);
+            }
+        }
+        faninInterconnectHier = Collections.unmodifiableMap(faninIctHier);
     }
+
 
     /**
      * Helper function to dump the contents.
      */
     void dumpInterconnectHier() {
-        for (Map.Entry me : interconnectHier.entrySet()) {
+        for (Map.Entry me : fanoutInterconnectHier.entrySet()) {
             System.out.println(me.getKey().toString());
             for (TimingGroup i : (TimingGroup[]) me.getValue()) {
                 System.out.printf("    ");

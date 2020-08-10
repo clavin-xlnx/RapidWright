@@ -70,10 +70,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     /**
      * Constructor from a device.
-     * @param device Target device
+     *
+     * @param device  Target device
      * @param ictInfo Interconnect information. TODO: should be selected automatically from device.
-     * @param width Width of delay tables.
-     * @param height Height of delay tables.
+     * @param width   Width of delay tables.
+     * @param height  Height of delay tables.
      */
     DelayEstimatorTable(Device device, T ictInfo, short width, short height, int verbose) {
         super(device, ictInfo, verbose);
@@ -83,38 +84,42 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        assert width < ictInfo.minTableHeight() :
 //                "DelayEstimatorTable expects larger custom table height.";
 
-        this.width   = width;
-        this.height  = height;
-        this.extendedWidth  = (short) (width  + 2*horizontalDetourDistance);
-        this.extendedHeight = (short) (height + 2*verticalDetourDistance);
-        short left  = horizontalDetourDistance;
-        short right = (short) (left + width);
-        short bot   = verticalDetourDistance;
-        short top   = (short) (bot + height);
-        this.botLeft  = new Pair<>(left, bot);
+        this.width = width;
+        this.height = height;
+        this.extendedWidth = (short) (width + 2 * horizontalDetourDistance);
+        this.extendedHeight = (short) (height + 2 * verticalDetourDistance);
+        short left = horizontalDetourDistance;
+        short right = (short) (left + width - 1);
+        short bot = verticalDetourDistance;
+        short top = (short) (bot + height - 1);
+        this.botLeft = new Pair<>(left, bot);
         this.botRight = new Pair<>(right, bot);
-        this.topLeft  = new Pair<>(left, top);
+        this.topLeft = new Pair<>(left, top);
         this.topRight = new Pair<>(right, top);
 
         build();
     }
+
     DelayEstimatorTable(Device device, T ictInfo, int verbose) {
         super(device, ictInfo, verbose);
-        this.width   = ictInfo.minTableWidth();
-        this.height  = ictInfo.minTableHeight();
+        this.width = ictInfo.minTableWidth();
+        this.height = ictInfo.minTableHeight();
         build();
     }
+
     DelayEstimatorTable(Device device, T ictInfo, int verbose, boolean build) {
         super(device, ictInfo, verbose);
-        this.width   = ictInfo.minTableWidth();
-        this.height  = ictInfo.minTableHeight();
+        this.width = ictInfo.minTableWidth();
+        this.height = ictInfo.minTableHeight();
         if (build) {
             build();
         }
     }
+
     DelayEstimatorTable(String partName, T ictInfo, short width, short height, int verbose) {
         this(Device.getDevice(partName), ictInfo, width, height, verbose);
     }
+
     DelayEstimatorTable(String partName, T ictInfo, int verbose) {
         this(Device.getDevice(partName), ictInfo, verbose);
     }
@@ -123,8 +128,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      */
     /**
      * Get the min estimated delay between two (com.xilinx.rapidwright.timing) timing groups.
+     *
      * @param timingGroup Timing group at the beginning of the route
-     * @param sinkPin Timing group at the end. It must be a sinkPin
+     * @param sinkPin     Timing group at the end. It must be a sinkPin
      * @return
      */
     @Override
@@ -148,7 +154,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         T.TimingGroup endTg = T.TimingGroup.CLE_IN;
         T.TimingGroup begTg = T.TimingGroup.CLE_OUT;
 
-return begX;
+        return begX;
 //        return getMinDelayToSinkPin(begTg, endTg, begX, begY, endX, endY, begSide, endSide).getFirst();
         // this is taking care off in getMinDelayToSinkPin
 //        // If we store both E and W sides, the size of each entry will be double.
@@ -178,10 +184,11 @@ return begX;
     private short extendedWidth;
     private short extendedHeight;
 
-    private short horizontalDetourDistance = 2;
-    private short verticalDetourDistance   = 4;
+    private short horizontalDetourDistance = 3;
+    private short verticalDetourDistance = 5;
 
-    private Pair<Short,Short> topLeft,topRight,botLeft,botRight;
+    // Right and top are inclusive!
+    private Pair<Short, Short> topLeft, topRight, botLeft, botRight;
     ResourceGraphBuilder rgBuilder;
 
 
@@ -191,7 +198,7 @@ return begX;
     // Store tables for each dist and tg to speed up on-line delay computation
     // indexed by distane x, y, source tg and target tg, respectively
     // Don't reuse entities from resourceGraph because those can be cleaned up.
-    private ArrayList<ArrayList<Map<T.TimingGroup,Map<T.TimingGroup,DelayGraphEntry>>>> tables;
+    private ArrayList<ArrayList<Map<T.TimingGroup, Map<T.TimingGroup, DelayGraphEntry>>>> tables;
 
     // temp to be deleted
     private Graph<Object, TimingGroupEdge> g;
@@ -205,6 +212,24 @@ return begX;
 //        cleanup();
     }
 
+    // make this generic
+    class Rectangle {
+        short minX, minY, maxX, maxY;
+
+        Rectangle(short minX, short minY, short maxX, short maxY) {
+            this.minX = minX;
+            this.maxX = maxX;
+            this.minY = minY;
+            this.maxY = maxY;
+        }
+
+        public boolean contains(short x, short y) {
+            if (x >= maxX || y >= maxY || x < minX || y < minY)
+                return false;
+            else
+                return true;
+        }
+    }
 
     class ResourceGraphBuilder {
         NodeManager nodeMan;
@@ -216,6 +241,7 @@ return begX;
             nodeMan = new NodeManager();
             buildResourceGraph();
         }
+
 
         /**
          * Maintain a set of nodes and their name to
@@ -322,6 +348,7 @@ return begX;
             }
 
             Object getNode(short x, short y, T.Orientation orientation, T.TileSide side, T.TimingGroup tg) {
+//                System.out.println(x + " " + y + " " + orientation + " " + side + " " + tg);
                 Pair<Pair<Short, Short>, Pair<T.Orientation, T.TileSide>> loc = new Pair<>(new Pair<>(x, y), new Pair<>(orientation, side));
                 return distTypeNodemap.get(loc).get(tg);
             }
@@ -333,46 +360,31 @@ return begX;
          */
         void buildResourceGraph() {
 
-//            // build all nodes
-//            for (short i = 0; i < extendedWidth; i++) {
-//                for (short j = 0; j < extendedWidth; j++) {
-//                    createNodes(i, j, new T.Orientation[]{T.Orientation.U, T.Orientation.D},
-//                            ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL)));
-//                    createNodes(i, j, new T.Orientation[]{T.Orientation.U, T.Orientation.D},
-//                            ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL)));
-//                    createNodes(i, j, new T.Orientation[]{T.Orientation.S},
-//                            ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.LOCAL)));
-//                    createNodes(i, j, new T.Orientation[]{T.Orientation.S},
-//                            ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.INPUT)));
-//                    createNodes(i, j, new T.Orientation[]{T.Orientation.S},
-//                            ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.OUTPUT)));
-//                }
-//            }
-
             // connect nodes from output forward, thus don't expand from Direction.INPUT
-            boolean crossSide = true;
+
+            Rectangle tableRect = new Rectangle((short) 0, (short) 0, extendedWidth, extendedHeight);
             for (short i = 0; i < extendedWidth; i++) {
                 for (short j = 0; j < extendedHeight; j++) {
-                    connectNodesFrom(i, j,
+                    connectNodesFrom(i, j, tableRect,
                             ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL) &&
                                     (e != T.TimingGroup.HORT_LONG) && (e != T.TimingGroup.HORT_SINGLE)));
 
-                    connectNodesFrom(i, j,
+                    connectNodesFrom(i, j, tableRect,
                             ictInfo.getTimingGroup((T.TimingGroup e) ->
                                     (e.direction() == T.Direction.VERTICAL) && (e != T.TimingGroup.VERT_LONG)));
 
-                    connectNodesFrom(i, j,
+                    connectNodesFrom(i, j, tableRect,
                             ictInfo.getTimingGroup((T.TimingGroup e) ->
                                     (e.direction() == T.Direction.VERTICAL) && (e == T.TimingGroup.VERT_LONG)));
-                    connectNodesFrom(i, j,
+                    connectNodesFrom(i, j, tableRect,
                             ictInfo.getTimingGroup((T.TimingGroup e) ->
                                     (e.direction() == T.Direction.HORIZONTAL) && (e == T.TimingGroup.HORT_LONG)));
-                    connectNodesFrom(i, j,
+                    connectNodesFrom(i, j, tableRect,
                             ictInfo.getTimingGroup((T.TimingGroup e) ->
                                     (e.direction() == T.Direction.HORIZONTAL) && (e == T.TimingGroup.HORT_SINGLE)));
-                    connectNodesFrom(i, j,
+                    connectNodesFrom(i, j, tableRect,
                             ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.LOCAL)));
-                    connectNodesFrom(i, j,
+                    connectNodesFrom(i, j, tableRect,
                             ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.OUTPUT)));
 
                     // correct individually
@@ -407,10 +419,104 @@ return begX;
 //                            ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.OUTPUT)));
                 }
             }
+
+
+            // connect from outside the table
+            short minX = botLeft.getFirst();
+            short minY = botLeft.getSecond();
+            short maxX = (short) (topRight.getFirst() + 1); // get get exclusive high end
+            short maxY = (short) (topRight.getSecond() + 1);
+            short vertExtensionLen = T.maxTgLength(T.Direction.VERTICAL);
+            short hortExtensionLen = T.maxTgLength(T.Direction.HORIZONTAL);
+            Rectangle box = new Rectangle(minX, minY, maxX, maxY);
+
+//            Rectangle box = new Rectangle((short) (minX-hortExtensionLen),(short) (minY-vertExtensionLen),
+//                    (short) (maxX+hortExtensionLen),(short) (maxY+vertExtensionLen));
+
+            for (short j = 0; j < T.maxTgLength(T.Direction.VERTICAL); j++) {
+                for (short x = minX; x < maxX; x++) {
+                    { // from bottom
+                        // start (j=0) one row below the target box
+                        short y = (short) (minY - j - 1);
+                        connectNodesFrom(x, y, box,
+                                ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL)));
+                    }
+                    { // from top
+                        // start (j=0) at maxY. Note maxY is exclusive
+                        short y = (short) (maxY + j);
+                        connectNodesFrom(x, y, box,
+                                ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL)));
+                    }
+                }
+            }
+
+
+            for (short j = 0; j < T.maxTgLength(T.Direction.HORIZONTAL); j++) {
+                for (short y = minY; y < maxY; y++) {
+                    { // from left
+                        short x = (short) (minX - j - 1);
+                        connectNodesFrom(x, y, box,
+                                ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL)));
+                    }
+                    { // from left
+                        short x = (short) (maxX + j);
+                        connectNodesFrom(x, y, box,
+                                ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.HORIZONTAL)));
+                    }
+                }
+            }
         }
 
+//        // TODO: this should be combined with connectNodeFrom method below
+//        List<T.TimingGroup> getTgFrom(short i, short j, Rectangle box, List<T.TimingGroup> tgs) {
+//            for (T.TimingGroup frTg : tgs) {
+//                for (T.TileSide frSide : frTg.getExsistence()) {
+//                    for (T.Orientation frOrientation : frTg.getOrientation(frSide)) {
+//                        short deltaX = frTg.direction() == InterconnectInfo.Direction.HORIZONTAL ? frTg.length() : 0;
+//                        short deltaY = frTg.direction() == InterconnectInfo.Direction.VERTICAL ? frTg.length() : 0;
+//                        short m = (short) (i + ((frOrientation == T.Orientation.U) ? +deltaX : -deltaX));
+//                        short n = (short) (j + ((frOrientation == T.Orientation.U) ? +deltaY : -deltaY));
+//
+//                        if (!box.contains(m,n))
+//                            continue;
+//                        if (verboseLevel > 0)
+//                            System.out.println("fromTG " + i + " " + j + " " + frTg + " " + frSide + " " + frOrientation);
+//
+//                        List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(frTg);
+//                        for (T.TimingGroup toTg : nxtTgs) {
+//                            if (verboseLevel > 0)
+//                                System.out.println("     toTG " + toTg);
+//                            for (T.TileSide toSide : frTg.toSide(frSide)) {
+//                                if (verboseLevel > 0)
+//                                    System.out.println("          toSide " + toSide);
+//                                for (T.Orientation toOrientation : toTg.getOrientation(toSide)) {
+//                                    deltaX = toTg.direction() == T.Direction.HORIZONTAL ? toTg.length() : 0;
+//                                    deltaY = toTg.direction() == T.Direction.VERTICAL ? toTg.length() : 0;
+//                                    short u = (short) (m + ((toOrientation == T.Orientation.U) ? +deltaX : -deltaX));
+//                                    short v = (short) (n + ((toOrientation == T.Orientation.U) ? +deltaY : -deltaY));
+//
+//                                    if (u >= extendedWidth || v >= extendedHeight || u < 0 || v < 0)
+//                                        continue;
+//                                    if (verboseLevel > 0)
+//                                        System.out.println("               toOri " + toOrientation);
+//
+//                                    // not go back to where it is from with the same tg
+//                                    if (!((toTg == frTg) && (toOrientation != frOrientation))) {
+//                                        if (verboseLevel > 0)
+//                                            System.out.println("                    add connection");
+////                                        System.out.println(i + " " + j + " " + frTg + " " + frSide + " " + toTg + " " + toOrientation);
+//                                        only diff
+////                                        nodeMan.connectNodes(i, j, m, n, frOrientation, frSide, toOrientation, toSide, frTg, toTg);
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
 
-        void connectNodesFrom(short i, short j, List<T.TimingGroup> tgs) {
+        void connectNodesFrom(short i, short j, Rectangle box, List<T.TimingGroup> tgs) {
             for (T.TimingGroup frTg : tgs) {
                 for (T.TileSide frSide : frTg.getExsistence()) {
                     for (T.Orientation frOrientation : frTg.getOrientation(frSide)) {
@@ -419,7 +525,7 @@ return begX;
                         short m = (short) (i + ((frOrientation == T.Orientation.U) ? +deltaX : -deltaX));
                         short n = (short) (j + ((frOrientation == T.Orientation.U) ? +deltaY : -deltaY));
 
-                        if (m >= extendedWidth || n >= extendedHeight || m < 0 || n < 0)
+                        if (!box.contains(m, n))
                             continue;
                         if (verboseLevel > 0)
                             System.out.println("fromTG " + i + " " + j + " " + frTg + " " + frSide + " " + frOrientation);
@@ -437,7 +543,7 @@ return begX;
                                     short u = (short) (m + ((toOrientation == T.Orientation.U) ? +deltaX : -deltaX));
                                     short v = (short) (n + ((toOrientation == T.Orientation.U) ? +deltaY : -deltaY));
 
-                                    if (u >= extendedWidth || v >= extendedHeight || u < 0 || v < 0)
+                                    if (!box.contains(u, v))
                                         continue;
                                     if (verboseLevel > 0)
                                         System.out.println("               toOri " + toOrientation);
@@ -458,16 +564,6 @@ return begX;
         }
 
 
-//        void createNodes (short i, short j, T.Orientation[] orientations, List<T.TimingGroup> tgs) {
-//            for (T.Orientation orientation : orientations) {
-//                for (T.TileSide side : new T.TileSide[]{T.TileSide.W, T.TileSide.E}) {
-//                    for (InterconnectInfo.TimingGroup tg : tgs) {
-//                        nodeMan.getOrCreateNode(i, j, orientation, side, tg);
-//                    }
-//                }
-//            }
-//        }
-
         void plot(String fname) {
             nodeMan.plot(fname);
         }
@@ -483,13 +579,13 @@ return begX;
         }
     }
 
-        /**
-         * Trim dominated entry from a table
-         * Moving it across the devices and record the min delay path.
-         * Vertices and edges that never become a part of the min delay path will be removed.
-         *
-         * Questions: how to specify the range to sweep?
-         */
+    /**
+     * Trim dominated entry from a table
+     * Moving it across the devices and record the min delay path.
+     * Vertices and edges that never become a part of the min delay path will be removed.
+     * <p>
+     * Questions: how to specify the range to sweep?
+     */
     void trimTables() {
 
     }
@@ -498,7 +594,7 @@ return begX;
     void initTables() {
         tables = new ArrayList<>();
         for (int i = 0; i < width; i++) {
-            ArrayList<Map<T.TimingGroup,Map<T.TimingGroup,DelayGraphEntry>>> subTables = new ArrayList<>();
+            ArrayList<Map<T.TimingGroup, Map<T.TimingGroup, DelayGraphEntry>>> subTables = new ArrayList<>();
             for (int j = 0; j < height; j++) {
                 Map<T.TimingGroup, Map<T.TimingGroup, DelayGraphEntry>> srcMap = new EnumMap<>(T.TimingGroup.class);
                 for (T.TimingGroup tg : T.TimingGroup.values()) {
@@ -532,105 +628,408 @@ return begX;
         public Object dstFarNear;
         public Object dstNearFar;
         public Object dstNearNear;
-        public short  fixedDelay;
+        public short fixedDelay;
         public boolean onlyOneDst;
     }
 
 
-
     // -----------------------   Methods for computing min delay ------------------------
-
     class ConnectionInfo {
-        Pair<Short,Short>  sourceCoor;
-        T.Orientation      orientation;
-        Object             sourceNode;
-        Object             sinkNode;
+        Pair<Short, Short> sourceCoor;
+        Pair<Short, Short> sinkCoor;
+        T.Orientation srcOrientation;
+        T.Orientation dstOrientation;
+        Object sourceNode;
+        Object sinkNode;
 
-        ConnectionInfo(Pair<Short,Short> sourceCoor, InterconnectInfo.Orientation orientation, Object sourceNode, Object sinkNode) {
-            this.sourceCoor  = sourceCoor;
-            this.orientation = orientation;
-            this.sourceNode  = sourceNode;
-            this.sinkNode    = sinkNode;
+        ConnectionInfo(Pair<Short, Short> sourceCoor, Pair<Short, Short> sinkCoor, T.Orientation srcOrientation, T.Orientation dstOrientation, Object sourceNode, Object sinkNode) {
+            this.sourceCoor = sourceCoor;
+            this.sinkCoor = sinkCoor;
+            this.srcOrientation = srcOrientation;
+            this.dstOrientation = dstOrientation;
+            this.sourceNode = sourceNode;
+            this.sinkNode = sinkNode;
         }
 
-        short sourceX() {
-            return sourceCoor.getFirst();
-        }
-        short sourceY() {
-            return sourceCoor.getSecond();
-        }
-        T.Orientation orientation() {
-            return orientation;
-        }
         Object sourceNode() {
             return sourceNode;
         }
+
         Object sinkNode() {
             return sinkNode;
         }
     }
 
-    private ConnectionInfo  getConnectionInfo (short begX, short begY, short endX, short endY,
-                                    T.TimingGroup begTg, T.TimingGroup endTg, T.TileSide begSide,  T.TileSide endSide) {
-        Pair<Short,Short> sourceCoor;
-        T.Orientation orientation; // orientation of X or Y?
+    class PartialRoute {
+        private final short delay;
+        private final short loc;
+        private final T.Orientation orientaion;
+        private final List<T.TimingGroup> tgs;
 
-        if (endX >= begX && endY >= begY) {
-            sourceCoor = botLeft;
-            orientation = T.Orientation.S;
-        } else if (endX < begX && endY >= begY) {
-            sourceCoor = botRight;
-            orientation = T.Orientation.S;
-        } else if (endX >= begX && endY < begY) {
-            sourceCoor = topLeft;
-            orientation = T.Orientation.S;
-        } else {
-            sourceCoor = topRight;
-            orientation = T.Orientation.S;
+        PartialRoute(short delay, short loc, T.Orientation orientaion, List<T.TimingGroup> tgs) {
+            this.delay = delay;
+            this.loc = loc;
+            this.orientaion = orientaion;
+            this.tgs = tgs;
         }
+
+        short delay() {
+            return delay;
+        }
+
+        short loc() {
+            return loc;
+        }
+
+        T.Orientation orientaion() {
+            return orientaion;
+        }
+
+        ;
+
+        T.TimingGroup lastTg() {
+            if (tgs.isEmpty())
+                return null;
+            else
+                return tgs.get(tgs.size() - 1);
+        }
+
+        boolean isEmpty() {
+            return tgs.isEmpty();
+        }
+
+        String route() {
+            String route = "";
+            for (T.TimingGroup tg : tgs)
+                route += tg.abbr();
+            return route;
+        }
+    }
+
+    //    /**
+//     * Finding info for table lookup. The sink will be aligned with one of the corner.
+//     * Aligning sink so that it can be used for outtable where the end use the table.
+//     * @param begX
+//     * @param begY
+//     * @param endX
+//     * @param endY
+//     * @param begTg
+//     * @param endTg
+//     * @param begSide
+//     * @param endSide
+//     * @return
+//     */
+    private ConnectionInfo getConnectionInfo(short begX, short begY, short endX, short endY,
+                                             T.TimingGroup begTg, T.TimingGroup endTg, T.TileSide begSide, T.TileSide endSide,
+                                             T.Orientation srcOrientation, T.Orientation dstOrientation) {
+        Pair<Short, Short> sinkCoor = projectSinkCoor(begX, begY, endX, endY);
 
         short distX = (short) (endX - begX);
         short distY = (short) (endY - begY);
 
-        Pair<Short,Short> sinkCoor = new Pair<>((short) (sourceCoor.getFirst()+distX),(short) (sourceCoor.getSecond()+distY));
+        Pair<Short, Short> sourceCoor = new Pair<>((short) (sinkCoor.getFirst() - distX), (short) (sinkCoor.getSecond() - distY));
 
-        Pair<Pair<Short, Short>, Pair<T.Orientation, T.TileSide>> sourceLoc = new Pair<>(sourceCoor, new Pair<>(orientation,begSide));
-        Pair<Pair<Short, Short>, Pair<T.Orientation, T.TileSide>> sinkLoc   = new Pair<>(sinkCoor,   new Pair<>(orientation,endSide));
+        Pair<Pair<Short, Short>, Pair<T.Orientation, T.TileSide>> sourceLoc = new Pair<>(sourceCoor, new Pair<>(srcOrientation, begSide));
+        Pair<Pair<Short, Short>, Pair<T.Orientation, T.TileSide>> sinkLoc = new Pair<>(sinkCoor, new Pair<>(dstOrientation, endSide));
 
-        Object sourceNode = rgBuilder.getNode(sourceCoor.getFirst(), sourceCoor.getSecond(), orientation, begSide, begTg);
-        short sinkX = (short) (sourceCoor.getFirst()+distX);
-        short sinkY = (short) (sourceCoor.getSecond()+distY);
-        Object sinkNode   = rgBuilder.getNode(sinkX, sinkY, orientation, endSide, endTg);
+        Object sourceNode = rgBuilder.getNode(sourceCoor.getFirst(), sourceCoor.getSecond(), srcOrientation, begSide, begTg);
+        Object sinkNode = rgBuilder.getNode(sinkCoor.getFirst(), sinkCoor.getSecond(), dstOrientation, endSide, endTg);
 
-        return new  ConnectionInfo(sourceCoor, orientation, sourceNode, sinkNode);
+        return new ConnectionInfo(sourceCoor, sinkCoor, srcOrientation, dstOrientation, sourceNode, sinkNode);
     }
 
-    private Pair<Short,String> getMinDelayToSinkPin(T.TimingGroup begTg, T.TimingGroup endTg,
-                 short begX, short begY, short endX, short endY, T.TileSide begSide, T.TileSide endSide) {
+    private Pair<Short, Short> projectSinkCoor(short begX, short begY, short endX, short endY) {
+        if (endX >= begX && endY >= begY) {
+            return topRight;
+        } else if (endX < begX && endY >= begY) {
+            return topLeft;
+        } else if (endX >= begX && endY < begY) {
+            return botRight;
+        } else {
+            return botLeft;
+        }
+    }
+
+    /**
+     * Get offset to map actual coor to coor based on the table.
+     * To translate real coor to table coor do "point + offset".
+     * To translate table coor to real coor do "point - offset".
+     *
+     * @param begX
+     * @param begY
+     * @param endX
+     * @param endY
+     * @return
+     */
+    private Pair<Short, Short> getOffsetToTable(short begX, short begY, short endX, short endY) {
+        Pair<Short, Short> sinkCoor = projectSinkCoor(begX, begY, endX, endY);
+        return new Pair<Short, Short>((short) (sinkCoor.getFirst() - endX), (short) (sinkCoor.getSecond() - endY));
+    }
+
+
+    private Pair<Short, String> getMinDelayToSinkPin(T.TimingGroup begTg, T.TimingGroup endTg,
+                                                     short begX, short begY, short endX, short endY, T.TileSide begSide, T.TileSide endSide,
+                                                     T.Orientation begOrientation, T.Orientation endOrientation) {
 
         assert endTg == T.TimingGroup.CLE_IN : "getMinDelayToSinkPin expects CLE_IN as the target timing group.";
 
         int distX = Math.abs(begX - endX);
         int distY = Math.abs(begY - endY);
 
-        Pair<Short,String> result = null;
+        Pair<Short, String> result = null;
         if (distX < width && distY < height) {
             // setup graph
             // 1) graph cover the extended width/height. However, the source/sink must be in the target width/height.
             // 2) align the source coordinate to the nearest conor of the target width/height.
             //    TODO: consider transpose the route so that the source is on bottom-left and sink on top-right.
 
-            ConnectionInfo info = getConnectionInfo(begX, begY, endX, endY, begTg, endTg, begSide, endSide);
+            ConnectionInfo info = getConnectionInfo(begX, begY, endX, endY, begTg, endTg, begSide, endSide, begOrientation, endOrientation);
 
 
 //            result = lookupDelay(g, info.sourceNode(), info.sinkNode(), info.sourceX(), info.sourceY());
             result = lookupDelay(g, info.sourceNode(), info.sinkNode(), begX, begY);
         } else {
-           // see findMinDelay of oldTable.java
+
+            boolean oneway = true;
+
+            // TODO: consider shuffleing segments within one or both directions.
+
+            InfoHorThenVer info = new InfoHorThenVer(begX, begY, endX, endY);
+
+            if (oneway) { // one way version
+
+                // The start will be quad/long on the direction that is farther aware from the box.
+                // table ranges have exclusive end points.
+                int gapX = (distX > width) ? Math.abs(distX - width + 1) : 0;
+                int gapY = (distY > height) ? Math.abs(distY - height + 1) : 0;
+
+                if (gapX < gapY) {
+                    info.swap();
+                }
+
+                PartialRoute partialFirst = extend(begTg, info.firstBeg(), info.firstEnd(), info.firstDir(), info.firstLim());
+                PartialRoute partialSecond = extend(partialFirst.lastTg(), info.secondBeg(), info.secondEnd(), info.secondDir(), info.secondLim());
+
+                String route = "";
+                if (verbose > 5 || verbose == -1) {
+                    route += partialFirst.route();
+                    route += partialSecond.route();
+                }
+
+                result = getTotalDelay(partialFirst, partialSecond, info.firstDir(), begSide,
+                        endTg, endSide, endOrientation, endX, endY, route);
+
+            } else { // two ways version
+
+                List<Pair<Short,String>> results = new ArrayList<>();
+
+                for (int i = 0; i < 2; i++) {
+                    PartialRoute partialFirst = extend(begTg, info.firstBeg(), info.firstEnd(), info.firstDir(), info.firstLim());
+                    T.TimingGroup switchingTG = partialFirst.isEmpty() ? begTg : partialFirst.lastTg();
+                    PartialRoute partialSecond = extend(switchingTG, info.secondBeg(), info.secondEnd(), info.secondDir(), info.secondLim());
+
+                    String route = "";
+                    if (verbose > 5 || verbose == -1) {
+                        route += partialFirst.route();
+                        route += partialSecond.route();
+                    }
+
+                    Pair<Short,String> aResult = getTotalDelay(partialFirst, partialSecond, info.firstDir(), begSide,
+                            endTg, endSide, endOrientation, endX, endY, route);
+                    results.add(aResult);
+
+                    info.swap();
+                }
+
+                result = Collections.min(results, new PairUtil.CompareFirst<>());
+            }
         }
 
         // add delay of input sitepin
-        return new Pair<>((short) (result.getFirst() + K0.get(T.Direction.INPUT).get(GroupDelayType.PINFEED)),result.getSecond());
+        return new Pair<>((short) (result.getFirst() + K0.get(T.Direction.INPUT).get(GroupDelayType.PINFEED)), result.getSecond());
+    }
+
+    class InfoHorThenVer {
+        final short num = 2;
+        short beg[];
+        short end[];
+        short lim[];
+        T.Direction dir[];
+
+        // index for first and second
+        short first;
+        short second;
+
+        InfoHorThenVer(short begX, short begY, short endX, short endY) {
+            beg = new short[num];
+            end = new short[num];
+            lim = new short[num];
+            dir = new T.Direction[num];
+
+            first = 0;
+            second = 1;
+
+            beg[0] = begX;
+            end[0] = endX;
+            lim[0] = width;
+            dir[0] = T.Direction.HORIZONTAL;
+
+            beg[1] = begY;
+            end[1] = endY;
+            lim[1] = height;
+            dir[1] = T.Direction.VERTICAL;
+        }
+
+        void swap() {
+            first = (short) ((first + 1) % num);
+            second = (short) ((second + 1) % num);
+        }
+        short firstBeg() {return beg[first];}
+        short firstEnd() {return end[first];}
+        short firstLim() {return lim[first];}
+        T.Direction firstDir() {return dir[first];}
+        short secondBeg() {return beg[second];}
+        short secondEnd() {return end[second];}
+        short secondLim() {return lim[second];}
+        T.Direction secondDir() {return dir[second];}
+    }
+
+
+    Pair<Short,Pair<Short,Short>> rollBackLastTg(short extendingDelay, InterconnectInfo.TimingGroup lastTg, T.Orientation lastOrientation, short newBegX, short newBegY) {
+        short endLoc = lastTg.direction() == T.Direction.HORIZONTAL ? newBegX : newBegY;
+        short deltaX = (lastTg.direction() == T.Direction.HORIZONTAL ? lastTg.length() : 0);
+        short deltaY = (lastTg.direction() == T.Direction.VERTICAL ? lastTg.length() : 0);
+        newBegX = (short) (newBegX + (lastOrientation == T.Orientation.U ? -deltaX : deltaX));
+        newBegY = (short) (newBegY + (lastOrientation == T.Orientation.U ? -deltaY : deltaY));
+        short begLoc = lastTg.direction() == T.Direction.HORIZONTAL ? newBegX : newBegY;
+        extendingDelay -= calcTimingGroupDelay(lastTg, begLoc, endLoc, 0.0);
+        return new Pair<>(extendingDelay,new Pair<>(newBegX, newBegY));
+    }
+
+    Pair<Short,String> getTotalDelay(PartialRoute partialFirst, PartialRoute partialSecond, T.Direction firstDir,
+                                     T.TileSide begSide,
+                                     T.TimingGroup endTg, T.TileSide endSide, T.Orientation endOrientation,
+                                     short endX, short endY, String route) {
+        T.TimingGroup lastTg = null;
+        T.Orientation lastOrientation = null;
+        if (!partialSecond.isEmpty()) {
+            lastTg = partialSecond.lastTg();
+            lastOrientation = partialSecond.orientaion();
+        } else {
+            lastTg = partialFirst.lastTg();
+            lastOrientation = partialFirst.orientaion();
+        }
+
+
+        short extendingDelay = (short) (partialFirst.delay() + partialSecond.delay());
+        short newBegX = (firstDir == T.Direction.HORIZONTAL) ?  partialFirst.loc() : partialSecond.loc();
+        short newBegY = (firstDir == T.Direction.VERTICAL)   ?  partialFirst.loc() : partialSecond.loc();
+
+        // TODO: this is very conservative and expensive. Need to pick just a few possibilities
+        // TODO: take it from interconnectInfo
+        T.TileSide lastSide = ((lastTg == T.TimingGroup.VERT_LONG) || (lastTg == T.TimingGroup.HORT_LONG))
+                ? T.TileSide.M : begSide;
+//            Pair<Short,Short> offset = getOffsetToTable(begX, begY, endX, endY);
+//            Rectangle tableRect = new Rectangle((short)(0-offset.getFirst()),(short)(0-offset.getSecond()),
+//                    (short) (extendedWidth-offset.getFirst()), (short) (extendedHeight-offset.getSecond()));
+//
+//            List<Pair<Short,String>> inTableDelays = new ArrayList<>();
+//            for (T.TimingGroup frTg : ictInfo.nextTimingGroups(lastTg)) {
+//                for (T.TileSide frSide : lastTg.toSide(lastSide)) {
+//                    for (T.Orientation frOrientation : frTg.getOrientation(frSide)) {
+//                        short deltaX = frTg.direction() == T.Direction.HORIZONTAL ? frTg.length() : 0;
+//                        short deltaY = frTg.direction() == T.Direction.VERTICAL ? frTg.length() : 0;
+//                        short u = (short) (newBegX + ((frOrientation == T.Orientation.U) ? +deltaX : -deltaX));
+//                        short v = (short) (newBegY + ((frOrientation == T.Orientation.U) ? +deltaY : -deltaY));
+//
+//                        if (!tableRect.contains(u,v))
+//                            continue;
+//
+//                        // not go back to where it is from with the same tg
+//                        if (!((frTg == lastTg) && (frOrientation != lastOrientation))) {
+//                            ConnectionInfo info = getConnectionInfo(newBegX, newBegY, endX, endY, frTg, endTg, frSide, endSide, frOrientation, endOrientation);
+//                            result = lookupDelay(g, info.sourceNode(), info.sinkNode(), newBegX, newBegY);
+//                            inTableDelays.add(result);
+//                        }
+//                    }
+//                }
+//            }
+//            result = Collections.min(inTableDelays, new PairUtil.CompareFirst<>());
+
+        Pair<Short,Pair<Short,Short>> rollBackInfo = rollBackLastTg(extendingDelay, lastTg, lastOrientation, newBegX, newBegY);
+        extendingDelay = rollBackInfo.getFirst();
+        newBegX = rollBackInfo.getSecond().getFirst();
+        newBegY = rollBackInfo.getSecond().getSecond();
+
+        if (verbose > 5 || verbose == -1) {
+            route = (route == null || route.length() == 0) ? null : (route.substring(0, route.length() - 1));
+        }
+
+        ConnectionInfo info = getConnectionInfo(newBegX, newBegY, endX, endY, lastTg, endTg, lastSide, endSide, lastOrientation, endOrientation);
+        Pair<Short,String> result = lookupDelay(g, info.sourceNode(), info.sinkNode(), newBegX, newBegY);
+
+
+        short  inTableDelay = result.getFirst();
+        String inTableRoute = result.getSecond();
+        result.setFirst((short) (inTableDelay + extendingDelay));
+        result.setSecond(route + inTableRoute);
+        return result;
+    }
+
+
+
+    /**
+     *
+     * @param begTg
+     * @param beg
+     * @param end
+     * @param dir
+     * @param tableRange
+     * @return Pair<Pair<delay,end coor>,list of Tgs>
+     */
+    PartialRoute extend (T.TimingGroup begTg, short beg, short end, T.Direction dir, short tableRange) {
+
+        int dist = Math.abs(beg - end);
+        // table range is exclusive end
+        int gap  = (dist > tableRange) ? Math.abs(dist - tableRange + 1) : 0;
+        T.Orientation orientation = (end > beg) ? T.Orientation.valueOf("U") : T.Orientation.valueOf("D");
+        short begLoc = beg;
+        short extendingDelay = 0;
+        List<T.TimingGroup> outTgs = new ArrayList<>();
+        T.TimingGroup lastTg = begTg;
+
+        while (gap > 0) {
+            final int dist_constant = dist;
+            List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(lastTg, (T.TimingGroup e) ->
+                    (e.direction() == dir) && (e.length() <= dist_constant));
+            T.TimingGroup tg = pickTheLongestTg(nxtTgs);
+            lastTg = tg;
+            outTgs.add(tg);
+
+            short endLoc = (short) (begLoc + ((orientation == T.Orientation.U) ? +tg.length() : -tg.length()));
+            Double incDly = calcTimingGroupDelay(tg, begLoc, endLoc, 0.0);
+            extendingDelay += incDly.shortValue();
+
+            begLoc = endLoc;
+            gap    = gap - tg.length();
+            dist   = dist - tg.length();
+        }
+
+//        return new Pair<Pair<Short,Short>, List<T.TimingGroup>>(new Pair<>(extendingDelay,begLoc), outTgs);
+        return new PartialRoute(extendingDelay, begLoc, orientation, outTgs);
+    }
+
+    T.TimingGroup pickTheLongestTg( List<T.TimingGroup> tgs) {
+        short maxLength = 0;
+        T.TimingGroup longestTg = null;
+
+        for (T.TimingGroup tg : tgs ) {
+            if (maxLength < tg.length())  {
+                maxLength = tg.length();
+                longestTg = tg;
+            }
+        }
+        return longestTg;
     }
 
     /**
@@ -701,25 +1100,80 @@ return begX;
         }
     }
 
+    /**
+     *
+     * @return
+     */
     private Pair<Short,String> verifyPath() {
         // if the path is broken, get nullPointerException
+        Pair<Short,Short> srcCoor = new Pair<>((short)37,(short)74);
         List<RoutingNode> route = new ArrayList<RoutingNode>(){{
-            add(new RoutingNode(2,4,"E","S","CLE_OUT"));
-            add(new RoutingNode(2,4,"E","U","VERT_QUAD"));
-            add(new RoutingNode(2,8,"M","U","HORT_LONG"));
-            add(new RoutingNode(8,8,"M","U","VERT_LONG"));
-            add(new RoutingNode(8,20,"W","D","VERT_SINGLE"));
-            add(new RoutingNode(8,19,"W","D","HORT_SINGLE"));
-            add(new RoutingNode(7,19,"E","S","CLE_IN"));
+            add(new RoutingNode(12,31,"M","D","VERT_LONG"));
+            add(new RoutingNode(12,19,"M","D","VERT_QUAD"));
+            add(new RoutingNode(12,15,"M","D","VERT_LONG"));
+            add(new RoutingNode(12,3,"E","U","VERT_DOUBLE"));
+            add(new RoutingNode(12,5,"E","S","CLE_IN"));
         }};
+//        Pair<Short,Short> srcCoor = new Pair<>((short)37,(short)74);
+//        List<RoutingNode> route = new ArrayList<RoutingNode>(){{
+//            add(new RoutingNode(12,31,"M","D","VERT_LONG"));
+//            add(new RoutingNode(12,19,"M","D","VERT_LONG"));
+//            add(new RoutingNode(12,7,"E","D","VERT_DOUBLE"));
+//            add(new RoutingNode(12,5,"E","S","CLE_IN"));
+//        }};
+//        Pair<Short,Short> srcCoor = new Pair<>((short)37,(short)76);
+//        List<RoutingNode> route = new ArrayList<RoutingNode>(){{
+//            add(new RoutingNode(12,-3,"M","U","VERT_LONG"));
+//            add(new RoutingNode(12,9,"M","U","VERT_LONG"));
+//            add(new RoutingNode(12,21,"E","U","VERT_DOUBLE"));
+//            add(new RoutingNode(12,23,"E","S","CLE_IN"));
+//        }};
+// 44->49, 421 -qld because HD detoure go over URAM
+// 49->44, 273 -qld
+//        Pair<Short,Short> srcCoor = new Pair<>((short)49,(short)123);
+//        List<RoutingNode> route = new ArrayList<RoutingNode>(){{
+//            add(new RoutingNode(13,5,"W","S","CLE_OUT"));
+//            add(new RoutingNode(13,5,"W","U","HORT_QUAD"));
+//            add(new RoutingNode(15,5,"M","D","HORT_LONG"));
+//            add(new RoutingNode(9,5,"E","D","HORT_DOUBLE"));
+//            add(new RoutingNode(8,5,"E","S","CLE_IN"));
+//        }};
+//        Pair<Short,Short> srcCoor = new Pair<>((short)44,(short)123);
+//        List<RoutingNode> route = new ArrayList<RoutingNode>(){{
+//            add(new RoutingNode(3,5,"W","S","CLE_OUT"));
+//            add(new RoutingNode(3,5,"W","D","HORT_QUAD"));
+//            add(new RoutingNode(1,5,"M","U","HORT_LONG"));
+//            add(new RoutingNode(7,5,"E","U","HORT_DOUBLE"));
+//            add(new RoutingNode(8,5,"E","S","CLE_IN"));
+//        }};
+
+//        Pair<Short,Short> srcCoor = new Pair<>((short)44,(short)123);
+//        List<RoutingNode> route = new ArrayList<RoutingNode>(){{
+//            add(new RoutingNode(8,17,"W","S","CLE_OUT"));
+//            add(new RoutingNode(8,17,"W","U","VERT_QUAD"));
+//            add(new RoutingNode(8,21,"M","U","HORT_LONG"));
+//            add(new RoutingNode(14,21,"E","D","HORT_QUAD"));
+//            add(new RoutingNode(12,21,"E","U","VERT_DOUBLE"));
+//            add(new RoutingNode(12,23,"E","S","CLE_IN"));
+//        }};
+//        Pair<Short,Short> srcCoor = new Pair<>((short)44,(short)123);
+//        List<RoutingNode> route = new ArrayList<RoutingNode>(){{
+//            add(new RoutingNode(2,4,"W","S","CLE_OUT"));
+//            add(new RoutingNode(2,4,"W","U","VERT_QUAD"));
+//            add(new RoutingNode(2,8,"M","U","HORT_LONG"));
+//            add(new RoutingNode(8,8,"E","D","HORT_QUAD"));
+//            add(new RoutingNode(6,8,"E","U","VERT_DOUBLE"));
+//            add(new RoutingNode(6,10,"E","S","CLE_IN"));
+//        }};
         verbose = 6;
 
         Double delay = 0.0;
         String abbr = "";
-        short offsetX = 44 - 2;
-        short offsetY = 123 - 4;
+
 
         RoutingNode srcInfo = route.get(0);
+        short offsetX = (short) (srcCoor.getFirst() - srcInfo.x);
+        short offsetY = (short) (srcCoor.getSecond() - srcInfo.y);
         Object sourceNode = rgBuilder.getNode(route.get(0).x, route.get(0).y, route.get(0).direction, route.get(0).side, route.get(0).tg);
         for (int i = 1; i < route.size(); i++) {
             RoutingNode sinkInfo = route.get(i);
@@ -746,12 +1200,12 @@ return begX;
     void testOne( int sx, int tx, int sy, int ty, String sSide, String tSide) {
         verbose = 6;
         Pair<Short,String> res = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN,
-                (short) sx, (short) sy, (short) tx, (short) ty, T.TileSide.valueOf(sSide), T.TileSide.valueOf(tSide));
+                (short) sx, (short) sy, (short) tx, (short) ty, T.TileSide.valueOf(sSide), T.TileSide.valueOf(tSide), T.Orientation.S, T.Orientation.S);
         System.out.println();
         System.out.println(sx + " " + tx + " " + sy + " " + ty + " " + res.getFirst() + " path " + res.getSecond());
     }
 
-    void testCases(String fname) {
+    int testCases(String fname) {
 
 //        zeroDistArrays();
         verbose = -1; // -1 for testing
@@ -764,6 +1218,8 @@ return begX;
             private int minLine;
             private int maxLine;
             private int sumErr;
+            private double minPct;
+            private double maxPct;
 
             ErrorComputer() {
                 cnt = 0;
@@ -772,12 +1228,14 @@ return begX;
                 minErr = Integer.MAX_VALUE;
                 maxErr = 0;
                 sumErr = 0;
+                minPct = Double.MAX_VALUE;
+                maxPct = 0;
             }
 
 
-            void insert(int err, int linNo) {
-//                minErr = Math.min(minErr, err);
-//                maxErr = Math.max(maxErr, err);
+            void insert(int err, double ept, int linNo) {
+                minPct = Math.min(minPct, ept);
+                maxPct = Math.max(maxPct, ept);
                 if (minErr >= err) {
                     minErr = err;
                     minLine = linNo;
@@ -793,7 +1251,8 @@ return begX;
 
             String report(String prefix) {
                 float avgErr = sumErr/cnt;
-                return prefix + " min " + minErr + " @" + minLine + " max " + maxErr + " @" + maxLine + " avg " + avgErr + " cnt " + cnt;
+                return prefix + " min " + minErr + " @" + minLine + " max " + maxErr + " @" + maxLine + " avg " + avgErr
+                        + " cnt " + cnt + " maxPctErr " +  maxPct + "% minPctErr " + minPct + "%";
             }
         }
 
@@ -869,8 +1328,9 @@ return begX;
                             // TBD
 //                            System.out.println(String.format("%3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
 
+                            System.out.println(String.format("attempt %3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
                             Pair<Short,String> res = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, sx, sy, tx, ty,
-                                    T.TileSide.valueOf(sSide), T.TileSide.valueOf(tSide));
+                                    T.TileSide.valueOf(sSide), T.TileSide.valueOf(tSide), T.Orientation.S, T.Orientation.S);
                             short est = res.getFirst();
 
 
@@ -902,11 +1362,11 @@ return begX;
 
 
                             if (!exceptionCase) {
-                                errToTgExc.insert(err1,resLineNo);
-                                errToRtExc.insert(err2,resLineNo);
+                                errToTgExc.insert(err1,ept1,resLineNo);
+                                errToRtExc.insert(err2,ept2,resLineNo);
                             }
-                            errToTg.insert(err1,resLineNo);
-                            errToRt.insert(err2,resLineNo);
+                            errToTg.insert(err1,ept1,resLineNo);
+                            errToRt.insert(err2,ept2,resLineNo);
                         }
                     } else {
                         System.out.println("Find comment at line " + cnt);
@@ -953,26 +1413,61 @@ return begX;
             System.out.println("Can't open file " + oname + " for write.");
             e.printStackTrace();
         }
+
+        return errToTg.cnt;
     }
 
     public static void main(String args[]) {
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
+
+        long startTime = System.nanoTime();
+
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 
-//        est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-//        est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-//        est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-//        est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+        long endBuildTime = System.nanoTime();
+        long elapsedBuildTime = endBuildTime - startTime;
+        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
 
+
+        int count = 0;
+
+        long startLookupTime = System.nanoTime();
+//        // diagonal in table
+//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+
+          //  out of table
+//        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
+//        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
+//        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
+//        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
+
+
+        long endLookupTime = System.nanoTime();
+        long elapsedLookupTime = endLookupTime - startLookupTime;
+
+
+        System.out.println();
+        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
+        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
+
+//        est.testOne(61, 37, 180, 150, "W", "W");
+//        est.testOne(37, 53, 60, 90, "E", "E");
+//        est.testOne(37, 37, 90, 60, "E", "E");
+//        est.testOne(37, 37, 60, 90, "E", "E");
+//        est.testOne(44, 49, 123, 123, "W", "E");
 //        est.testOne(44, 49, 123, 138, "E", "E");
 //        est.testOne(44, 45, 121, 137, "E", "E");
 //        est.testOne(44, 45, 124, 124, "E", "W");
 
+
 //        est.verifyPath();
 
     }
-
 }
 
 

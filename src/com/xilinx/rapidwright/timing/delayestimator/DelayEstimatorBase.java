@@ -193,6 +193,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         numRow = distArrays.get(T.Direction.VERTICAL).get(GroupDelayType.SINGLE).size();
         distArrays.get(T.Direction.INPUT).put(GroupDelayType.PINFEED, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
         distArrays.get(T.Direction.LOCAL).put(GroupDelayType.PIN_BOUNCE, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
+        distArrays.get(T.Direction.OUTPUT).put(GroupDelayType.OTHER, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
 
 
         if (false) {
@@ -349,23 +350,23 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             tl.put(GroupDelayType.PIN_BOUNCE, (short) 0);
             L.put(T.Direction.LOCAL, tl);
         }
-//        {
-//            Map<GroupDelayType, Float> tk0 = new EnumMap<>(GroupDelayType.class);
-//            tk0.put(GroupDelayType.OTHER, 0f);
-//            K0.put(T.Direction.OUTPUT, tk0);
-//
-//            Map<GroupDelayType, Float> tk1 = new EnumMap<>(GroupDelayType.class);
-//            tk1.put(GroupDelayType.OTHER, 0f);
-//            K1.put(T.Direction.OUTPUT, tk1);
-//
-//            Map<GroupDelayType, Float> tk2 = new EnumMap<>(GroupDelayType.class);
-//            tk2.put(GroupDelayType.OTHER, 0f);
-//            K2.put(T.Direction.OUTPUT, tk2);
-//
-//            Map<GroupDelayType, Short> tl = new EnumMap<>(GroupDelayType.class);
-//            tl.put(GroupDelayType.OTHER, (short) 0);
-//            L.put(T.Direction.OUTPUT, tl);
-//        }
+        {
+            Map<GroupDelayType, Float> tk0 = new EnumMap<>(GroupDelayType.class);
+            tk0.put(GroupDelayType.OTHER, 0f);
+            K0.put(T.Direction.OUTPUT, tk0);
+
+            Map<GroupDelayType, Float> tk1 = new EnumMap<>(GroupDelayType.class);
+            tk1.put(GroupDelayType.OTHER, 0f);
+            K1.put(T.Direction.OUTPUT, tk1);
+
+            Map<GroupDelayType, Float> tk2 = new EnumMap<>(GroupDelayType.class);
+            tk2.put(GroupDelayType.OTHER, 0f);
+            K2.put(T.Direction.OUTPUT, tk2);
+
+            Map<GroupDelayType, Short> tl = new EnumMap<>(GroupDelayType.class);
+            tl.put(GroupDelayType.OTHER, (short) 0);
+            L.put(T.Direction.OUTPUT, tl);
+        }
     }
 
     protected boolean isSwitchingSide(TimingGroupEdge e) {
@@ -450,9 +451,9 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, short x, short y, Double dly,
                                                 boolean isBackward) {
         // For testing, to not explore known high delay
-        if (dly > 444) {
-            return Short.MAX_VALUE / 2;
-        }
+//        if (dly > 444) {
+//            return Short.MAX_VALUE / 2;
+//        }
 
 
         // return calcTimingGroupDelay(e.getTimingGroup(), loc.shortValue(), e.isReverseDirection() ^ isBackward);
@@ -502,11 +503,11 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @return
      */
     protected double calcTimingGroupDelay(T.TimingGroup tg, short begLoc, short endLoc, Double dly) {
-        if (tg == T.TimingGroup.CLE_OUT) {
-            if (verbose > 5)
-                System.out.println();
-            return (short) 0;
-        }
+//        if (tg == T.TimingGroup.CLE_OUT) {
+//            if (verbose > 5)
+//                System.out.println();
+//            return (short) 0;
+//        }
 
         float k0 = K0.get(tg.direction()).get(tg.type());
         float k1 = K1.get(tg.direction()).get(tg.type());
