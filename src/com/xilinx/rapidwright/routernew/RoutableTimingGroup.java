@@ -1,9 +1,9 @@
 package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -50,24 +50,21 @@ public class RoutableTimingGroup implements Routable{
 	
 	public int setChildren(int globalIndex, float base_cost_fac, Map<TimingGroup, RoutableTimingGroup> createdRoutable){
 		this.children = new ArrayList<>();
-
-		if(this.timingGroup.getNextTimingGroups() != null){
-			for(TimingGroup timingGroup:this.timingGroup.getNextTimingGroups()){
-				RoutableTimingGroup childRNode;
-				//TimingGroup toString/hashCode is not unique,
-				if(!createdRoutable.containsKey(timingGroup)){
-					childRNode = new RoutableTimingGroup(globalIndex, timingGroup);
-					childRNode.setBaseCost(base_cost_fac);
-					globalIndex++;
-					children.add(childRNode);
-					createdRoutable.put(timingGroup, childRNode);
-				}else{
-					children.add(createdRoutable.get(timingGroup));
-				}
+		for(TimingGroup timingGroup:this.timingGroup.getNextTimingGroups()){
+			RoutableTimingGroup childRNode;
+			//TimingGroup toString/hashCode is not unique,
+			if(!createdRoutable.containsKey(timingGroup)){
+				childRNode = new RoutableTimingGroup(globalIndex, timingGroup);
+				childRNode.setBaseCost(base_cost_fac);
+				globalIndex++;
+				children.add(childRNode);
+				createdRoutable.put(timingGroup, childRNode);
+			}else{
+				children.add(createdRoutable.get(timingGroup));
+				System.out.println("created up-front " + createdRoutable.get(timingGroup).type);
 			}
-		}else{
-			System.out.println("next timing group is null");
 		}
+		
 		this.childrenSet = true;
 		return globalIndex;
 	}
@@ -110,25 +107,26 @@ public class RoutableTimingGroup implements Routable{
 
 	@Override
 	public void setXY() {
-		int nodeSize = this.timingGroup.getNodes().size();
-		short[] xMaxCoordinates = new short[nodeSize];
-		short[] xMinCoordinates = new short[nodeSize];
-		short[] yMaxCoordinates = new short[nodeSize];
-		short[] yMinCoordinates = new short[nodeSize];
-		short nodeId = 0;
+		
+		List<Wire> wiresInTG = new ArrayList<>();
 		for(Node node:this.timingGroup.getNodes()){
-			this.setCenterXYNode(node);
-			xMaxCoordinates[nodeId] = this.xhigh;
-			xMinCoordinates[nodeId] = this.xlow;
-			yMaxCoordinates[nodeId] = this.yhigh;
-			yMinCoordinates[nodeId] = this.ylow;
-			nodeId++;
+			wiresInTG.addAll(Arrays.asList(node.getAllWiresInNode()));
+		}
+		int length = wiresInTG.size();
+		short[] xCoordinates = new short[length];
+		short[] yCoordinates = new short[length];
+		
+		short id = 0;
+		for(Wire w:wiresInTG){
+			xCoordinates[id] = (short) w.getTile().getColumn();
+			yCoordinates[id] = (short) w.getTile().getRow();
+			id++;
 		}
 		
-		this.xlow = this.min(xMinCoordinates);
-		this.xhigh = this.max(xMaxCoordinates);
-		this.ylow = this.min(yMinCoordinates);
-		this.yhigh = this.max(yMaxCoordinates);
+		this.xlow = this.min(xCoordinates);
+		this.xhigh = this.max(xCoordinates);
+		this.ylow = this.min(yCoordinates);
+		this.yhigh = this.max(yCoordinates);
 	}
 	
 	public void setCenterXYNode(Node node){
@@ -226,6 +224,25 @@ public class RoutableTimingGroup implements Routable{
 		StringBuilder s = new StringBuilder();
 		s.append("RNode " + this.index + " ");
 		s.append(String.format("%-11s", coordinate));
+		s.append(",");
+		s.append(this.timingGroup.getLastNode().toString());
+		s.append(", ");
+		s.append(String.format("type = %s", this.type));
+		
+		return s.toString();
+	}
+	
+	public String toStringFull(){
+		String coordinate = "";
+		if(this.xlow == this.xhigh && this.ylow == this.yhigh) {
+			coordinate = "(" + this.xlow + "," + this.ylow + ")";
+		} else {
+			coordinate = "(" + this.xlow + "," + this.ylow + ") to (" + this.xhigh + "," + this.yhigh + ")";
+		}
+		
+		StringBuilder s = new StringBuilder();
+		s.append("RNode " + this.index + " ");
+		s.append(String.format("%-11s", coordinate));
 		s.append(String.format("basecost = %.2e", this.base_cost));
 		s.append(", ");
 		s.append(String.format("capacity = %d", Routable.capacity));
@@ -237,6 +254,25 @@ public class RoutableTimingGroup implements Routable{
 		s.append(String.format("num_unique_parents = %d", this.rnodeData.numUniqueParents()));
 		s.append(", ");
 		s.append(String.format("level = %d", this.rnodeData.getLevel()));
+		s.append(",");
+		s.append(this.timingGroup.getLastNode().toString());
+		s.append(", ");
+		s.append(String.format("type = %s", this.type));
+		
+		return s.toString();
+	}
+	
+	public String toStringShort(){
+		String coordinate = "";
+		if(this.xlow == this.xhigh && this.ylow == this.yhigh) {
+			coordinate = "(" + this.xlow + "," + this.ylow + ")";
+		} else {
+			coordinate = "(" + this.xlow + "," + this.ylow + ") to (" + this.xhigh + "," + this.yhigh + ")";
+		}
+		
+		StringBuilder s = new StringBuilder();
+		s.append("RNode " + this.index + " ");
+		s.append(String.format("%-11s", coordinate));
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		
@@ -275,5 +311,5 @@ public class RoutableTimingGroup implements Routable{
 	public void setTarget(boolean isTarget) {
 		this.target = isTarget;	
 	}
-
+	
 }

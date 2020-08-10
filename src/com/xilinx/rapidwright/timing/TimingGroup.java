@@ -67,13 +67,25 @@ public class TimingGroup implements Comparable<TimingGroup> {
     public float cost;
     public int sameSpotCounter;
     
-    public int index;
+//    public int index;
 
     /**
      * Default constructor used by the TimingModel to create a TimingGroup.
      * @param timingModel Reference to the TimingModel.
      */
     public TimingGroup(TimingModel timingModel) {
+        this.sameSpotCounter = 0;
+        this.timingModel = timingModel;
+        this.nodes = new LinkedList<>();
+        this.pips = new LinkedList<>();
+        this.nodeTypes = new LinkedList<>();
+        this.isInitialGroup = false;
+        this.isFinalGroup = false;
+        this.hasGlobalWire = false;
+    }
+    
+    public TimingGroup(int index, TimingModel timingModel) {
+//    	this.index = index;
         this.sameSpotCounter = 0;
         this.timingModel = timingModel;
         this.nodes = new LinkedList<>();
@@ -115,7 +127,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
      * @param timingModel Reference to the current TimingModel.
      */
     public TimingGroup(int index, SitePinInst startPin, TimingModel timingModel) {
-    	this.index = index;
+//    	this.index = index;
         this.sameSpotCounter = 0;
         this.timingModel = timingModel;
         this.nodes = new LinkedList<>();
@@ -134,10 +146,99 @@ public class TimingGroup implements Comparable<TimingGroup> {
         timingModel.calcDelay(this);
     }
     
-    //TODO
+   /* //TODO
     @Override
     public int hashCode(){
     	return this.index;
+    }
+    */
+    /**
+     * Method used by the Router example to get the downhill TimingGroups from a given TimingGroup.  
+     * For example a user may create a TimingGroup at a given SitePinInst using that constructor, 
+     * and then request the possible downhill TimingGroups using this method.  The resulting array 
+     * of TimingGroups can easily be filtered using the "filter" method within TimingModel.
+     * @return Array of downhill/adjacent TimingGroups from the current TimingGroup
+     */
+    public TimingGroup[] getDownhillTimingGroups() {
+        List<TimingGroup> preResult = new ArrayList<>();
+        Node prevLastNode = nodes.get(nodes.size()-1);
+        List<Node> downhillNodes = prevLastNode.getAllDownhillNodes();
+        for (Node nextNode : downhillNodes) {
+            Wire[] wires = nextNode.getAllWiresInNode();
+            IntentCode ic = wires[0].getIntentCode();
+            PIP pip = null;
+
+            for (PIP p : prevLastNode.getAllDownhillPIPs()) {
+                Node startNode = p.getStartNode();
+                Node endNode = p.getEndNode();
+                if (startNode.equals(prevLastNode) &&
+                        endNode.equals(nextNode)) {
+                    pip = p;
+                    break;
+                }
+            }
+            if (pip != null && !pip.getStartNode().equals(prevLastNode))
+                continue;
+
+            boolean nextNodeHasGlobalWire = false;
+            for (Wire w : nextNode.getAllWiresInNode()) {
+                if (w.getWireName().contains("_GLOBAL"))
+                    nextNodeHasGlobalWire = true;
+            }
+            if (ic == IntentCode.NODE_CLE_OUTPUT) {
+                TimingGroup newTS = new TimingGroup(timingModel);
+                newTS.add(nextNode, ic);
+                newTS.computeTypes();
+                timingModel.calcDelay(newTS);
+                preResult.add(newTS);
+            }
+            else if (nextNodeHasGlobalWire ||
+                    ic == IntentCode.NODE_HLONG ||
+                    ic == IntentCode.NODE_VLONG
+            ) {
+                TimingGroup newTS = new TimingGroup(timingModel);
+                newTS.add(nextNode, ic);
+                if (pip != null)
+                    newTS.add(pip);
+                newTS.computeTypes();
+                timingModel.calcDelay(newTS);
+                preResult.add(newTS);
+
+            } else {
+                PIP nextNextPip = null;
+
+                for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
+                    for (PIP p : nextNode.getAllDownhillPIPs()) {
+                        if (p.getStartNode().equals(nextNode) &&
+                                p.getEndNode().equals(nextNextNode)) {
+                            nextNextPip = p;
+                            break;
+                        }
+                    }
+                    if(nextNextPip == null) return null;//TODO better way to check earlier
+                    nextNextNode = nextNextPip.getEndNode();
+
+                    Wire[] nextNextWires = nextNextNode.getAllWiresInNode();
+                    IntentCode nextNextIc = nextNextWires[0].getIntentCode();
+
+                    TimingGroup newTS = new TimingGroup(timingModel);
+                    newTS.add(nextNode, ic);
+                    newTS.add(nextNextNode, nextNextIc);
+                    if (pip != null)
+                        newTS.add(pip);
+                    if (nextNextPip != null)
+                        newTS.add(nextNextPip);
+                    newTS.computeTypes();
+                    timingModel.calcDelay(newTS);
+                    preResult.add(newTS);
+                }
+                if (nextNextPip == null) {
+                    continue;
+                }
+            }
+        }
+        TimingGroup[] result = preResult.toArray(new TimingGroup[preResult.size()]);
+        return result;
     }
 
     /**
@@ -203,7 +304,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
                             break;
                         }
                     }
-                    if(nextNextPip == null) return null;//TODO better way to check earlier
+//                    if(nextNextPip == null) return null;//TODO better way to check earlier
                     nextNextNode = nextNextPip.getEndNode();
 
                     Wire[] nextNextWires = nextNextNode.getAllWiresInNode();

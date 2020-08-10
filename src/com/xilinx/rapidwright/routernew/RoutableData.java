@@ -164,4 +164,20 @@ public class RoutableData {
 		return this.index;
 	}
 	
+	@Override
+	public String toString(){
+		StringBuilder s = new StringBuilder();
+		s.append("RNode " + this.index + " ");
+		s.append(", ");
+		s.append(String.format("occupation = %d", this.getOccupation()));
+		s.append(", ");
+		s.append(String.format("num_unique_sources = %d", this.numUniqueSources()));
+		s.append(", ");
+		s.append(String.format("num_unique_parents = %d", this.numUniqueParents()));
+		s.append(", ");
+		s.append(String.format("level = %d", this.getLevel()));
+		s.append(",");
+		return s.toString();
+	}
+	
 }

@@ -143,6 +143,32 @@ public class Connection{
 		
 	}
 	
+	public String toStringTG() {
+		
+		StringBuilder s = new StringBuilder();
+			
+		String coordinate = "(" + this.source.getTile().getColumn() + "," + this.source.getTile().getRow() + ") to (" 
+							+ this.sink.getTile().getColumn() + "," + this.sink.getTile().getRow() + ")";
+		
+		s.append("Con");
+		s.append(String.format("%6s", this.id));
+		s.append(", ");
+		s.append(String.format("%22s", coordinate));
+		s.append(", ");
+		s.append(String.format("net = %5s", this.net.getId()));
+		s.append(", ");
+		s.append(String.format("net fanout = %3s", this.net.fanout));
+		s.append(", ");
+		s.append(String.format("source = %26s", this.source.getName() + " -> " + ((RoutableTimingGroup)this.sourceRNode).toStringShort()));
+		s.append(", ");
+		s.append(String.format("sink = %26s", ((RoutableTimingGroup) this.sinkRNode).toStringShort() + " -> " +  this.sink.getName()));
+		s.append(", ");
+		s.append(String.format("mahattan d = %4d ", this.getManhattanDistance()));
+		
+		return s.toString();
+		
+	}
+	
 	public int getManhattanDistance() {
 		int dx = Math.abs(this.source.getTile().getColumn() - this.sink.getTile().getColumn());
 		int dy = Math.abs(this.source.getTile().getRow() - this.sink.getTile().getRow());

@@ -731,7 +731,6 @@ public class RoutableWireRouter{
 		if(this.debugRoutingCon) this.printInfo("routing for " + con.toStringWire());
 		
 		while(!this.targetReached(con)){
-			this.nodesExpanded++;
 			
 			if(this.queue.isEmpty()){
 				System.out.println(this.nodesExpanded);

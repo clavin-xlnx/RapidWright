@@ -14,6 +14,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.c;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
@@ -73,7 +74,7 @@ public class RoutableTimingGroupRouter{
 	
 	public boolean trial = true;
 	public boolean debugRoutingCon = true;
-	public boolean debugExpansion = false;
+	public boolean debugExpansion = true;
 	
 	public RoutableTimingGroupRouter(Design design,
 			String dcpFileName,
@@ -301,10 +302,17 @@ public class RoutableTimingGroupRouter{
 				
 		//do routing
 		boolean validRouting;
-        List<Netplus> trialNets = new ArrayList<>();
+		List<Netplus> trialNets = new ArrayList<>();
         for(Netplus net : this.sortedListOfNetplus){
-        	if(net.getNet().getName().equals("n7a2")){
+        	if(net.getNet().getName().equals("n7b5")){
         		trialNets.add(net);
+//        		System.out.println(net.getNet().getName());
+        	}
+        }
+        List<Connection> trialCons = new ArrayList<>();
+        for(Connection con : this.sortedListOfConnection){
+        	if(con.id == 1216){
+        		trialCons.add(con);
         	}
         }
         
@@ -330,6 +338,7 @@ public class RoutableTimingGroupRouter{
 			}else{
 				for(Netplus np : trialNets){
 					for(Connection c : np.getConnection()){
+//				for(Connection c : trialCons){
 						if(this.itry == 1){
 							this.routerTimer.firstIteration.start();
 							this.routeACon(c);
@@ -776,10 +785,11 @@ public class RoutableTimingGroupRouter{
 
 	public void routeACon(Connection con){
 		this.prepareForRoutingACon(con);
-		if(this.debugRoutingCon) this.printInfo("routing for " + con.toString());
+		if(this.debugRoutingCon) this.printInfo("routing for " + con.toStringTG());
+		
+		System.out.println("target set " + con.getSinkRNode().isTarget() + ((RoutableTimingGroup) con.getSinkRNode()).getTimingGroup().getLastNode().toString());
 		
 		while(!this.targetReached(con)){
-			this.nodesExpanded++;
 			
 			if(this.queue.isEmpty()){
 				System.out.println(this.nodesExpanded);
@@ -815,7 +825,7 @@ public class RoutableTimingGroupRouter{
 	public void finishRoutingACon(Connection con){
 		//save routing in connection class
 		this.saveRouting(con);
-		((RoutableTimingGroup)con.getSinkRNode()).target = false;
+		con.getSinkRNode().setTarget(false);
 		// Reset path cost
 		this.resetPathCost();
 		
@@ -852,8 +862,6 @@ public class RoutableTimingGroupRouter{
 				this.addNodeToQueue(rnode, childRNode, con);
 				
 			}else if(childRNode.type.equals(RoutableType.INTERRR)){
-				//traverse INT tiles only, otherwise, the router would take CLB sites as next hop candidates
-				//this can be done by downsizing the created rnodes
 				if(childRNode.isInBoundingBoxLimit(con)){
 					if(this.debugExpansion) this.printInfo("\t\t" + " add node to the queue");
 					this.addNodeToQueue(rnode, childRNode, con);
@@ -969,8 +977,7 @@ public class RoutableTimingGroupRouter{
 		this.queue.clear();	
 		
 		//set the sink rrg node of con as the target
-		RoutableTimingGroup sink = (RoutableTimingGroup) con.getSinkRNode();
-		sink.target = true;
+		con.getSinkRNode().setTarget(true);
 		
 		// Add source to queue
 		RoutableTimingGroup source = (RoutableTimingGroup) con.getSourceRNode();
