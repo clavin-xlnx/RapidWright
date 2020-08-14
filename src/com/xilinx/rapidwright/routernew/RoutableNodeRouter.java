@@ -21,6 +21,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.router.RouteThruHelper;
 
 public class RoutableNodeRouter{
 	public Design design;
@@ -40,6 +41,7 @@ public class RoutableNodeRouter{
 	public List<Connection> sortedListOfConnection;
 	public List<Netplus> sortedListOfNetplus;
 
+	public RouteThruHelper routethruHelper;
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -100,8 +102,6 @@ public class RoutableNodeRouter{
 		this.mdWeight = mdWeight;
 		this.hopWeight = hopWeight;
 		
-		this.getRoutethrus();
-		
 		this.routerTimer = new RouterTimer();
 		this.fanout1Net = 0;
 		this.rrgNodeId = 0;
@@ -109,6 +109,8 @@ public class RoutableNodeRouter{
 				
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
+		
+		this.routethruHelper = new RouteThruHelper(this.design.getDevice());
 		
 		this.connectionsRouted = 0;
 		this.connectionsRoutedIteration = 0;
@@ -122,29 +124,23 @@ public class RoutableNodeRouter{
 	public int initializeNetsCons(short bbRange, int rrgNodeId, float base_cost_fac){
 		int inet = 0;
 		int icon = 0;
-		
+			
 		this.nets = new ArrayList<>();
 		this.connections = new ArrayList<>();
 		
 		DesignTools.createMissingSitePinInsts(this.design);
 		
 		for(Net n:this.design.getNets()){	
-			if(n.getPins().size() == 1|| (n.getSource() == null && n.getSinkPins().size() > 0)){
+			if((n.getSource() != null && n.getPins().size() == 1) || (n.getSource() == null && n.getSinkPins().size() > 0 && n.hasPIPs() == false)){
 				for(SitePinInst pin:n.getPins()){
 					Node node = pin.getConnectedNode();
-					/*RoutableType type;
-					if(pin.isOutPin()){
-						type = RoutableType.SOURCERR;
-					}else{
-						type = RoutableType.SINKRR;
-					}*/
 					RoutableNode reservedRRGNode = new RoutableNode(rrgNodeId, node, RoutableType.RESERVED);
 					reservedRRGNode.setBaseCost(Float.MAX_VALUE - 1);
 					this.rnodesCreated.put(node, reservedRRGNode);
 					rrgNodeId++;			
 				}
-			} else if(n.isClockNet() || n.isStaticNet() || n.getName().equals("clk")){
-				
+			} else if(n.getSource() == null && n.getSinkPins().size() > 0 && n.hasPIPs() == true){
+				//GLOBAL_LOGIC0 and GLOBAL_LOGIC1
 				for(PIP pip:n.getPIPs()){
 					Node nodeStart = pip.getStartNode();
 					RoutableNode startRRGNode = new RoutableNode(rrgNodeId, nodeStart, RoutableType.RESERVED);//INTERRR not accurate
@@ -172,6 +168,14 @@ public class RoutableNodeRouter{
 				rrgNodeId++;
 				
 				for(SitePinInst sink:n.getSinkPins()){
+					
+					if(source.getName().equals("COUT") && (!sink.getName().equals("CIN"))){
+						source = n.getAlternateSource();
+						sourceRNode = new RoutableNode(rrgNodeId, source, RoutableType.SOURCERR);
+						sourceRNode.setBaseCost(base_cost_fac);
+						this.rnodesCreated.put(sourceRNode.getNode(), sourceRNode);
+					}
+					
 					Connection c = new Connection(icon, source, sink);	
 					c.setSourceRNode(sourceRNode);
 					
@@ -192,19 +196,6 @@ public class RoutableNodeRouter{
 			}	
 		}
 		return rrgNodeId;
-	}
-	
-	public void getRoutethrus(){
-		Map<String,Cell> routethruMap = new HashMap<String, Cell>();
-		for(SiteInst i : this.design.getSiteInsts()) {
-		  for(Cell c : i.getCells()) {
-		    if(c.isRoutethru()) {
-		      routethruMap.put(c.getSiteName() + "/" + c.getBELName(), c);
-		    }
-		  }
-		}
-		
-		System.out.println(routethruMap.size());
 	}
 
 	public void initializeRouter(float initial_pres_fac, float pres_fac_mult, float acc_fac){
@@ -601,7 +592,7 @@ public class RoutableNodeRouter{
 		}
 		
 		this.checkPIPsUsage();
-		this.checkInvalidlyRoutedNets("LUT6_2_0/O5");
+//		this.checkInvalidlyRoutedNets("LUT6_2_0/O5");
 //		this.checkNetRoutedPins();
 //		this.printWrittenPIPs();
 	}
@@ -751,7 +742,7 @@ public class RoutableNodeRouter{
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated);
+				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, this.routethruHelper);
 			}
 			this.routerTimer.rnodesCreation.finish();
 			

@@ -7,6 +7,7 @@ import java.util.Map;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.router.RouteThruHelper;
 
 public class RoutableNode implements Routable{
 	public int index;
@@ -44,13 +45,11 @@ public class RoutableNode implements Routable{
 		this.setXY();
 	}
 	
-	public int setChildren(int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable){
+	public int setChildren(int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable, RouteThruHelper routethruHelper){
 		this.children = new ArrayList<>();
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
-//		if(allDownHillNodes.size() == 0) System.out.println(this.node.toString() + " has no children.");
-//		else System.out.println(this.index + ": # children = " + allDownHillNodes.size());
 		for(Node node:allDownHillNodes){
-//			if(node.getTile().getName().startsWith("INT_")){// || node.getTile().getName().startsWith("BRAM") || node.getTile().getName().startsWith("CLE")){//TODO "routethru" is not allowed in this way
+			if(!routethruHelper.isRouteThru(this.node, node)){
 				if(!createdRoutable.containsKey(node)){
 					RoutableNode child;
 					child = new RoutableNode(globalIndex, node, RoutableType.INTERRR);
@@ -58,12 +57,11 @@ public class RoutableNode implements Routable{
 					globalIndex++;
 					this.children.add(child);
 					createdRoutable.put(node, child);
-//					System.out.println("new created");
 				}else{
-//					System.out.println("child RRG node " + node.toString() + " created upfront as a " + createdRoutable.get(node).type);
-					this.children.add(createdRoutable.get(node));//the sink routable a target created up-front 
-				}		
-//			}
+
+					this.children.add(createdRoutable.get(node));//the sink routable of a target has been created up-front 
+				}
+			}
 		}
 		this.childrenSet = true;
 		return globalIndex++;

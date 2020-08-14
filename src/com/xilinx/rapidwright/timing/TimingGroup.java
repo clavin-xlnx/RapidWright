@@ -26,6 +26,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.util.Pair;
 
 import static com.xilinx.rapidwright.timing.TimingDirection.NORTH;
 import static com.xilinx.rapidwright.timing.TimingDirection.SOUTH;
@@ -45,6 +46,7 @@ public class TimingGroup implements Comparable<TimingGroup> {
     private TimingModel timingModel;
     private List<Node> nodes;
     private List<PIP> pips;
+    private int hashCode;
     private List<IntentCode> nodeTypes;
     private GroupDelayType groupDelayType;
     private GroupWireDirection groupWireDir;
@@ -66,26 +68,12 @@ public class TimingGroup implements Comparable<TimingGroup> {
     public float delay;
     public float cost;
     public int sameSpotCounter;
-    
-//    public int index;
 
     /**
      * Default constructor used by the TimingModel to create a TimingGroup.
      * @param timingModel Reference to the TimingModel.
      */
     public TimingGroup(TimingModel timingModel) {
-        this.sameSpotCounter = 0;
-        this.timingModel = timingModel;
-        this.nodes = new LinkedList<>();
-        this.pips = new LinkedList<>();
-        this.nodeTypes = new LinkedList<>();
-        this.isInitialGroup = false;
-        this.isFinalGroup = false;
-        this.hasGlobalWire = false;
-    }
-    
-    public TimingGroup(int index, TimingModel timingModel) {
-//    	this.index = index;
         this.sameSpotCounter = 0;
         this.timingModel = timingModel;
         this.nodes = new LinkedList<>();
@@ -118,127 +106,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
         }
         computeTypes();
         timingModel.calcDelay(this);
-    }
-    
-    /**
-     * Constructor used for Router example to create a TimingGroup, starting at a given SitePinInst.
-     * @param index A unique index
-     * @param startPin Starting SitePinInst for the TimingGroup.
-     * @param timingModel Reference to the current TimingModel.
-     */
-    public TimingGroup(int index, SitePinInst startPin, TimingModel timingModel) {
-//    	this.index = index;
-        this.sameSpotCounter = 0;
-        this.timingModel = timingModel;
-        this.nodes = new LinkedList<>();
-        this.pips = new LinkedList<>();
-        this.nodeTypes = new LinkedList<>();
-        this.isInitialGroup = true;
-        this.isFinalGroup = false;
-        this.hasGlobalWire = false;
-        Node node = startPin.getConnectedNode();
-        if (node != null) {
-            Wire[] wires = node.getAllWiresInNode();
-            IntentCode ic = wires[0].getIntentCode();
-            add(startPin.getConnectedNode(),ic);
-        }
-        computeTypes();
-        timingModel.calcDelay(this);
-    }
-    
-   /* //TODO
-    @Override
-    public int hashCode(){
-    	return this.index;
-    }
-    */
-    /**
-     * Method used by the Router example to get the downhill TimingGroups from a given TimingGroup.  
-     * For example a user may create a TimingGroup at a given SitePinInst using that constructor, 
-     * and then request the possible downhill TimingGroups using this method.  The resulting array 
-     * of TimingGroups can easily be filtered using the "filter" method within TimingModel.
-     * @return Array of downhill/adjacent TimingGroups from the current TimingGroup
-     */
-    public TimingGroup[] getDownhillTimingGroups() {
-        List<TimingGroup> preResult = new ArrayList<>();
-        Node prevLastNode = nodes.get(nodes.size()-1);
-        List<Node> downhillNodes = prevLastNode.getAllDownhillNodes();
-        for (Node nextNode : downhillNodes) {
-            Wire[] wires = nextNode.getAllWiresInNode();
-            IntentCode ic = wires[0].getIntentCode();
-            PIP pip = null;
-
-            for (PIP p : prevLastNode.getAllDownhillPIPs()) {
-                Node startNode = p.getStartNode();
-                Node endNode = p.getEndNode();
-                if (startNode.equals(prevLastNode) &&
-                        endNode.equals(nextNode)) {
-                    pip = p;
-                    break;
-                }
-            }
-            if (pip != null && !pip.getStartNode().equals(prevLastNode))
-                continue;
-
-            boolean nextNodeHasGlobalWire = false;
-            for (Wire w : nextNode.getAllWiresInNode()) {
-                if (w.getWireName().contains("_GLOBAL"))
-                    nextNodeHasGlobalWire = true;
-            }
-            if (ic == IntentCode.NODE_CLE_OUTPUT) {
-                TimingGroup newTS = new TimingGroup(timingModel);
-                newTS.add(nextNode, ic);
-                newTS.computeTypes();
-                timingModel.calcDelay(newTS);
-                preResult.add(newTS);
-            }
-            else if (nextNodeHasGlobalWire ||
-                    ic == IntentCode.NODE_HLONG ||
-                    ic == IntentCode.NODE_VLONG
-            ) {
-                TimingGroup newTS = new TimingGroup(timingModel);
-                newTS.add(nextNode, ic);
-                if (pip != null)
-                    newTS.add(pip);
-                newTS.computeTypes();
-                timingModel.calcDelay(newTS);
-                preResult.add(newTS);
-
-            } else {
-                PIP nextNextPip = null;
-
-                for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
-                    for (PIP p : nextNode.getAllDownhillPIPs()) {
-                        if (p.getStartNode().equals(nextNode) &&
-                                p.getEndNode().equals(nextNextNode)) {
-                            nextNextPip = p;
-                            break;
-                        }
-                    }
-                    if(nextNextPip == null) return null;//TODO better way to check earlier
-                    nextNextNode = nextNextPip.getEndNode();
-
-                    Wire[] nextNextWires = nextNextNode.getAllWiresInNode();
-                    IntentCode nextNextIc = nextNextWires[0].getIntentCode();
-
-                    TimingGroup newTS = new TimingGroup(timingModel);
-                    newTS.add(nextNode, ic);
-                    newTS.add(nextNextNode, nextNextIc);
-                    if (pip != null)
-                        newTS.add(pip);
-                    if (nextNextPip != null)
-                        newTS.add(nextNextPip);
-                    newTS.computeTypes();
-                    timingModel.calcDelay(newTS);
-                    preResult.add(newTS);
-                }
-                if (nextNextPip == null) {
-                    continue;
-                }
-            }
-        }
-        TimingGroup[] result = preResult.toArray(new TimingGroup[preResult.size()]);
-        return result;
     }
 
     /**
@@ -304,7 +171,6 @@ public class TimingGroup implements Comparable<TimingGroup> {
                             break;
                         }
                     }
-//                    if(nextNextPip == null) return null;//TODO better way to check earlier
                     nextNextNode = nextNextPip.getEndNode();
 
                     Wire[] nextNextWires = nextNextNode.getAllWiresInNode();
@@ -330,6 +196,69 @@ public class TimingGroup implements Comparable<TimingGroup> {
         return result;
     }
 
+    /**
+     * Find all downhill timing groups of the current timing group.
+     * @return a list of list of timing groups representing a list of siblings -- timing groups sharing the same last nodes,
+     * instead of an array of timing groups, returned by getNextTimingGroups().
+     */
+    public List<List<TimingGroup>> getNextSiblingTimingGroups() {
+        List<List<TimingGroup>> result = new ArrayList<>();
+        Node prevLastNode = nodes.get(nodes.size()-1);
+
+        for (PIP pip : prevLastNode.getAllDownhillPIPs()) {
+            Node nextNode = pip.getEndNode();
+            IntentCode ic = nextNode.getAllWiresInNode()[0].getIntentCode();
+
+            // TODO: is there a better way then relying on name?
+            boolean nextNodeHasGlobalWire = false;
+            for (Wire w : nextNode.getAllWiresInNode()) {
+                if (w.getWireName().contains("_GLOBAL"))
+                    nextNodeHasGlobalWire = true;
+            }
+
+            // CLE_OUT, GLOBAL, LONG TGs have only one node, others have 2 nodes.
+            // TG with one node has no siblings.
+            if (ic == IntentCode.NODE_CLE_OUTPUT) {
+                TimingGroup newTS = new TimingGroup(timingModel,
+                        new ArrayList<Pair<Node,IntentCode>>(){{add(new Pair<>(nextNode,ic));}},
+                        new ArrayList<PIP>());
+                result.add(new ArrayList<TimingGroup>(){{add(newTS);}});
+            }
+            else if (nextNodeHasGlobalWire ||
+                    ic == IntentCode.NODE_HLONG ||
+                    ic == IntentCode.NODE_VLONG )
+            {
+                TimingGroup newTS = new TimingGroup(timingModel,
+                        new ArrayList<Pair<Node,IntentCode>>(){{add(new Pair<>(nextNode,ic));}},
+                        new ArrayList<PIP>(){{add(pip);}});
+                result.add(new ArrayList<TimingGroup>(){{add(newTS);}});
+            } else {
+                // for other TGs look for the 2nd node
+                for (PIP nextNextPip : nextNode.getAllDownhillPIPs()) {
+                    Node nextNextNode = nextNextPip.getEndNode();
+                    IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
+
+                    List<TimingGroup> siblings = new ArrayList<>();
+                    for (PIP nextPrvPip : nextNextNode.getAllUphillPIPs()) { // need to get all downhill PIPs
+                        Node nextPrvNode = nextPrvPip.getStartNode();
+                        IntentCode nextPrvIc = nextPrvNode.getAllWiresInNode()[0].getIntentCode();
+                        TimingGroup newTS = new TimingGroup(timingModel,
+                                new ArrayList<Pair<Node, IntentCode>>() {{
+                                    add(new Pair<>(nextPrvNode, nextPrvIc));
+                                    add(new Pair<>(nextNextNode, nextNextIc));
+                                }},
+                                new ArrayList<PIP>() {{
+                                    add(pip);
+                                    add(nextNextPip);
+                                }});
+                        siblings.add(newTS);
+                    }
+                    result.add(siblings);
+                }
+            }
+        }
+        return result;
+    }
 
     /**
      * Used for adding a node into a TimingGroup.
@@ -345,6 +274,11 @@ public class TimingGroup implements Comparable<TimingGroup> {
             if (w.getWireName().contains("_GLOBAL"))
                 hasGlobalWire = true;
         }
+        // not needed if cleanup is called after TG construction.
+        // put it here for safty, the safest way is to accept list of nodes and pips in ctor so that hash code
+        // can be computed. don't need clean up in that case.
+        Node lastNode = nodes.get(nodes.size()-1);
+        hashCode = lastNode.hashCode();
     }
 
     /**
@@ -355,6 +289,44 @@ public class TimingGroup implements Comparable<TimingGroup> {
         pips.add(p);
     }
 
+    /**
+     *
+     * @param timingModel
+     * @param nodes
+     * @param pips
+     */
+    public TimingGroup(TimingModel timingModel, List<Pair<Node,IntentCode>> nodes, List<PIP> pips) {
+        this.sameSpotCounter = 0;
+        this.timingModel = timingModel;
+        this.nodes = new LinkedList<>();
+        this.pips = new LinkedList<>();
+        this.nodeTypes = new LinkedList<>();
+        this.isInitialGroup = false;
+        this.isFinalGroup = false;
+        this.hasGlobalWire = false;
+
+        for (Pair<Node,IntentCode> n_ic : nodes) {
+            add(n_ic.getFirst(),n_ic.getSecond());
+        }
+        for (PIP p : pips) {
+            add(p);
+        }
+        computeTypes();
+        // TODO: is there a bettter way that not relying on public field of TimingGroup
+        timingModel.calcDelay(this);
+
+        Node lastNode = this.nodes.get(nodes.size()-1);
+        hashCode = lastNode.hashCode();
+        // PM:PM can I delete this?  Delay estimator needs to know E/W and direction. Thus, nodes are needed.
+//        nodes.clear();
+//        pips.clear();
+    }
+
+    // PM add this to avoid recomputing
+    @Override
+    public int hashCode() {
+        return hashCode;
+    }
     /**
      * Returns a String representation of this object that may be useful for debugging.
      * @return String representation.
