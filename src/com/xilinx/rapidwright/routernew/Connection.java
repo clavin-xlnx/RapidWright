@@ -111,7 +111,7 @@ public class Connection{
 		s.append(", ");
 		s.append(String.format("sink = %26s", this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName()));
 		s.append(", ");
-		s.append(String.format("mahattan d = %4d ", this.getManhattanDistance()));
+		s.append(String.format("Manhattan d = %4d ", this.getManhattanDistance()));
 		
 		return s.toString();
 		

@@ -5,7 +5,9 @@ import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
@@ -28,6 +30,7 @@ public class RoutableNode implements Routable{
 	public RoutableNode(int index, SitePinInst sitePinInst, RoutableType type){
 		this.index = index;
 		this.type = type;
+//		System.out.println(sitePinInst.getName());
 		this.node = sitePinInst.getConnectedNode();
 		this.rnodeData = new RoutableData(this.index);
 		this.childrenSet = false;
@@ -49,7 +52,13 @@ public class RoutableNode implements Routable{
 		this.children = new ArrayList<>();
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
 		for(Node node:allDownHillNodes){
-			if(!routethruHelper.isRouteThru(this.node, node)){
+			//TODO recognize available routethrus
+			boolean availableNode = false;
+			boolean isRoutethru = routethruHelper.isRouteThru(this.node, node);
+			BELPin belPin = node.getSitePin() != null ? node.getSitePin().getBELPin() : null;
+			//TODO how to connect BELPin/BEL with a Cell
+			
+			if(!routethruHelper.isRouteThru(this.node, node)){//routethrus are forbidden in this way
 				if(!createdRoutable.containsKey(node)){
 					RoutableNode child;
 					child = new RoutableNode(globalIndex, node, RoutableType.INTERRR);

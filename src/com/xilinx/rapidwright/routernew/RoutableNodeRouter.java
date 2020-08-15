@@ -14,6 +14,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -32,6 +33,8 @@ public class RoutableNodeRouter{
 	public List<Netplus> nets;
 	public List<Connection> connections;
 	public int fanout1Net;
+	public int inet;
+	public int icon;
 	
 //	public Map<Net, List<Node>> netsReservedNodes;
 	public PriorityQueue<QueueElement> queue;
@@ -105,7 +108,7 @@ public class RoutableNodeRouter{
 		this.routerTimer = new RouterTimer();
 		this.fanout1Net = 0;
 		this.rrgNodeId = 0;
-		this.rrgNodeId = this.initializeNetsCons(bbRange, this.rrgNodeId, this.base_cost_fac);
+		this.rrgNodeId = this.initializeNetsCons(bbRange, this.base_cost_fac);
 				
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -121,83 +124,127 @@ public class RoutableNodeRouter{
 		this.illegalRNodes = new HashSet<>();
 	}
 	
-	public int initializeNetsCons(short bbRange, int rrgNodeId, float base_cost_fac){
-		int inet = 0;
-		int icon = 0;
+	public int initializeNetsCons(short bbRange, float base_cost_fac){
 			
 		this.nets = new ArrayList<>();
 		this.connections = new ArrayList<>();
 		
 		DesignTools.createMissingSitePinInsts(this.design);
 		
-		for(Net n:this.design.getNets()){	
-			if((n.getSource() != null && n.getPins().size() == 1) || (n.getSource() == null && n.getSinkPins().size() > 0 && n.hasPIPs() == false)){
-				for(SitePinInst pin:n.getPins()){
-					Node node = pin.getConnectedNode();
-					RoutableNode reservedRRGNode = new RoutableNode(rrgNodeId, node, RoutableType.RESERVED);
-					reservedRRGNode.setBaseCost(Float.MAX_VALUE - 1);
-					this.rnodesCreated.put(node, reservedRRGNode);
-					rrgNodeId++;			
-				}
-			} else if(n.getSource() == null && n.getSinkPins().size() > 0 && n.hasPIPs() == true){
-				//GLOBAL_LOGIC0 and GLOBAL_LOGIC1
-				for(PIP pip:n.getPIPs()){
-					Node nodeStart = pip.getStartNode();
-					RoutableNode startRRGNode = new RoutableNode(rrgNodeId, nodeStart, RoutableType.RESERVED);//INTERRR not accurate
-					startRRGNode.setBaseCost(Float.MAX_VALUE - 1);
-					this.rnodesCreated.put(nodeStart, startRRGNode);
-					rrgNodeId++;
-					
-					Node nodeEnd = pip.getEndNode();
-					RoutableNode endRRGNode = new RoutableNode(rrgNodeId, nodeEnd, RoutableType.RESERVED);//INTERRR not accurate
-					endRRGNode.setBaseCost(Float.MAX_VALUE - 1);
-					this.rnodesCreated.put(nodeEnd, endRRGNode);
-					rrgNodeId++;
-					
-				}
-			} else if(n.getSource() != null && n.getSinkPins().size() > 0){
-				n.unroute();
-				Netplus np = new Netplus(inet, bbRange, n);
-				this.nets.add(np);
-				inet++;
+		for(Net n:this.design.getNets()){
+			
+			if(n.isClockNet() || n.isStaticNet()){
 				
-				SitePinInst source = n.getSource();
-				RoutableNode sourceRNode = new RoutableNode(rrgNodeId, source, RoutableType.SOURCERR);
-				sourceRNode.setBaseCost(base_cost_fac);
-				this.rnodesCreated.put(sourceRNode.getNode(), sourceRNode);	
-				rrgNodeId++;
-				
-				for(SitePinInst sink:n.getSinkPins()){
-					
-					if(source.getName().equals("COUT") && (!sink.getName().equals("CIN"))){
-						source = n.getAlternateSource();
-						sourceRNode = new RoutableNode(rrgNodeId, source, RoutableType.SOURCERR);
-						sourceRNode.setBaseCost(base_cost_fac);
-						this.rnodesCreated.put(sourceRNode.getNode(), sourceRNode);
-					}
-					
-					Connection c = new Connection(icon, source, sink);	
-					c.setSourceRNode(sourceRNode);
-					
-					//create RNode of the sink pin external wire up front 
-					RoutableNode sinkRNode = new RoutableNode(rrgNodeId, sink, RoutableType.SINKRR);
-					sinkRNode.setBaseCost(base_cost_fac);
-					c.setSinkRNode(sinkRNode);
-					this.rnodesCreated.put(sinkRNode.getNode(), sinkRNode);
-					rrgNodeId++;
-					
-					this.connections.add(c);
-					c.setNet(np);//TODO new and set its TimingEdge for timing-driven version
-					np.addCons(c);
-					icon++;
+				if(n.hasPIPs()){
+					this.reservePipsOfNet(n);
+				}else{
+					this.reserveConnectedNodesOfNetPins(n);
 				}
-				if(n.getSinkPins().size() == 1)
-					this.fanout1Net++;
-			}	
+				
+			}else if (n.getType().equals(NetType.WIRE)){
+				
+				if(this.isRegularNetToBeRouted(n)){
+					this.initializeNetAndCons(n, bbRange);
+					
+				}else if(this.isOnePinTypeNetWithoutPips(n)){
+					this.reserveConnectedNodesOfNetPins(n);
+					
+				} else if(this.isNetWithInputPinsAndPips(n)){
+					this.reservePipsOfNet(n);
+					
+				}else{
+					//internally routed within one site / nets without pins
+					if(n.getPins().size() != 0) System.out.println(n.getName() + " " + n.getPins().size());
+				}
+			}else{
+				System.out.println("UNKNOWN type net: " + n.toString());
+			}
 		}
 		return rrgNodeId;
 	}
 
+	public void initializeNetAndCons(Net n, short bbRange){
+		n.unroute();
+		Netplus np = new Netplus(inet, bbRange, n);
+		this.nets.add(np);
+		inet++;
+		
+		SitePinInst source = n.getSource();
+		RoutableNode sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, base_cost_fac);
+		
+		for(SitePinInst sink:n.getSinkPins()){
+			
+			if(this.isExternalConnectionToCout(source, sink)){
+				source = n.getAlternateSource();
+				sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, base_cost_fac);
+			}
+			
+			Connection c = new Connection(icon, source, sink);	
+			c.setSourceRNode(sourceRNode);
+			
+			//create RNode of the sink pin external wire up front 
+			RoutableNode sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.SINKRR, base_cost_fac);
+			
+			c.setSinkRNode(sinkRNode);
+			
+			this.connections.add(c);
+			c.setNet(np);//TODO new and set its TimingEdge for timing-driven version
+			np.addCons(c);
+			icon++;
+		}
+		if(n.getSinkPins().size() == 1)
+			this.fanout1Net++;
+	}
+	
+	public boolean isRegularNetToBeRouted(Net n){
+		return n.getSource() != null && n.getSinkPins().size() > 0;
+	}
+	
+	public boolean isOnePinTypeNetWithoutPips(Net n){
+		return (n.getSource() != null && n.getPins().size() == 1) || (n.getSource() == null && n.getSinkPins().size() > 0 && n.hasPIPs() == false);
+	}
+	
+	public boolean isNetWithInputPinsAndPips(Net n){
+		return n.getSource() == null && n.getSinkPins().size() > 0 && n.hasPIPs() == true;
+	}
+	
+	public boolean isExternalConnectionToCout(SitePinInst source, SitePinInst sink){
+		return source.getName().equals("COUT") && (!sink.getName().equals("CIN"));
+	}
+	
+	public void reservePipsOfNet(Net n){
+		for(PIP pip:n.getPIPs()){
+			Node nodeStart = pip.getStartNode();
+			this.createRoutableNodeAndAdd(this.rrgNodeId, nodeStart, RoutableType.RESERVED, Float.MAX_VALUE - 1);
+			
+			Node nodeEnd = pip.getEndNode();
+			this.createRoutableNodeAndAdd(this.rrgNodeId, nodeEnd, RoutableType.RESERVED, Float.MAX_VALUE - 1);
+		}
+	}
+	
+	public void reserveConnectedNodesOfNetPins(Net n){
+		for(SitePinInst pin:n.getPins()){
+			Node node = pin.getConnectedNode();
+			this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.RESERVED, Float.MAX_VALUE - 1);			
+		}
+	}
+	
+	public void createRoutableNodeAndAdd(int globalIndex, Node node, RoutableType type, float base_cost_fac){
+		RoutableNode rrgNode = new RoutableNode(globalIndex, node, type);
+		rrgNode.setBaseCost(base_cost_fac);
+		this.rnodesCreated.put(node, rrgNode);
+		this.rrgNodeId++;
+	}
+
+	public RoutableNode createRoutableNodeAndAdd(int globalIndex, SitePinInst pin, RoutableType type, float base_cost_fac){
+		RoutableNode rrgNode = new RoutableNode(rrgNodeId, pin, type);
+		rrgNode.setBaseCost(base_cost_fac);
+		this.rnodesCreated.put(rrgNode.getNode(), rrgNode);
+		this.rrgNodeId++;
+		
+		return rrgNode;
+	}
+	
 	public void initializeRouter(float initial_pres_fac, float pres_fac_mult, float acc_fac){
 		this.rnodesTouched.clear();
     	this.queue.clear();
@@ -653,6 +700,7 @@ public class RoutableNodeRouter{
 	
 	public List<PIP> conPIPs(Connection con){
 		List<PIP> conPIPs = new ArrayList<>();
+//		System.out.println(con.getNet().getNet().getName() + " " + con.toString());
 		
 		for(int i = con.rnodes.size() -1; i > 0; i--){
 			Node nodeFormer = ((RoutableNode) (con.rnodes.get(i))).getNode();
@@ -661,6 +709,7 @@ public class RoutableNodeRouter{
 			Wire pipStartWire = this.findEndWireOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
 			
 			if(pipStartWire != null){
+				//TODO bug fixing
 				PIP pip = new PIP(nodeLatter.getTile(), pipStartWire.getWireIndex(), nodeLatter.getWire());
 				conPIPs.add(pip);
 			}else{
@@ -727,6 +776,7 @@ public class RoutableNodeRouter{
 		}else{//dealing with null pointer exception
 			System.out.println("queue is empty");
 			System.out.println("Expanded nodes: " + this.nodesExpanded);
+			System.out.println(con.getNet().getNet().getName());
 			System.out.println(con.toString());
 			throw new RuntimeException("Queue is empty: target unreachable?");
 		}

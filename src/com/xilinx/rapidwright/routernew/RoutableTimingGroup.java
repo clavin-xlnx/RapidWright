@@ -32,6 +32,7 @@ public class RoutableTimingGroup implements Routable{
 		this.type = type;
 		this.timingGroup =  new TimingGroup(sitePinInst, tmodel);
 		if(this.timingGroup == null) System.out.println("null timing group");
+		System.out.println(this.timingGroup.getNodes().size());
 		this.rnodeData = new RoutableData(this.index);
 		this.target = false;
 		this.childrenSet = false;
