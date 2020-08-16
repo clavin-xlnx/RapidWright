@@ -19,7 +19,6 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SitePin;
->>>>>>> de3c0f2b7e89f4f8c9e379b07ae6a9d6f969a4d3
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -133,9 +132,6 @@ public class RouteThruHelper {
             }
         }        
     }
-    
-    public static void main(String[] args) {
-        RouteThruHelper rtHelper = new RouteThruHelper(Device.getDevice(Device.AWS_F1));
 
     public static boolean isRouteThruPIPAvailable(Design design, PIP routethru) {
         if(!routethru.isRouteThru()) return false;
