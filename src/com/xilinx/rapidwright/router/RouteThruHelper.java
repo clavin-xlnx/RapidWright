@@ -10,6 +10,16 @@ import com.esotericsoftware.kryo.unsafe.UnsafeOutput;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SitePin;
+>>>>>>> de3c0f2b7e89f4f8c9e379b07ae6a9d6f969a4d3
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -127,6 +137,33 @@ public class RouteThruHelper {
     public static void main(String[] args) {
         RouteThruHelper rtHelper = new RouteThruHelper(Device.getDevice(Device.AWS_F1));
 
+    public static boolean isRouteThruPIPAvailable(Design design, PIP routethru) {
+        if(!routethru.isRouteThru()) return false;
+        return isRouteThruPIPAvailable(design, routethru.getStartWire(), routethru.getEndWire());
+    }
+    
+    public static boolean isRouteThruPIPAvailable(Design design, Wire start, Wire end) {
+        SitePin outPin = end.getSitePin();
+        if(outPin == null) return false;
+        SiteInst siteInst = design.getSiteInstFromSite(outPin.getSite());
+        if(siteInst == null) return true;
+        Net outputNetCollision = siteInst.getNetFromSiteWire(outPin.getBELPin().getSiteWireName());
+        if(outputNetCollision != null) return false;
+        SitePin inPin = start.getSitePin();
+        BELPin belPin = inPin.getBELPin();
+        Net inputNetCollision = siteInst.getNetFromSiteWire(belPin.getSiteWireName());
+        if(inputNetCollision != null) return false;
+        
+        for(BELPin sink : belPin.getSiteConns()) {
+            Cell collision = siteInst.getCell(sink.getBEL());
+            if(collision != null) return false;
+        }
+        return true;
+    }
+    
+    public static void main(String[] args) {
+        RouteThruHelper rtHelper = new RouteThruHelper(Device.getDevice(Device.AWS_F1));
+        
         //rtHelper.printRouteThrusByTileType();
         
         for(Tile tile : rtHelper.device.getAllTiles()) {
