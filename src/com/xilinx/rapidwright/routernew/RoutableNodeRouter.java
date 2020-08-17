@@ -716,21 +716,10 @@ public class RoutableNodeRouter{
 			if(pip != null){
 				conPIPs.add(pip);
 			}else{
-				System.err.println("pip start wire is null");
+				System.err.println("Null PIP connecting node " + nodeFormer.toString() + " and node " + nodeLatter.toString());
 			}
 		}
 		return conPIPs;
-	}
-	
-	public void checkNullPointerException(NullPointerException e, Connection con, Node nodeFormer, Node nodeLatter){
-		e.printStackTrace();
-		System.out.println("NullPointerException caught from " + con.toString());
-		this.debugRoutingCon = true;
-		this.printConRNodes(con);
-		System.out.println(nodeFormer.toString() + " *!* "
-							+ nodeLatter.getWireName() + " --> " + nodeLatter.toString());
-		Wire pipEndWire = new Wire(nodeLatter.getTile(), nodeLatter.getWire());
-		System.out.println("check base wire of the second node vs. new wire " + pipEndWire.getWireName() + "\n\n");
 	}
 	
 	public PIP findThePIPbetweenTwoNodes(Wire[] nodeFormerWires, Node nodeLatter){

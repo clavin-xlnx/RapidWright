@@ -56,10 +56,10 @@ public class RoutableNode implements Routable{
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
 		for(Node node:allDownHillNodes){
 			//TODO check if CLK_CMT_MUX_3TO1_32_CLK_OUT connected to the target node is included
-			if(this.targetTileOfTheLocalClockNetFound(node, c)){
+			/*if(this.targetTileOfTheLocalClockNetFound(node, c)){
 				System.out.println(routethruHelper.isRouteThru(this.node, node));
 				System.out.println();
-			}
+			}*/
 			//TODO recognize available routethrus
 			if(!routethruHelper.isRouteThru(this.node, node)){//routethrus are forbidden in this way
 				if(!createdRoutable.containsKey(node)){
