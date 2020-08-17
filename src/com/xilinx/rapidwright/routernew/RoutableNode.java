@@ -30,7 +30,6 @@ public class RoutableNode implements Routable{
 	public RoutableNode(int index, SitePinInst sitePinInst, RoutableType type){
 		this.index = index;
 		this.type = type;
-//		System.out.println(sitePinInst.getName());
 		this.node = sitePinInst.getConnectedNode();
 		this.rnodeData = new RoutableData(this.index);
 		this.childrenSet = false;
@@ -52,12 +51,11 @@ public class RoutableNode implements Routable{
 		this.children = new ArrayList<>();
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
 		for(Node node:allDownHillNodes){
+			//TODO check if there is any child node from XIPHY tile
+			/*if(this.targetTileOfTheLocalClockNetFound(node)){
+				System.out.println("target tile found " + node.toString());
+			}*/
 			//TODO recognize available routethrus
-			boolean availableNode = false;
-			boolean isRoutethru = routethruHelper.isRouteThru(this.node, node);
-			BELPin belPin = node.getSitePin() != null ? node.getSitePin().getBELPin() : null;
-			//TODO how to connect BELPin/BEL with a Cell
-			
 			if(!routethruHelper.isRouteThru(this.node, node)){//routethrus are forbidden in this way
 				if(!createdRoutable.containsKey(node)){
 					RoutableNode child;
@@ -67,13 +65,16 @@ public class RoutableNode implements Routable{
 					this.children.add(child);
 					createdRoutable.put(node, child);
 				}else{
-
 					this.children.add(createdRoutable.get(node));//the sink routable of a target has been created up-front 
 				}
 			}
 		}
 		this.childrenSet = true;
 		return globalIndex++;
+	}
+	
+	public boolean targetTileOfTheLocalClockNetFound(Node node){
+		return node.getTile().getName().equals("XIPHY_L_X63Y120");
 	}
 	
 	//TODO how to efficiently check if the routethru is available
@@ -221,19 +222,20 @@ public class RoutableNode implements Routable{
 		}
 		
 		StringBuilder s = new StringBuilder();
-		s.append("RNode " + this.index + " ");
-		s.append(String.format("%-23s", coordinate));
-		s.append(String.format("basecost = %.2e", this.base_cost));
+		s.append("node " + this.node.toString());
 		s.append(", ");
-		s.append(String.format("capacity = %d", Routable.capacity));
-		s.append(", ");
-		s.append(String.format("occupation = %d", this.rnodeData.getOccupation()));
-		s.append(", ");
-		s.append(String.format("num_unique_sources = %d", this.rnodeData.numUniqueSources()));
-		s.append(", ");
-		s.append(String.format("num_unique_parents = %d", this.rnodeData.numUniqueParents()));
-		s.append(", ");
-		s.append(String.format("level = %d", this.rnodeData.getLevel()));
+		s.append(coordinate);
+//		s.append(String.format("basecost = %.2e", this.base_cost));
+//		s.append(", ");
+//		s.append(String.format("capacity = %d", Routable.capacity));
+//		s.append(", ");
+//		s.append(String.format("occupation = %d", this.rnodeData.getOccupation()));
+//		s.append(", ");
+//		s.append(String.format("num_unique_sources = %d", this.rnodeData.numUniqueSources()));
+//		s.append(", ");
+//		s.append(String.format("num_unique_parents = %d", this.rnodeData.numUniqueParents()));
+//		s.append(", ");
+//		s.append(String.format("level = %d", this.rnodeData.getLevel()));
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		

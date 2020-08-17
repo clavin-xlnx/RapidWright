@@ -176,7 +176,15 @@ public class RoutableNodeRouter{
 			
 			if(this.isExternalConnectionToCout(source, sink)){
 				source = n.getAlternateSource();
-				sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, base_cost_fac);
+				try{
+					if(source != null){
+						sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, base_cost_fac);
+					}else{
+						System.out.println("net alterNative source is null: " + n.toStringFull());
+					}
+				}catch(NullPointerException e){
+					e.printStackTrace();
+				}
 			}
 			
 			Connection c = new Connection(icon, source, sink);	
@@ -297,14 +305,14 @@ public class RoutableNodeRouter{
 		boolean validRouting;
         List<Netplus> trialNets = new ArrayList<>();
         for(Netplus net : this.sortedListOfNetplus){
-        	if(net.getId() == 417){
+        	if(net.getId() == 49945){
         		trialNets.add(net);
 //        		System.out.println(net.getNet().getName());
         	}
         }
         List<Connection> trialCons = new ArrayList<>();
         for(Connection con : this.sortedListOfConnection){
-        	if(con.id == 1216){
+        	if(con.id == 113819){
         		trialCons.add(con);
         	}
         }
@@ -329,9 +337,9 @@ public class RoutableNodeRouter{
 					}
 				}
 			}else{
-				for(Netplus np : trialNets){
-					for(Connection c : np.getConnection()){
-//					for(RConnection c : trialCons){
+//				for(Netplus np : trialNets){
+//					for(Connection c : np.getConnection()){
+					for(Connection c : trialCons){
 						if(this.itry == 1){
 							this.routerTimer.firstIteration.start();
 							this.routeACon(c);
@@ -343,7 +351,7 @@ public class RoutableNodeRouter{
 							this.routeACon(c);
 							this.routerTimer.rerouteCongestion.finish();
 						}
-					}	
+//					}	
 				}
 			}
 		
@@ -700,23 +708,37 @@ public class RoutableNodeRouter{
 	
 	public List<PIP> conPIPs(Connection con){
 		List<PIP> conPIPs = new ArrayList<>();
-//		System.out.println(con.getNet().getNet().getName() + " " + con.toString());
 		
+		//nodes of a connection are added starting from the sink until the source
 		for(int i = con.rnodes.size() -1; i > 0; i--){
 			Node nodeFormer = ((RoutableNode) (con.rnodes.get(i))).getNode();
 			Node nodeLatter = ((RoutableNode) (con.rnodes.get(i-1))).getNode();
 			
 			Wire pipStartWire = this.findEndWireOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
-			
-			if(pipStartWire != null){
-				//TODO bug fixing
-				PIP pip = new PIP(nodeLatter.getTile(), pipStartWire.getWireIndex(), nodeLatter.getWire());
-				conPIPs.add(pip);
-			}else{
-				System.out.println("pip start wire is null");
-			}			
+			try{
+				if(pipStartWire != null){
+					//TODO bug fixing
+					PIP pip = new PIP(nodeLatter.getTile(), pipStartWire.getWireIndex(), nodeLatter.getWire());
+					conPIPs.add(pip);
+				}else{
+					System.out.println("pip start wire is null");
+				}
+			}catch(NullPointerException e){
+				this.checkNullPointerException(e, con, pipStartWire, nodeFormer, nodeLatter);
+			}
 		}
 		return conPIPs;
+	}
+	
+	public void checkNullPointerException(NullPointerException e, Connection con, Wire pipStartWire, Node nodeFormer, Node nodeLatter){
+		e.printStackTrace();
+		System.out.println("NullPointerException caught from " + con.toString());
+		this.debugRoutingCon = true;
+		this.printConRNodes(con);
+		System.out.println(nodeFormer.toString() + " --> " + pipStartWire.getWireName() + " *!* "
+							+ nodeLatter.getWireName() + " --> " + nodeLatter.toString());
+		Wire pipEndWire = new Wire(nodeLatter.getTile(), nodeLatter.getWire());
+		System.out.println("check base wire of the second node vs. new wire " + pipEndWire.getWireName() + "\n\n");
 	}
 	
 	public Wire findEndWireOfNode(Wire[] wires, Tile tile){
@@ -914,6 +936,7 @@ public class RoutableNodeRouter{
 			data.setPrev(rnode);
 			if(rnode != null) data.setLevel(rnode.rnodeData.getLevel()+1);
 			this.queue.add(new QueueElement(childRNode, new_lower_bound_total_path_cost));
+			if(this.debugExpansion) this.printInfo("\t\t node added, queue size = " + this.queue.size());
 		}
 	}
 	
