@@ -13,7 +13,7 @@ import com.xilinx.rapidwright.timing.TimingModel;
 
 public class RoutableTimingGroup implements Routable{
 	public int index;
-	private TimingGroup timingGroup;
+	private List<TimingGroup> timingGroups;
 	public RoutableType type;
 	
 	public short xlow, xhigh;
@@ -30,39 +30,41 @@ public class RoutableTimingGroup implements Routable{
 	public RoutableTimingGroup(int index, SitePinInst sitePinInst, RoutableType type, TimingModel tmodel){
 		this.index = index;
 		this.type = type;
-		this.timingGroup =  new TimingGroup(sitePinInst, tmodel);
-		if(this.timingGroup == null) System.out.println("null timing group");
-		System.out.println(this.timingGroup.getNodes().size());
+		//TODO source pin only
+		this.timingGroups.add(new TimingGroup(sitePinInst, tmodel));
+		
 		this.rnodeData = new RoutableData(this.index);
 		this.target = false;
 		this.childrenSet = false;
 		this.setXY();
 	}
 	
-	public RoutableTimingGroup(int index, TimingGroup timingGroup){
+	public RoutableTimingGroup(int index, List<TimingGroup> timingGroups){
 		this.index = index;
 		this.type = RoutableType.INTERRR;
-		this.timingGroup = timingGroup;
+		this.timingGroups = timingGroups;
 		this.rnodeData = new RoutableData(this.index);
 		this.target= false;
 		this.childrenSet = false;	
 		this.setXY();
 	}
 	
-	public int setChildren(int globalIndex, float base_cost_fac, Map<TimingGroup, RoutableTimingGroup> createdRoutable){
+	public int setChildren(int globalIndex, float base_cost_fac, Map<Node, RoutableTimingGroup> createdRoutable){
 		this.children = new ArrayList<>();
-		for(TimingGroup timingGroup:this.timingGroup.getNextTimingGroups()){
+		
+		for(List<TimingGroup> tGroups:this.timingGroups.get(0).getNextSiblingTimingGroups()){
 			RoutableTimingGroup childRNode;
-			//TimingGroup toString/hashCode is not unique,
-			if(!createdRoutable.containsKey(timingGroup)){
-				childRNode = new RoutableTimingGroup(globalIndex, timingGroup);
+			//the last node of timing group siblings is unique, used as the key
+			Node key = tGroups.get(0).getLastNode();
+			if(!createdRoutable.containsKey(key)){
+				childRNode = new RoutableTimingGroup(globalIndex, tGroups);
 				childRNode.setBaseCost(base_cost_fac);
 				globalIndex++;
 				children.add(childRNode);
-				createdRoutable.put(timingGroup, childRNode);
+				createdRoutable.put(key, childRNode);
 			}else{
-				children.add(createdRoutable.get(timingGroup));
-				System.out.println("created up-front " + createdRoutable.get(timingGroup).type);
+				children.add(createdRoutable.get(key));
+				System.out.println("created up-front " + createdRoutable.get(key).type);
 			}
 		}
 		
@@ -110,8 +112,10 @@ public class RoutableTimingGroup implements Routable{
 	public void setXY() {
 		
 		List<Wire> wiresInTG = new ArrayList<>();
-		for(Node node:this.timingGroup.getNodes()){
-			wiresInTG.addAll(Arrays.asList(node.getAllWiresInNode()));
+		for(TimingGroup tg:this.timingGroups){
+			for(Node node:tg.getNodes()){
+				wiresInTG.addAll(Arrays.asList(node.getAllWiresInNode()));
+			}
 		}
 		int length = wiresInTG.size();
 		short[] xCoordinates = new short[length];
@@ -226,7 +230,7 @@ public class RoutableTimingGroup implements Routable{
 		s.append("RNode " + this.index + " ");
 		s.append(String.format("%-11s", coordinate));
 		s.append(",");
-		s.append(this.timingGroup.getLastNode().toString());
+		s.append(this.timingGroups.get(0).getLastNode().toString());
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		
@@ -256,7 +260,7 @@ public class RoutableTimingGroup implements Routable{
 		s.append(", ");
 		s.append(String.format("level = %d", this.rnodeData.getLevel()));
 		s.append(",");
-		s.append(this.timingGroup.getLastNode().toString());
+		s.append(this.timingGroups.get(0).getLastNode().toString());
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		
@@ -299,8 +303,8 @@ public class RoutableTimingGroup implements Routable{
 		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
 	}
 
-	public TimingGroup getTimingGroup() {
-		return this.timingGroup;
+	public List<TimingGroup> getTimingGroup() {
+		return this.timingGroups;
 	}
 	
 	@Override

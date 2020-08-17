@@ -1,13 +1,17 @@
 package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
@@ -47,14 +51,15 @@ public class RoutableNode implements Routable{
 		this.setXY();
 	}
 	
-	public int setChildren(int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable, RouteThruHelper routethruHelper){
+	public int setChildren(Connection c, int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable, RouteThruHelper routethruHelper){
 		this.children = new ArrayList<>();
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
 		for(Node node:allDownHillNodes){
-			//TODO check if there is any child node from XIPHY tile
-			/*if(this.targetTileOfTheLocalClockNetFound(node)){
-				System.out.println("target tile found " + node.toString());
-			}*/
+			//TODO check if CLK_CMT_MUX_3TO1_32_CLK_OUT connected to the target node is included
+			if(this.targetTileOfTheLocalClockNetFound(node, c)){
+				System.out.println(routethruHelper.isRouteThru(this.node, node));
+				System.out.println();
+			}
 			//TODO recognize available routethrus
 			if(!routethruHelper.isRouteThru(this.node, node)){//routethrus are forbidden in this way
 				if(!createdRoutable.containsKey(node)){
@@ -73,8 +78,28 @@ public class RoutableNode implements Routable{
 		return globalIndex++;
 	}
 	
-	public boolean targetTileOfTheLocalClockNetFound(Node node){
-		return node.getTile().getName().equals("XIPHY_L_X63Y120");
+	public boolean targetTileOfTheLocalClockNetFound(Node node, Connection c){
+		boolean foundTargetTile = node.getTile().getName().equals("XIPHY_L_X63Y120");
+		
+		if(foundTargetTile){
+			Tile tile = node.getTile();
+			Set<Node> allNodesInTile = new HashSet<>();
+			
+			for(PIP pip:tile.getPIPs()){
+				Node nodeStart = pip.getStartNode();
+				allNodesInTile.add(nodeStart);
+				Node nodeEnd = pip.getEndNode();
+				allNodesInTile.add(nodeEnd);
+			}
+			
+			Node targetNode = ((RoutableNode)c.getSinkRNode()).getNode();
+			for(Node n:targetNode.getAllUphillNodes()){
+				System.out.println(n.toString());
+			}
+		}
+		
+		
+		return foundTargetTile;
 	}
 	
 	//TODO how to efficiently check if the routethru is available

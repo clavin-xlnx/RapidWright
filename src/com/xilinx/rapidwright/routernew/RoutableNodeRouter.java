@@ -125,7 +125,8 @@ public class RoutableNodeRouter{
 	}
 	
 	public int initializeNetsCons(short bbRange, float base_cost_fac){
-			
+		this.inet = 0;
+		this.icon = 0;
 		this.nets = new ArrayList<>();
 		this.connections = new ArrayList<>();
 		
@@ -814,7 +815,7 @@ public class RoutableNodeRouter{
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, this.routethruHelper);
+				this.rrgNodeId = rnode.setChildren(con, this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, this.routethruHelper);
 			}
 			this.routerTimer.rnodesCreation.finish();
 			
