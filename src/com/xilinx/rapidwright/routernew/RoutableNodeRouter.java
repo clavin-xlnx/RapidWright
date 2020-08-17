@@ -289,15 +289,7 @@ public class RoutableNodeRouter{
 	}
 	
 	public void route(){
-		
-		//sorted nets and connections
-		this.sortedListOfConnection = new ArrayList<>();
-		this.sortedListOfConnection.addAll(this.connections);
-		Collections.sort(this.sortedListOfConnection, Comparators.FanoutBBConnection);	
-		
-		this.sortedListOfNetplus = new ArrayList<>();
-		this.sortedListOfNetplus.addAll(this.nets);
-		Collections.sort(this.sortedListOfNetplus, Comparators.FanoutNet);
+		this.sortNetsAndConnections();
 		
 		//initialize router
 		this.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
@@ -308,9 +300,9 @@ public class RoutableNodeRouter{
         for(Netplus net : this.sortedListOfNetplus){
         	if(net.getId() == 49945){
         		trialNets.add(net);
-//        		System.out.println(net.getNet().getName());
         	}
         }
+        
         List<Connection> trialCons = new ArrayList<>();
         for(Connection con : this.sortedListOfConnection){
         	if(con.id == 113819){
@@ -327,33 +319,15 @@ public class RoutableNodeRouter{
 			
 			if(!this.trial){
 				for(Connection con:this.sortedListOfConnection){
-					if(this.itry == 1){
-						this.routerTimer.firstIteration.start();
-						this.routeACon(con);
-						this.routerTimer.firstIteration.finish();
-					}else if(con.congested()){
-						this.routerTimer.rerouteCongestion.start();
-						this.routeACon(con);
-						this.routerTimer.rerouteCongestion.finish();
-					}
+					this.routingAndTimer(con);
 				}
 			}else{
 //				for(Netplus np : trialNets){
 //					for(Connection c : np.getConnection()){
 					for(Connection c : trialCons){
-						if(this.itry == 1){
-							this.routerTimer.firstIteration.start();
-							this.routeACon(c);
-							this.routerTimer.firstIteration.finish();
-						}else if(c.congested()){
-							this.routerTimer.rerouteCongestion.start();
-							/*this.router.debugExpansion = true;
-							this.router.debugRoutingCon = true;*/
-							this.routeACon(c);
-							this.routerTimer.rerouteCongestion.finish();
-						}
-//					}	
-				}
+						this.routingAndTimer(c);
+					}	
+//				}
 			}
 		
 			//check if routing is valid
@@ -404,6 +378,29 @@ public class RoutableNodeRouter{
 		}
 		
 		return;
+	}
+	
+	public void routingAndTimer(Connection con){
+		if(this.itry == 1){
+			this.routerTimer.firstIteration.start();
+			this.routeACon(con);
+			this.routerTimer.firstIteration.finish();
+		}else if(con.congested()){
+			this.routerTimer.rerouteCongestion.start();
+			this.routeACon(con);
+			this.routerTimer.rerouteCongestion.finish();
+		}
+	}
+	
+	public void sortNetsAndConnections(){
+		//sorted nets and connections
+		this.sortedListOfConnection = new ArrayList<>();
+		this.sortedListOfConnection.addAll(this.connections);
+		Collections.sort(this.sortedListOfConnection, Comparators.FanoutBBConnection);	
+		
+		this.sortedListOfNetplus = new ArrayList<>();
+		this.sortedListOfNetplus.addAll(this.nets);
+		Collections.sort(this.sortedListOfNetplus, Comparators.FanoutNet);
 	}
 	
 	public boolean isValidRouting(){
@@ -715,42 +712,38 @@ public class RoutableNodeRouter{
 			Node nodeFormer = ((RoutableNode) (con.rnodes.get(i))).getNode();
 			Node nodeLatter = ((RoutableNode) (con.rnodes.get(i-1))).getNode();
 			
-			Wire pipStartWire = this.findEndWireOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
-			try{
-				if(pipStartWire != null){
-					//TODO bug fixing
-					PIP pip = new PIP(nodeLatter.getTile(), pipStartWire.getWireIndex(), nodeLatter.getWire());
-					conPIPs.add(pip);
-				}else{
-					System.out.println("pip start wire is null");
-				}
-			}catch(NullPointerException e){
-				this.checkNullPointerException(e, con, pipStartWire, nodeFormer, nodeLatter);
+			PIP pip = this.findThePIPbetweenTwoNodes(nodeFormer.getAllWiresInNode(), nodeLatter);
+			if(pip != null){
+				conPIPs.add(pip);
+			}else{
+				System.err.println("pip start wire is null");
 			}
 		}
 		return conPIPs;
 	}
 	
-	public void checkNullPointerException(NullPointerException e, Connection con, Wire pipStartWire, Node nodeFormer, Node nodeLatter){
+	public void checkNullPointerException(NullPointerException e, Connection con, Node nodeFormer, Node nodeLatter){
 		e.printStackTrace();
 		System.out.println("NullPointerException caught from " + con.toString());
 		this.debugRoutingCon = true;
 		this.printConRNodes(con);
-		System.out.println(nodeFormer.toString() + " --> " + pipStartWire.getWireName() + " *!* "
+		System.out.println(nodeFormer.toString() + " *!* "
 							+ nodeLatter.getWireName() + " --> " + nodeLatter.toString());
 		Wire pipEndWire = new Wire(nodeLatter.getTile(), nodeLatter.getWire());
 		System.out.println("check base wire of the second node vs. new wire " + pipEndWire.getWireName() + "\n\n");
 	}
 	
-	public Wire findEndWireOfNode(Wire[] wires, Tile tile){
-		Wire w = null;
-		for(Wire wire:wires){
-			if(wire.getTile().equals(tile)){
-				w = wire;
-				break;
+	public PIP findThePIPbetweenTwoNodes(Wire[] nodeFormerWires, Node nodeLatter){
+		PIP pip = null;
+		Tile pipTile = nodeLatter.getTile();
+		int wire1 = nodeLatter.getWire();
+		for(Wire wire:nodeFormerWires){
+			pip = pipTile.getPIP(wire.getWireIndex(), wire1);
+			if(pip != null){
+				 break;
 			}
 		}
-		return w;
+		return pip;
 	}
 	
 	public void findAverBaseCosts(){

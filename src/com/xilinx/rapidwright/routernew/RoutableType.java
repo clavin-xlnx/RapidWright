@@ -1,6 +1,8 @@
 package com.xilinx.rapidwright.routernew;
 
 public enum RoutableType {
-	SOURCERR, SINKRR,
-	INTERRR, RESERVED
+	SOURCERR,
+	SINKRR,
+	INTERRR,
+	RESERVED
 }

@@ -14,7 +14,7 @@ public class Main {
 	private CodePerfTracker t;
 	
 	private boolean routerNew = true;
-	private RoutingGranularityOpt opt = RoutingGranularityOpt.ROUTABLENODE;
+	private RoutingGranularityOpt opt = RoutingGranularityOpt.NODE;
 	
 	//allowed number of routing iterations
 	private int nrOfTrials = 100;
@@ -45,11 +45,11 @@ public class Main {
 				
 				short optNum = Short.parseShort(arguments[++i]);
 				if(optNum == 3){
-					this.opt = RoutingGranularityOpt.ROUTABLETIMINGGROUP;
+					this.opt = RoutingGranularityOpt.TIMINGGROUP;
 				}else if(optNum == 2){
-					this.opt = RoutingGranularityOpt.ROUTABLENODE;
+					this.opt = RoutingGranularityOpt.NODE;
 				}else if(optNum == 1){
-					this.opt = RoutingGranularityOpt.ROUTABLEWIRE;
+					this.opt = RoutingGranularityOpt.WIRE;
 				}
 				
 			}else if(arguments[i].contains("bbRange")){
@@ -107,7 +107,7 @@ public class Main {
 			router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
 			
 		}else{			
-			if(this.opt == RoutingGranularityOpt.ROUTABLENODE){
+			if(this.opt == RoutingGranularityOpt.NODE){
 				RoutableNodeRouter router = new RoutableNodeRouter(this.design, 
 						this.toWriteDCPfileName,
 						this.nrOfTrials,
@@ -146,7 +146,7 @@ public class Main {
 						router.nodesExpanded,
 						router.routerTimer);
 				
-			}else if(this.opt == RoutingGranularityOpt.ROUTABLEWIRE){
+			}else if(this.opt == RoutingGranularityOpt.WIRE){
 				RoutableWireRouter router = new RoutableWireRouter(this.design, 
 						this.toWriteDCPfileName,
 						this.nrOfTrials,
@@ -185,7 +185,7 @@ public class Main {
 						router.nodesExpanded,
 						router.routerTimer);
 				
-			}else if(this.opt == RoutingGranularityOpt.ROUTABLETIMINGGROUP){
+			}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
 				RoutableTimingGroupRouter router = new RoutableTimingGroupRouter(this.design, 
 						this.toWriteDCPfileName,
 						this.nrOfTrials,
@@ -286,9 +286,9 @@ public class Main {
 		System.out.printf("Rnodes created 1st iter: %d\n", firstIterRNodes);
 		System.out.printf("Total rnodes created: %d\n", totalRNodes);
 		System.out.printf("Total rnodes used: %d\n", totalUsage);
-		if(this.opt == RoutingGranularityOpt.ROUTABLENODE){
+		if(this.opt == RoutingGranularityOpt.NODE){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
-		}else if(this.opt == RoutingGranularityOpt.ROUTABLETIMINGGROUP){
+		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #node in rnodes: %5.2f\n", averNode);
 		}
