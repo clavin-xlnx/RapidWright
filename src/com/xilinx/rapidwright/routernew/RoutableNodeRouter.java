@@ -727,10 +727,12 @@ public class RoutableNodeRouter{
 		Tile pipTile = nodeLatter.getTile();
 		int wire1 = nodeLatter.getWire();
 		for(Wire wire:nodeFormerWires){
-			pip = pipTile.getPIP(wire.getWireIndex(), wire1);
-			if(pip != null){
-				 break;
-			}
+			if(wire.getTile().equals(pipTile)){
+				pip = pipTile.getPIP(wire.getWireIndex(), wire1);
+				if(pip != null){
+					 break;
+				}
+			}	
 		}
 		return pip;
 	}
