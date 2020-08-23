@@ -14,11 +14,10 @@ public class Connection{
 	public Netplus net;
     public final short boundingBox;
 	
-	public final String sourceName;
-	
 	private Routable sourceRNode;
 	private Routable sinkRNode;
 	public List<Routable> rnodes;
+	public List<Routable> pathFromSinkToSwitchBox;
 	
 	public Connection(int id, SitePinInst source, SitePinInst sink){
 		this.id = id;
@@ -27,7 +26,6 @@ public class Connection{
 		this.sink = sink;
 		
 		this.boundingBox = this.calculateBoundingBox();
-		this.sourceName = this.source.getName();
 		
 		this.rnodes = new ArrayList<>();
 	}
@@ -74,6 +72,14 @@ public class Connection{
 		this.rnodes.clear();
 	}
 	
+	public void addPartialPath(Routable routable){
+		if(this.pathFromSinkToSwitchBox == null){
+			this.pathFromSinkToSwitchBox = new ArrayList<>();
+			this.pathFromSinkToSwitchBox.add(routable);
+		}else{
+			this.pathFromSinkToSwitchBox.add(routable);
+		}
+	}
 	
 	public Routable getSourceRNode() {
 		return sourceRNode;
@@ -155,7 +161,7 @@ public class Connection{
 		s.append(", ");
 		s.append(String.format("%22s", coordinate));
 		s.append(", ");
-		s.append(String.format("net = %5s", this.net.getId()));
+		s.append(String.format("net = %s", this.net.getNet().getName()));
 		s.append(", ");
 		s.append(String.format("net fanout = %3s", this.net.fanout));
 		s.append(", ");

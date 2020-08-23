@@ -29,7 +29,7 @@ public class Netplus{
 		this.net = net;
 		this.type = net.getType();
 		this.connections = new ArrayList<>();
-		this.fanout = (short) this.net.getFanOut();
+		this.fanout = (short) this.net.getFanOut();//getSinkPins().size();
 		this.getBoundingXYs(net);
 	}
 	
@@ -41,7 +41,7 @@ public class Netplus{
 		short x_geo_sum = 0;
 		short y_geo_sum = 0;
 		
-		short numPins = (short) (net.getFanOut() + 1);
+		short numPins = (short) (this.net.getFanOut() + 1); //(net.getPins().size());
 		
 		short[] xArray = new short[numPins];
 		short[] yArray = new short[numPins];

@@ -37,7 +37,7 @@ public class RoutableTimingGroupRouter{
 	public int inet;
 	public int icon;
 	
-//	public Map<Net, List<Node>> netsReservedNodes;
+	public Set<Node> reservedNodes;
 	public PriorityQueue<QueueElement> queue;
 	public Collection<RoutableData> rnodesTouched;
 	public Map<Node, RoutableTimingGroup> rnodesCreated;//node and rnode pair
@@ -74,10 +74,12 @@ public class RoutableTimingGroupRouter{
 	
 	public long hops;
 	public float manhattanD;
+	public float averWire;
+	public float averNode;
 	
-	public boolean trial = true;
-	public boolean debugRoutingCon = true;
-	public boolean debugExpansion = true;
+	public boolean trial = false;
+	public boolean debugRoutingCon = false;
+	public boolean debugExpansion = false;
 	
 	public RoutableTimingGroupRouter(Design design,
 			String dcpFileName,
@@ -97,6 +99,7 @@ public class RoutableTimingGroupRouter{
 		TimingManager tm = new TimingManager(this.design);
 		this.timingModel = tm.getTimingModel();
 		
+		this.reservedNodes = new HashSet<>();
 		this.rnodesCreated = new HashMap<>();
 		this.dcpFileName = dcpFileName;
 		this.nrOfTrials = nrOfTrials;
@@ -133,7 +136,7 @@ public class RoutableTimingGroupRouter{
 		this.connections = new ArrayList<>();
 		
 		DesignTools.createMissingSitePinInsts(this.design);
-		//TODO source pin only for creating a timing group using a sitePinInst
+		//source pin only for creating a timing group using a sitePinInst
 		for(Net n:this.design.getNets()){
 			
 			if(n.isClockNet() || n.isStaticNet()){
@@ -167,22 +170,59 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public void reservePipsOfNet(Net n){
-		//TODO
 		for(PIP pip:n.getPIPs()){
-			
+			Node nodeStart = pip.getStartNode();
+			this.addReservedNode(nodeStart);
+			Node nodeEnd = pip.getEndNode();
+			this.addReservedNode(nodeEnd);
 		}
 	}
 	
 	public void reserveConnectedNodesOfNetPins(Net n){
-		//TODO
+		for(SitePinInst pin:n.getPins()){
+			Node node = pin.getConnectedNode();
+			this.addReservedNode(node);
+		}
+	}
+	
+	public void addReservedNode(Node node){
+		this.reservedNodes.add(node);
 	}
 	
 	public boolean isRegularNetToBeRouted(Net n){
 		return n.getSource() != null && n.getSinkPins().size() > 0;
 	}
 	public void initializeNetAndCons(Net n, short bbRange){
-		//TODO
+		n.unroute();
+		Netplus np = new Netplus(inet, bbRange, n);
+		this.nets.add(np);
+		inet++;
+		
+		SitePinInst source = n.getSource();
+		RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
+		for(SitePinInst sink:n.getSinkPins()){
+			if(RouterHelper.isExternalConnectionToCout(source, sink)){
+				source = n.getAlternateSource();
+				if(source == null){
+					String errMsg = "net alterNative source is null: " + n.toStringFull();
+					 throw new IllegalArgumentException(errMsg);
+				}
+				sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
+			}
+			
+			Connection c = new Connection(icon, source, sink);	
+			c.setSourceRNode(sourceRNode);
+			
+			RoutableTimingGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.SINKRR, this.timingModel, this.base_cost_fac);
+			c.setSinkRNode(sinkRNode);
+			this.connections.add(c);
+			c.setNet(np);
+			np.addCons(c);
+			icon++;
+		}
+		if(n.getSinkPins().size() == 1) this.fanout1Net++;
 	}
+	
 	public boolean isOnePinTypeNetWithoutPips(Net n){
 		return (n.getSource() != null && n.getPins().size() == 1) || (n.getSource() == null && n.getSinkPins().size() > 0 && n.hasPIPs() == false);
 	}
@@ -191,72 +231,12 @@ public class RoutableTimingGroupRouter{
 		return n.getSource() == null && n.getSinkPins().size() > 0 && n.hasPIPs() == true;
 	}
 	
-	public void findNodesConflicts(){
-		Map<Node, Integer> nodesUsage = new HashMap<>();
-		Map<Net, Set<Node>> netNodes = new HashMap<>();
-
-		for(Net net:this.design.getNets()){
-			
-			Set<Node> nodes = new HashSet<>();
-			
-			if(net.hasPIPs()){
-				for(PIP p: net.getPIPs()){
-					Node startNode = p.getStartNode();
-					if(!nodesUsage.containsKey(startNode)){
-						nodesUsage.put(startNode, 1);
-
-					}else{
-						nodesUsage.put(startNode, nodesUsage.get(startNode) + 1);
-					}
-					nodes.add(startNode);
-					
-					Node endNode = p.getEndNode();
-					if(!nodesUsage.containsKey(endNode)){
-						nodesUsage.put(endNode, 1);
-
-					}else{
-						nodesUsage.put(endNode, nodesUsage.get(endNode) + 1);
-					}
-					nodes.add(endNode);
-				}
-			}else{
-				for(SitePinInst spi:net.getPins()){
-					Node node = spi.getConnectedNode();
-					if(!nodesUsage.containsKey(node)){
-						nodesUsage.put(node, 1);
-					}else{
-						nodesUsage.put(node, nodesUsage.get(node) + 1);
-					}
-					nodes.add(node);
-				}
-			}
-			
-			netNodes.put(net, nodes);
-			
-		}
-		
-		
-		Set<Node> conflictedNodes = new HashSet<>();
-		for(Node node:nodesUsage.keySet()){
-			if(nodesUsage.get(node) > 1){
-				conflictedNodes.add(node);
-			}
-		}
-		
-		Set<Net> conflictedNets = new HashSet<>();
-		for(Net n:netNodes.keySet()){
-			for(Node nn:netNodes.get(n)){
-				if(conflictedNodes.contains(nn)){
-					conflictedNets.add(n);
-				}
-			}
-		}
-		
-		for(Net n : conflictedNets){
-			System.out.println(n.toString());
-		}
-		
-		
+	public RoutableTimingGroup createRoutableNodeAndAdd(int index, SitePinInst sitePinInst, RoutableType type, TimingModel model, float base_cost_fac){
+		RoutableTimingGroup routableTG = new RoutableTimingGroup(index, sitePinInst, type, model);
+		routableTG.setBaseCost(base_cost_fac);
+		this.rnodesCreated.put(sitePinInst.getConnectedNode(), routableTG);
+		this.rrgNodeId++;
+		return routableTG;
 	}
 
 	public void initializeRouter(float initial_pres_fac, float pres_fac_mult, float acc_fac){
@@ -311,7 +291,7 @@ public class RoutableTimingGroupRouter{
 		boolean validRouting;
 		List<Netplus> trialNets = new ArrayList<>();
         for(Netplus net : this.sortedListOfNetplus){
-        	if(net.getNet().getName().equals("n7b5")){
+        	if(net.getNet().getName().equals("n689")){
         		trialNets.add(net);
 //        		System.out.println(net.getNet().getName());
         	}
@@ -332,31 +312,15 @@ public class RoutableTimingGroupRouter{
 			
 			if(!this.trial){
 				for(Connection con:this.sortedListOfConnection){
-					if(this.itry == 1){
-						this.routerTimer.firstIteration.start();
-						this.routeACon(con);
-						this.routerTimer.firstIteration.finish();
-					}else if(con.congested()){
-						this.routerTimer.rerouteCongestion.start();
-						this.routeACon(con);
-						this.routerTimer.rerouteCongestion.finish();
-					}
+					this.routingAndTimer(con);
 				}
 			}else{
 				for(Netplus np : trialNets){
-					for(Connection c : np.getConnection()){
-//				for(Connection c : trialCons){
-						if(this.itry == 1){
-							this.routerTimer.firstIteration.start();
-							this.routeACon(c);
-							this.routerTimer.firstIteration.finish();
-						}else if(c.congested()){
-							this.routerTimer.rerouteCongestion.start();
-							/*this.router.debugExpansion = true;
-							this.router.debugRoutingCon = true;*/
-							this.routeACon(c);
-							this.routerTimer.rerouteCongestion.finish();
-						}
+					for(Connection con : np.getConnection()){
+//				for(Connection con : trialCons){
+//					System.out.println(( (RoutableTimingGroup)(con.getSinkRNode()) ).getTimingGroup().getSiblings().size());
+//					System.out.println(( (RoutableTimingGroup)(con.getSinkRNode()) ).getTimingGroup().getSiblings().get(0).getNodes().size());
+						this.routingAndTimer(con);
 					}	
 				}
 			}
@@ -409,6 +373,18 @@ public class RoutableTimingGroupRouter{
 		}
 		
 		return;
+	}
+	
+	public void routingAndTimer(Connection con){
+		if(this.itry == 1){
+			this.routerTimer.firstIteration.start();
+			this.routeACon(con);
+			this.routerTimer.firstIteration.finish();
+		}else if(con.congested()){
+			this.routerTimer.rerouteCongestion.start();
+			this.routeACon(con);
+			this.routerTimer.rerouteCongestion.finish();
+		}
 	}
 	
 	public boolean isValidRouting(){
@@ -786,7 +762,10 @@ public class RoutableTimingGroupRouter{
 			return this.queue.peek().rnode.isTarget();
 		}else{//dealing with null pointer exception
 			System.out.println("queue is empty");
-			return false;
+			System.out.println("Expanded nodes: " + this.nodesExpanded);
+			System.out.println("net: " + con.getNet().getNet().getName());
+			System.out.println("con: " + con.toString());
+			throw new RuntimeException("Queue is empty: target unreachable?");
 		}
 	}
 
@@ -794,22 +773,16 @@ public class RoutableTimingGroupRouter{
 		this.prepareForRoutingACon(con);
 		if(this.debugRoutingCon) this.printInfo("routing for " + con.toStringTG());
 		
-		System.out.println("target set " + con.getSinkRNode().isTarget() 
-				+ ((RoutableTimingGroup) con.getSinkRNode()).getTimingGroup().get(0).getLastNode().toString());
+		if(this.debugRoutingCon) System.out.println("target set " + con.getSinkRNode().isTarget() + ", "
+				+ ((RoutableTimingGroup) con.getSinkRNode()).getTimingGroup().getSiblings().get(0).getLastNode().toString());
 		
 		while(!this.targetReached(con)){
-			
-			if(this.queue.isEmpty()){
-				System.out.println(this.nodesExpanded);
-				System.out.println(con.getNet().getNet().getName() + " " + con.source.getName() + " " + con.sink.getName());
-				throw new RuntimeException("Queue is empty: target unreachable?");
-			}
 			
 			RoutableTimingGroup rnode = (RoutableTimingGroup) queue.poll().rnode;
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated);
+				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, this.reservedNodes);
 			}
 			this.routerTimer.rnodesCreation.finish();
 			
@@ -864,7 +837,7 @@ public class RoutableTimingGroupRouter{
 		}
 		if(this.debugExpansion) this.printInfo("\t starting  queue size: " + this.queue.size());
 		for(RoutableTimingGroup childRNode:rnode.children){
-			
+			if(this.debugExpansion) this.printInfo("run here and check RNode " + childRNode.toString());
 			if(childRNode.isTarget()){		
 				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
 				this.addNodeToQueue(rnode, childRNode, con);
@@ -992,32 +965,26 @@ public class RoutableTimingGroupRouter{
 		this.addRNodeToQueue(source, null, 0, 0);
 	}
 	
-	public float checkAverageNumWires(){
-		float aver = 0;
-		float sum = 0;
+	public void checkAverageNumWires(){
+		this.averWire = 0;
+		this.averNode = 0;
+		
+		float sumWire = 0;
+		float sumNodes = 0;
+		float numTG = 0;
+		
 		for(RoutableTimingGroup rn:this.rnodesCreated.values()){
-			for(TimingGroup tg:rn.getTimingGroup()){
-				for(Node node:tg.getNodes()){//TODO
-					sum += node.getAllWiresInNode().length;
+			List<TimingGroup> timingGroups = rn.getTimingGroup().getSiblings();
+			numTG += timingGroups.size();
+			for(TimingGroup tg:timingGroups){
+				sumNodes += tg.getNodes().size();
+				for(Node node:tg.getNodes()){
+					sumWire += node.getAllWiresInNode().length;
 				}
 			}		
 		}
-		aver = sum / this.rnodesCreated.values().size();
-		
-		return aver;
-	}
-	
-	public float checkAverageNumNodes(){
-		float aver = 0;
-		float sum = 0;
-		for(RoutableTimingGroup rn:this.rnodesCreated.values()){
-			for(TimingGroup tg:rn.getTimingGroup()){
-				sum += tg.getNodes().size();
-			}		
-		}
-		aver = sum / this.rnodesCreated.values().size();
-		
-		return aver;
+		this.averWire = sumWire / numTG;
+		this.averNode = sumNodes / numTG;
 	}
 	
 	public void printInfo(String s){

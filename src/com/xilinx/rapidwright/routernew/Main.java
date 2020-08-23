@@ -95,7 +95,7 @@ public class Main {
 		if(!this.routerNew){
 			RWRouter router = new RWRouter(this.design);
 			this.t.start("Route Design");
-//			router.routeDesign();
+			router.routeDesign();
 			
 			System.out.println("------------------------------------------------------------------------------");
 			System.out.printf("Find input pin feed took : %10.4f s\n", router.findInputPinFeedTime);
@@ -208,14 +208,15 @@ public class Main {
 				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
 				
 				router.getAllHopsAndManhattanD();
+				router.checkAverageNumWires();
 				
 				this.rnodesInfo(router.manhattanD,
 						router.hops,
 						router.firstIterRNodes,
 						router.rrgNodeId,
 						router.usedRNodes.size(),
-						router.checkAverageNumWires(),
-						router.checkAverageNumNodes());
+						router.averWire,
+						router.averNode);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.itry, 
