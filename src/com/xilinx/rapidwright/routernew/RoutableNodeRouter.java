@@ -12,18 +12,15 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -39,8 +36,12 @@ public class RoutableNodeRouter{
 	public List<Netplus> nets;
 	public List<Connection> connections;
 	public int fanout1Net;
-	public int inet;
-	public int icon;
+	public int inetToBeRouted;
+	public int iconToBeRouted;
+	public int iclockAndStaticNet;
+	public int iWirePinsUnknown;
+	public int iWireOneTypePin;
+	public int iUnknownTypeNet;
 	
 //	public Map<Net, List<Node>> netsReservedNodes;
 	public PriorityQueue<QueueElement> queue;
@@ -133,14 +134,17 @@ public class RoutableNodeRouter{
 	}
 	
 	public int initializeNetsCons(short bbRange, float base_cost_fac){
-		this.inet = 0;
-		this.icon = 0;
+		this.inetToBeRouted = 0;
+		this.iconToBeRouted = 0;
+		this.iclockAndStaticNet = 0;
+		this.iWirePinsUnknown = 0;
+		this.iWireOneTypePin = 0;
+		this.iUnknownTypeNet = 0;
+		
 		this.nets = new ArrayList<>();
 		this.connections = new ArrayList<>();
 		
 		DesignTools.createMissingSitePinInsts(this.design);
-		
-		
 		
 		for(Net n:this.design.getNets()){
 			
@@ -151,24 +155,23 @@ public class RoutableNodeRouter{
 				}else{
 					this.reserveConnectedNodesOfNetPins(n);
 				}
+				this.iclockAndStaticNet++;
 				
 			}else if (n.getType().equals(NetType.WIRE)){
 				
 				if(RouterHelper.isRegularNetToBeRouted(n)){
 					this.initializeNetAndCons(n, bbRange);
 					
-				}else if(RouterHelper.isOnePinTypeNetWithoutPips(n)){
-					this.reserveConnectedNodesOfNetPins(n);//TODO counters keeping record of this
+				}else if(RouterHelper.isOneTypePinNet(n)){
+					this.reserveConnectedNodesOfNetPins(n);
+					this.iWireOneTypePin++;
 					
-				} else if(RouterHelper.isNetWithInputPinsAndPips(n)){//TODO counter for this
-					this.reservePipsOfNet(n);
-					
-				}else{
-					//internally routed within one site / nets without pins
-					if(n.getPins().size() != 0) System.out.println(n.getName() + " " + n.getPins().size());
+				}else if(RouterHelper.isNoPinNets(n)){
+					this.iWirePinsUnknown++;
 				}
 			}else{
-				System.out.println("UNKNOWN type net: " + n.toString());//TODO counter for this
+				this.iUnknownTypeNet++;
+				System.err.println("UNKNOWN type net: " + n.toString());
 			}
 		}
 		
@@ -179,9 +182,9 @@ public class RoutableNodeRouter{
 
 	public void initializeNetAndCons(Net n, short bbRange){
 		n.unroute();
-		Netplus np = new Netplus(inet, bbRange, n);
+		Netplus np = new Netplus(inetToBeRouted, bbRange, n);
 		this.nets.add(np);
-		inet++;
+		inetToBeRouted++;
 		
 		SitePinInst source = n.getSource();
 		RoutableNode sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.base_cost_fac);
@@ -198,7 +201,7 @@ public class RoutableNodeRouter{
 				sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.base_cost_fac);		
 			}
 			
-			Connection c = new Connection(icon, source, sink);	
+			Connection c = new Connection(iconToBeRouted, source, sink);	
 			c.setSourceRNode(sourceRNode);
 			
 			//create RNode of the sink pin external wire up front 
@@ -209,7 +212,7 @@ public class RoutableNodeRouter{
 			this.connections.add(c);
 			c.setNet(np);//TODO new and set its TimingEdge for timing-driven version
 			np.addCons(c);
-			icon++;
+			iconToBeRouted++;
 		}
 		if(n.getSinkPins().size() == 1)
 			this.fanout1Net++;
@@ -462,6 +465,7 @@ public class RoutableNodeRouter{
 			//fix illegal routing trees if any
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
+//				this.debugRoutingCon = true;
 				this.fixIllegalTree(sortedListOfConnection);
 				this.routerTimer.rerouteIllegal.finish();
 			}
@@ -530,6 +534,7 @@ public class RoutableNodeRouter{
 	}
 	
 	public boolean isValidRouting(){
+		if(this.debugRoutingCon) this.printInfo("check valid routing"); 
 		for(RoutableNode rnode:this.rnodesCreated.values()){
 			if(rnode.overUsed()){
 				return false;
@@ -564,6 +569,7 @@ public class RoutableNodeRouter{
 	}
 	
 	public void updateCostFactors(){
+		if(this.debugRoutingCon) this.printInfo("update cost factors"); 
 		if (this.itry == 1) {
 			this.pres_fac = this.initial_pres_fac;
 		} else {
@@ -649,15 +655,21 @@ public class RoutableNodeRouter{
 					illegal.add(rn.hashCode());
 				}
 			}
-		}	
+		}
+		/*if(this.debugRoutingCon){
+			for(Integer id:illegal){
+				this.printInfo("index = " + id);
+			}
+		}*/
 		return illegal.size();	
 	}
 	
 	public void fixIllegalTree(List<Connection> cons) {
-//		this.printInfo("checking if there is any illegal node");	
+ 		if(this.debugRoutingCon) this.printInfo("fix illegal tree"); 
+		if(this.debugRoutingCon) this.printInfo("checking if there is any illegal node");	
 		int numIllegal = this.getIllegalNumRNodes(cons);	
 		if(numIllegal > 0){
-//			this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
+			this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
 			
 			List<Netplus> illegalTrees = new ArrayList<>();
 			for(Netplus net : this.nets) {
@@ -672,11 +684,22 @@ public class RoutableNodeRouter{
 				}
 			}
 			
-//			this.printInfo("There are " + illegalTrees.size() + " illegal trees");
+			if(this.debugRoutingCon) {
+				this.printInfo("There are " + illegalTrees.size() + " illegal trees");
+				for(Netplus np:illegalTrees){
+					for(Connection con:np.getConnection()){
+						System.out.println(con.toString());
+						this.printConRNodes(con);
+					}
+					this.printInfo("");
+				}
+			}
 			//find the illegal connections and fix illegal trees
 			for(Netplus illegalTree : illegalTrees){
+				if(this.debugRoutingCon) this.printInfo("fixing net: " + illegalTree.hashCode());
 				Routable illegalRNode;
-				while((illegalRNode = illegalTree.getIllegalNode()) != null){
+				//TODO bug fixing, gnl_2_4_7_1.3_gnl_2500_05_7_80_80 routing got stuck here
+				while((illegalRNode = illegalTree.getIllegalRNode()) != null){
 					List<Connection> illegalCons = new ArrayList<>();
 					for(Connection con : illegalTree.getConnection()) {
 						for(Routable rnode : con.rnodes) {
@@ -686,15 +709,25 @@ public class RoutableNodeRouter{
 						}
 					}
 					
+					if(this.debugRoutingCon){
+						if(illegalTree.hashCode() == 697){
+							this.printInfo("illegal rnode id = " + illegalRNode.hashCode());
+							for(Connection con:illegalCons){
+								this.printInfo("  illegal con id = " + con.id);
+							}
+							System.out.println();
+						}
+					}
+					
 					//fixing the illegal trees, since there is no criticality info, use the hops info
 					//Find the illegal connection with maximum number of RNodes (hops)
 					Connection maxCriticalConnection = illegalCons.get(0);
 					for(Connection illegalConnection : illegalCons) {
-						if(illegalConnection.rnodes.size() > maxCriticalConnection.rnodes.size()) {
+						if(illegalConnection.rnodes.size() < maxCriticalConnection.rnodes.size()) {
 							maxCriticalConnection = illegalConnection;
 						}
 					}
-					
+					if(this.debugRoutingCon) this.printInfo("  max con" + maxCriticalConnection.id);
 					//Get the path from the connection with maximum hops
 					List<Routable> newRouteNodes = new ArrayList<>();
 					boolean add = false;
@@ -765,7 +798,7 @@ public class RoutableNodeRouter{
 			Set<PIP> netPIPs = new HashSet<>();
 			
 			for(Connection c:np.getConnection()){
-				netPIPs.addAll(this.conPIPs(c));
+				netPIPs.addAll(RouterHelper.conPIPs(c));
 			}
 			np.getNet().setPIPs(netPIPs);
 		}
@@ -774,7 +807,7 @@ public class RoutableNodeRouter{
 //		this.checkInvalidlyRoutedNets("LUT6_2_0/O5");
 //		this.checkNetRoutedPins();
 //		this.printWrittenPIPs();
-		this.printConNodes(113819);
+//		this.printConNodes(113819);
 	}
 	
 	public void printWrittenPIPs(){
@@ -826,7 +859,7 @@ public class RoutableNodeRouter{
 				System.out.println(net.getNet().toString() + ", out: " + net.getNet().getSource().getName());
 				for(Connection c: net.getConnection()){
 					System.out.println(((RoutableNode)c.getSinkRNode()).getNode().toString() + " -> " + c.sink.getName());
-					for(PIP p:this.conPIPs(c)){
+					for(PIP p:RouterHelper.conPIPs(c)){
 						System.out.println("\t" + p.toString());
 					}
 					System.out.println();
@@ -840,39 +873,6 @@ public class RoutableNodeRouter{
 			System.out.println(net.toStringFull());
 			System.out.println(net.getSource().toString() + " " + net.getSinkPins().size());
 		}
-	}
-	
-	public List<PIP> conPIPs(Connection con){
-		List<PIP> conPIPs = new ArrayList<>();
-		
-		//nodes of a connection are added starting from the sink until the source
-		for(int i = con.rnodes.size() -1; i > 0; i--){
-			Node nodeFormer = ((RoutableNode) (con.rnodes.get(i))).getNode();
-			Node nodeLatter = ((RoutableNode) (con.rnodes.get(i-1))).getNode();
-			
-			PIP pip = this.findThePIPbetweenTwoNodes(nodeFormer.getAllWiresInNode(), nodeLatter);
-			if(pip != null){
-				conPIPs.add(pip);
-			}else{
-				System.err.println("Null PIP connecting node " + nodeFormer.toString() + " and node " + nodeLatter.toString());
-			}
-		}
-		return conPIPs;
-	}
-	
-	public PIP findThePIPbetweenTwoNodes(Wire[] nodeFormerWires, Node nodeLatter){
-		PIP pip = null;
-		Tile pipTile = nodeLatter.getTile();
-		int wire1 = nodeLatter.getWire();
-		for(Wire wire:nodeFormerWires){
-			if(wire.getTile().equals(pipTile)){
-				pip = pipTile.getPIP(wire.getWireIndex(), wire1);
-				if(pip != null){
-					 break;
-				}
-			}	
-		}
-		return pip;
 	}
 	
 	public void findAverBaseCosts(){
@@ -1144,9 +1144,15 @@ public class RoutableNodeRouter{
 	public void designInfo(){
 		System.out.println("------------------------------------------------------------------------------");
 		System.out.println("FPGA tiles size: " + this.design.getDevice().getColumns() + "x" + this.design.getDevice().getRows());
-		System.out.println("Num con to be routed: " + this.connections.size());
+		System.out.println("Total nets: " + this.design.getNets().size());
 		System.out.println("Num net to be routed: " + this.nets.size());
-		System.out.println("Num 1-sink net: " + this.fanout1Net);
+		System.out.println("    Num con to be routed: " + this.connections.size());
+		System.out.println("    of which Num 1-sink net: " + this.fanout1Net);
+		System.out.println("Reserved clock and static nets: " + this.iclockAndStaticNet);	
+		System.out.println("Nets not needing routing: " + (this.iWireOneTypePin + this.iWirePinsUnknown));
+		System.out.println("    Net with one type pins: " + this.iWireOneTypePin);
+		System.out.println("    Net with unknown pins: " + this.iWirePinsUnknown);
+		System.out.println("Net unknown type: " + this.iUnknownTypeNet);
 		System.out.println("------------------------------------------------------------------------------");
 	}
 }

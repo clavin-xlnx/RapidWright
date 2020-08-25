@@ -20,7 +20,7 @@ public class RoutableTimingGroup implements Routable{
 	
 	public short xlow, xhigh;
 	public short ylow, yhigh;
-		
+	
 	public float base_cost;
 	
 	public final RoutableData rnodeData;

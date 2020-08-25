@@ -534,7 +534,7 @@ public class RoutableTimingGroupRouter{
 			//find the illegal connections and fix illegal trees
 			for(Netplus illegalTree : illegalTrees){
 				Routable illegalRNode;
-				while((illegalRNode = illegalTree.getIllegalNode()) != null){
+				while((illegalRNode = illegalTree.getIllegalRNode()) != null){
 					List<Connection> illegalCons = new ArrayList<>();
 					for(Connection con : illegalTree.getConnection()) {
 						for(Routable rnode : con.rnodes) {

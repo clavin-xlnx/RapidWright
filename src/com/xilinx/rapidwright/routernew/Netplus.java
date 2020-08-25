@@ -105,7 +105,7 @@ public class Netplus{
 		return this.connections;
 	}
 	
-	public Routable getIllegalNode() {
+	public Routable getIllegalRNode() {
 		for(Connection con : this.connections) {
 			for(Routable rnode : con.rnodes) {
 				if(rnode.illegal()) {

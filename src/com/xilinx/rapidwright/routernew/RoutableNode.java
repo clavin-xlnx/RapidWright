@@ -247,6 +247,8 @@ public class RoutableNode implements Routable{
 		}
 		
 		StringBuilder s = new StringBuilder();
+		s.append("id = " + this.index);
+		s.append(", ");
 		s.append("node " + this.node.toString());
 		s.append(", ");
 		s.append(coordinate);

@@ -21,4 +21,5 @@ public interface Routable {
 	public float getManhattanD();
 	public boolean isInBoundingBoxLimit(Connection con);
 	public String toString();
+	public int hashCode();
 }
