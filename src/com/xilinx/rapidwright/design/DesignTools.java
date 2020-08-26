@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -857,6 +858,12 @@ public class DesignTools {
 		postBlackBoxCleanup(hierarchicalCellName, design);
 	}
 
+	/**
+	 * Attempts to rename boundary nets around the previous blackbox to follow naming convention 
+	 * (net is named after source).
+	 * @param hierCellName The hierarchical cell instance that was previously a black box
+	 * @param design The current design.
+	 */
 	public static void postBlackBoxCleanup(String hierCellName, Design design) {		
 		EDIFNetlist netlist = design.getNetlist();
 		EDIFCellInst inst = netlist.getCellInstFromHierName(hierCellName);
@@ -1307,5 +1314,107 @@ public class DesignTools {
 			}
 		}
 		return false;
+	}
+	
+	
+	/**
+	 * Creates any and all missing SitePinInsts for this net.  This is common as a placed
+	 * DCP will not have SitePinInsts annotated and this information is generally necessary
+	 * for routing to take place.  
+	 * @param design The current design of this net.
+	 * @return The list of pins that were created or an empty list if none were created.
+	 */
+	public static List<SitePinInst> createMissingSitePinInsts(Design design, Net net) {
+		EDIFNetlist n = design.getNetlist();
+		List<EDIFHierPortInst> physPins = n.getPhysicalPins(net.getName());
+		if(physPins == null) return Collections.emptyList();
+		List<SitePinInst> newPins = new ArrayList<>();
+		for(EDIFHierPortInst p :  physPins) {
+			Cell c = design.getCell(p.getFullHierarchicalInstName());
+			if(c == null || c.getBEL() == null) continue;
+			String sitePinName = getRoutedSitePin(c, net, p.getPortInst().getName());
+			if(sitePinName == null) continue;
+			SiteInst si = c.getSiteInst();
+			SitePinInst newPin = si.getSitePinInst(sitePinName);
+			if(newPin != null) continue;
+			newPin = net.createPin(p.isOutput(), sitePinName, c.getSiteInst());
+			if(newPin != null) newPins.add(newPin);
+		}
+		return newPins;
+	}
+
+	/**
+	 * Gets the site pin that is currently routed to the specified cell pin.  If 
+	 * the site instance is not routed, it will return null. 
+	 * Side Effect: It will set alternative source site pins on the net if present.
+	 * @param cell The cell with the pin of interest.
+	 * @param net The physical net to which this pin belongs
+	 * @param logicalPinName The logical pin name of the cell to query.
+	 * @return The name of the site pin on the cell's site to which the pin is routed.
+	 */
+	public static String getRoutedSitePin(Cell cell, Net net, String logicalPinName) {
+	    SiteInst inst = cell.getSiteInst();
+	    String belPinName = cell.getPhysicalPinMapping(logicalPinName);
+	    if(belPinName == null) return null;
+	    Set<String> siteWires = inst.getSiteWiresFromNet(net);
+	    String toReturn = null;
+	    Queue<BELPin> queue = new LinkedList<>();
+	    queue.add(cell.getBEL().getPin(belPinName));
+	    while(!queue.isEmpty()) {
+		    BELPin curr = queue.remove();
+	        if(!siteWires.contains(curr.getSiteWireName())) return null;
+	        if(curr.isInput()) {
+	            BELPin source = curr.getSourcePin();
+	            if(source.isSitePort()) {
+	                return source.getName();
+	            } else if(source.getBEL().getBELClass() == BELClass.RBEL){
+	                SitePIP sitePIP = inst.getUsedSitePIP(source.getBEL().getName());
+	                if(sitePIP == null) return null;
+	                queue.add(sitePIP.getInputPin());
+	            } else {
+	                return null;
+	            }
+	        }else { // output
+	            for(BELPin sink : curr.getSiteConns()) {
+	                if(!siteWires.contains(sink.getSiteWireName())) continue;
+	                if(sink.isSitePort()) {
+	                	// Check if there is a dual output scenario
+	                	if(toReturn != null) {
+	                		SitePinInst source = net.getSource();
+	                		if(source != null && source.getName().equals(sink.getName())) {
+		                		net.setAlternateSource(new SitePinInst(true, toReturn, inst));
+		                		toReturn = sink.getName();
+	                		}else {
+		                		net.setAlternateSource(new SitePinInst(true, sink.getName(), inst));	                			
+	                		}
+	                		// We'll return the first one we found, store the 2nd in the alternate
+	                		// reference on the net
+	                		return toReturn;
+	                	}else {
+			                toReturn = sink.getName();	                		
+	                	}
+	                } else if(sink.getBEL().getBELClass() == BELClass.RBEL){
+	                	// Check if the SitePIP is being used
+	                    SitePIP sitePIP = inst.getUsedSitePIP(sink.getBEL().getName());
+	                    if(sitePIP == null) continue;
+	                    // Don't proceed if its configured for a different pin
+	                    if(!sitePIP.getInputPinName().equals(sink.getName())) continue;
+	                    // Make this the new source to search from and keep looking...
+	                    queue.add(sitePIP.getOutputPin());
+	                }
+	            }
+	        }
+	    }
+	    return toReturn;
+	}
+	
+	/**
+	 * Creates all missing SitePinInsts in a design. See also {@link #createMissingSitePinInsts(Design, Net)}
+	 * @param design The current design
+	 */
+	public static void createMissingSitePinInsts(Design design) {
+		for(Net net : design.getNets()) {
+			createMissingSitePinInsts(design,net);
+		}
 	}
 }

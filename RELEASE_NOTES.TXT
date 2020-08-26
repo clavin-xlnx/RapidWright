@@ -1,3 +1,100 @@
+============= RapidWright 2020.1.2-beta released on 2020-08-13 ================
+Notes:
+ * Minor update with API additions
+ - API Additions:
+   - com.xilinx.rapidwright.design.Cell "public AltPinMapping getAltPinMapping(String physicalPin)"
+   - com.xilinx.rapidwright.design.Cell "public void addAltPinMapping(String physicalPin, AltPinMapping logicalPin)"
+   - com.xilinx.rapidwright.design.Cell "public boolean hasAltPinMappings()"
+   - com.xilinx.rapidwright.design.Cell "public Map<String,AltPinMapping> getAltPinMappings()"
+   - com.xilinx.rapidwright.design.Cell "public boolean isLocked()"
+   - com.xilinx.rapidwright.design.Cell "public void setNullBEL(boolean b)"
+   - com.xilinx.rapidwright.design.Cell "public boolean isNullBEL()"
+   - com.xilinx.rapidwright.design.Cell "public void setLocked(boolean isLocked)"
+   - com.xilinx.rapidwright.design.Cell "public void setRoutethru(boolean isRoutethru)"
+   - com.xilinx.rapidwright.design.Cell "public void setType(String type)"
+   - com.xilinx.rapidwright.design.Cell "public void setAltBlockedSiteType(SiteTypeEnum typeEnum)"
+   - com.xilinx.rapidwright.design.Cell "public SiteTypeEnum getAltBlockedSiteType()"
+   - com.xilinx.rapidwright.design.SiteInst "public boolean isSiteLocked()"
+   - com.xilinx.rapidwright.design.SiteInst "public void setSiteLocked(boolean isSiteLocked)"
+
+
+============= RapidWright 2020.1.1-beta released on 2020-08-07 ================
+Notes:
+ * Minor update with API additions
+ * Adds an alternative source pin to Nets (for dual output scenarios)
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public static readCheckpoint(String dcpFileName, String edfFileName, CodePerfTracker t)"
+   - com.xilinx.rapidwright.design.Net "public SitePinInst getAlternateSource()"
+   - com.xilinx.rapidwright.design.Net "public void setAlternateSource(SitePinInst altSource)"
+   - com.xilinx.rapidwright.design.SiteInst "public BELPin[] getSiteWirePins(String siteWireName)"
+   - com.xilinx.rapidwright.design.SiteInst "public BELPin[] getSiteWirePins(int siteWireIdx)"
+   - com.xilinx.rapidwright.design.SiteInst "public String[] getSiteWires()"
+   - com.xilinx.rapidwright.design.SiteInst "public String[] getSitePinNames()"
+   - com.xilinx.rapidwright.design.SiteInst "public int getHighestSitePinInputIndex()"
+   - com.xilinx.rapidwright.design.SiteInst "public boolean isSitePinInput(String pinName)"
+   - com.xilinx.rapidwright.design.SiteInst "public boolean isSitePinOutput(String pinName)"
+   - com.xilinx.rapidwright.device.Node "public IntentCode getIntentCode()"
+
+============= RapidWright 2020.1.0-beta released on 2020-07-31 ================
+Notes:
+ * Coresponds to the Vivado 2020.1 release, all device models consistent
+ * Fixed an issue where timing designs would not open in Vivado
+ * Adds utility method (DesignTools.createMissingSitePinInsts()) to
+   create missing SitePinInsts to nets to faciltiate routing.
+ * Changes hashCode() and equals() on PIP class to ignore flags, only
+   includes tile and wire names
+ - API Additions:
+   - com.xilinx.rapidwright.design.Design "public ModuleInst createModuleInst(String name, Module module, boolean includePortRouting)"
+   - com.xilinx.rapidwright.design.Design "public void copyPartitionPins(Design source, ModuleInst dest, Map<EDIFPort,EDIFPort> portMap)"
+   - com.xilinx.rapidwright.design.Design "public void trimPartitionPins(Pair<Tile,Tile> range)"
+   - com.xilinx.rapidwright.design.Net "public void trimPartitionPins(Pair<Tile,Tile> range)"
+   - com.xilinx.rapidwright.device.BELPin "public SitePin getSitePin(Site site)" 
+   - com.xilinx.rapidwright.device.BELPin "public Node getExternalNode(Site site)" 
+   - com.xilinx.rapidwright.device.Node "public List<Node> getAllUphillNodes()"
+   - com.xilinx.rapidwright.device.Node "public List<PIP> getAllUphillPIPs()"
+   - com.xilinx.rapidwright.device.PIP "public boolean isReversed()"
+   - com.xilinx.rapidwright.device.PIP "public void setIsReversed(boolean isReversed)"
+ - API Refactored:
+   - com.xilinx.rapidwright.device.Site "public Node getConnectedNode(int pinIndex)"
+     - getconnectedNode(int pinIndex) --> getConnectedNode(int pinIndex)
+ - Bug Fixes / Pull Requests:
+   - Issue #70 - Fixes NPE when EDIFCellInst is null on Cell.
+   - Issue #35 - Missing SitePinInsts for placed-only designs.
+   - Pull Request #68 - Fixed getLUTSize(), proper processing of LUT size/parsing.
+   - Other bug fixes (see commit log for details).   
+
+============= RapidWright 2019.2.2-beta released on 2020-06-03 ================
+Notes:
+ * Minor feature: 
+   - Support to manage/load EDIF files with blackboxes where encrypted
+     IP is not populated. 
+   - Adds a very basic Makefile to compile without Gradle on
+     Linux-based platforms.
+ - API Additions:
+   - com.xilinx.rapidwright.device.Device "public int getSiteTypeCount()"
+   - com.xilinx.rapidwright.device.Device "public int getTileTypeCount()"
+   - com.xilinx.rapidwright.device.Site "public int getSiteWireCount()"
+   - com.xilinx.rapidwright.device.Site "public String getSiteWireName(int wireIndex)"
+   - com.xilinx.rapidwright.device.Site "public int getSitePinCount()"
+   - com.xilinx.rapidwright.device.Site "public int getHighestInputPinIndex()"
+   - com.xilinx.rapidwright.device.Site "public boolean isInputPin(int pinIndex)"
+   - com.xilinx.rapidwright.device.Site "public boolean isOutputPin(int pinIndex)"
+   - com.xilinx.rapidwright.device.Site "public SitePIP[] getSitePIPs()"
+   - com.xilinx.rapidwright.device.Site "public SitePIP getSitePIP(int index)"
+   - com.xilinx.rapidwright.device.Site "public int getSitePIPCount()"
+   - com.xilinx.rapidwright.device.Site "public String[] getSiteWireNames()"
+   - com.xilinx.rapidwright.device.Tile "public int getTilePatternIndex()"
+
+ - Bug Fixes / Pull Requests:
+   - Issue #4 - Java 9 Compliance
+      - Updates several libraries and provides a workaround for Kryo
+      to avoid Illegal access messages from JVM
+   - Pull Request #58 - Fixed file naming issues when having multiple instances of an IP
+   - Pull Request #60 - Horizontal density (pblock creation)
+   - Pull Request #62 - Ensure that highlighted tile numbers are drawn above tile highlighting
+   - Other bug fixes (see commit log for details).   
+
+
 ============= RapidWright 2019.2.1-beta released on 2020-03-10 ================
 Notes:
  * Minor feature: 

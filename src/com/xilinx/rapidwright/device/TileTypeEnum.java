@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2019 Xilinx, Inc. 
+ * Copyright (c) 2020 Xilinx, Inc. 
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,7 +26,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Fri Dec 06 10:46:56 2019
+ * Generated on: Fri Jul 31 14:30:49 2020
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  * 
  * Enumeration of Tile type for all valid devices within Vivado.
@@ -891,6 +891,13 @@ public enum TileTypeEnum {
 	RCLK_RCLK_XIPHY_INNER_FT,
 	RCLK_TERM_L,
 	RCLK_XIPHY_OUTER_RIGHT,
+	RFADC_RFADC_RIGHT_FT,
+	RFADC_RFADC_RIGHT_RBRK_FT,
+	RFADC_RFADC_RIGHT_TERM_B_FT,
+	RFDAC_RFDAC_RFADC_RIGHT_RBRK_FT,
+	RFDAC_RFDAC_RIGHT_FT,
+	RFDAC_RFDAC_RIGHT_RBRK_FT,
+	RFDAC_RFDAC_RIGHT_TERM_T_FT,
 	RIOB18,
 	RIOB18_SING,
 	RIOB33,
