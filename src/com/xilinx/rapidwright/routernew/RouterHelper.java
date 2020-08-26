@@ -33,6 +33,12 @@ public class RouterHelper {
 		return source.getName().equals("COUT") && (!sink.getName().equals("CIN"));
 	}
 	
+	public static boolean isCyclicRoutingTree(Net n){
+		boolean isCyclic = false;
+		
+		return isCyclic;
+	}
+	
 	//methods for pips assignment
 	public static List<PIP> conPIPs(Connection con){
 		List<PIP> conPIPs = new ArrayList<>();
