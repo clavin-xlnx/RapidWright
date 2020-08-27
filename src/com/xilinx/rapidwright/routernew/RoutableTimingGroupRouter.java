@@ -15,13 +15,12 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.design.c;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.timing.TimingGroup;
+import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.TimingModel;
 
@@ -115,7 +114,7 @@ public class RoutableTimingGroupRouter{
 		this.routerTimer = new RouterTimer();
 		this.fanout1Net = 0;
 		this.rrgNodeId = 0;
-		this.rrgNodeId = this.initializeNetsCons(bbRange, this.rrgNodeId, this.base_cost_fac);
+		this.rrgNodeId = this.initializeNetsCons(bbRange, this.base_cost_fac);
 				
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
@@ -129,7 +128,7 @@ public class RoutableTimingGroupRouter{
 		this.illegalRNodes = new HashSet<>();
 	}
 	
-	public int initializeNetsCons(short bbRange, int rrgNodeId, float base_cost_fac){
+	public int initializeNetsCons(short bbRange, float base_cost_fac){
 		this.inet = 0;
 		this.icon = 0;
 		this.nets = new ArrayList<>();
@@ -234,6 +233,7 @@ public class RoutableTimingGroupRouter{
 	public RoutableTimingGroup createRoutableNodeAndAdd(int index, SitePinInst sitePinInst, RoutableType type, TimingModel model, float base_cost_fac){
 		RoutableTimingGroup routableTG = new RoutableTimingGroup(index, sitePinInst, type, model);
 		routableTG.setBaseCost(base_cost_fac);
+//		System.out.println(routableTG.getTimingGroup().getSiblings()[0].hashCode() + " " + sitePinInst.getConnectedNode().hashCode());
 		this.rnodesCreated.put(sitePinInst.getConnectedNode(), routableTG);
 		this.rrgNodeId++;
 		return routableTG;
@@ -774,7 +774,7 @@ public class RoutableTimingGroupRouter{
 		if(this.debugRoutingCon) this.printInfo("routing for " + con.toStringTG());
 		
 		if(this.debugRoutingCon) System.out.println("target set " + con.getSinkRNode().isTarget() + ", "
-				+ ((RoutableTimingGroup) con.getSinkRNode()).getTimingGroup().getSiblings().get(0).getLastNode().toString());
+				+ ((RoutableTimingGroup) con.getSinkRNode()).getTimingGroup().hashCode());
 		
 		while(!this.targetReached(con)){
 			
@@ -782,6 +782,7 @@ public class RoutableTimingGroupRouter{
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
+//				System.out.println(this.rrgNodeId);
 				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, this.reservedNodes);
 			}
 			this.routerTimer.rnodesCreation.finish();
@@ -974,14 +975,21 @@ public class RoutableTimingGroupRouter{
 		float numTG = 0;
 		
 		for(RoutableTimingGroup rn:this.rnodesCreated.values()){
-			List<TimingGroup> timingGroups = rn.getTimingGroup().getSiblings();
-			numTG += timingGroups.size();
-			for(TimingGroup tg:timingGroups){
-				sumNodes += tg.getNodes().size();
-				for(Node node:tg.getNodes()){
-					sumWire += node.getAllWiresInNode().length;
+			ImmutableTimingGroup[] timingGroups = rn.getTimingGroup().getSiblings();
+			numTG += timingGroups.length;
+			for(ImmutableTimingGroup tg:timingGroups){
+				Node entryNode = tg.entryNode();
+				Node exitNode = tg.exitNode();
+				
+				if(entryNode != null){
+					sumNodes += 1;
+					sumWire += entryNode.getAllWiresInNode().length;
 				}
-			}		
+				if(exitNode != null){
+					sumNodes += 1;
+					sumWire += exitNode.getAllWiresInNode().length;
+				}
+			}
 		}
 		this.averWire = sumWire / numTG;
 		this.averNode = sumNodes / numTG;

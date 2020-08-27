@@ -9,8 +9,8 @@ import java.util.Set;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.SiblingsTimingGroup;
-import com.xilinx.rapidwright.timing.TimingGroup;
 import com.xilinx.rapidwright.timing.TimingModel;
 
 public class RoutableTimingGroup implements Routable{
@@ -29,13 +29,13 @@ public class RoutableTimingGroup implements Routable{
 	public List<RoutableTimingGroup> children;
 	public boolean childrenSet;
 	
-//	public boolean debug = false;
+	public boolean debug = false;
 	
 	public RoutableTimingGroup(int index, SitePinInst sitePinInst, RoutableType type, TimingModel tmodel){
 		this.index = index;
 		this.type = type;
-		//TODO source pin only
-		this.sibTimingGroups = new SiblingsTimingGroup(sitePinInst, tmodel);
+		
+		this.sibTimingGroups = new SiblingsTimingGroup(sitePinInst);
 		
 		this.rnodeData = new RoutableData(this.index);
 		this.target = false;
@@ -54,16 +54,18 @@ public class RoutableTimingGroup implements Routable{
 	}
 	
 	public int setChildren(int globalIndex, float base_cost_fac, Map<Node, RoutableTimingGroup> createdRoutable, Set<Node> reservedNodes){
-//		this.downHillNodesodTheLastNode();
+		if(debug) this.downHillNodesodTheLastNode();
 		
 		this.children = new ArrayList<>();
-//		if(debug) System.out.println("set children");
+		if(debug) System.out.println("set children");
 		//TODO getNextSiblingTimingGroups does not return right list of siblingsTimingGroups
-		for(SiblingsTimingGroup stGroups:this.sibTimingGroups.getNextSiblingsTimingGroups(reservedNodes)){
+		for(SiblingsTimingGroup stGroups:this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes)){
 			RoutableTimingGroup childRNode;
 			//the last node of timing group siblings is unique, used as the key
-			Node key = stGroups.getSiblings().get(0).getLastNode();
-//			if(debug) System.out.println(key.toString());
+			
+			Node key = stGroups.getSiblings()[0].exitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
+			
+			if(debug) System.out.println(stGroups.getSiblings()[0].exitNode().toString());
 			if(!createdRoutable.containsKey(key)){
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups);
 				childRNode.setBaseCost(base_cost_fac);
@@ -74,18 +76,19 @@ public class RoutableTimingGroup implements Routable{
 				children.add(createdRoutable.get(key));
 			}
 		}
-//		if(debug){
-//			System.out.println("children size = " + this.children.size());
-//			for(RoutableTimingGroup rtg:this.children){
-//				System.out.println(rtg.toString());
-//			}
-//		}
+		if(debug){
+			System.out.println("children size = " + this.children.size());
+			for(RoutableTimingGroup rtg:this.children){
+				System.out.println(rtg.toString());
+			}
+			System.out.println();
+		}
 		this.childrenSet = true;
 		return globalIndex;
 	}
 	
 	public List<Node> downHillNodesodTheLastNode(){
-		List<Node> nodes = this.sibTimingGroups.getSiblings().get(0).getLastNode().getAllDownhillNodes();
+		List<Node> nodes = this.sibTimingGroups.getSiblings()[0].exitNode().getAllDownhillNodes();
 		for(Node node:nodes){
 			System.out.println(node.toString() + " downhill nodes: ");
 			for(Node dn:node.getAllDownhillNodes()){
@@ -133,12 +136,12 @@ public class RoutableTimingGroup implements Routable{
 
 	@Override
 	public void setXY() {
-		
 		List<Wire> wiresInTG = new ArrayList<>();
-		for(TimingGroup tg:this.sibTimingGroups.getSiblings()){
-			for(Node node:tg.getNodes()){
-				wiresInTG.addAll(Arrays.asList(node.getAllWiresInNode()));
-			}
+		for(ImmutableTimingGroup tg:this.sibTimingGroups.getSiblings()){
+			if(tg.entryNode() != null)
+				wiresInTG.addAll(Arrays.asList(tg.entryNode().getAllWiresInNode()));
+			if(tg.exitNode() != null)
+				wiresInTG.addAll(Arrays.asList(tg.exitNode().getAllWiresInNode()));
 		}
 		int length = wiresInTG.size();
 		short[] xCoordinates = new short[length];
@@ -155,45 +158,6 @@ public class RoutableTimingGroup implements Routable{
 		this.xhigh = this.max(xCoordinates);
 		this.ylow = this.min(yCoordinates);
 		this.yhigh = this.max(yCoordinates);
-	}
-	
-	public void setCenterXYNode(Node node){
-		int length = node.getAllWiresInNode().length;
-		short[] xCoordinates = new short[length];
-		short[] yCoordinates = new short[length];
-		short id = 0;
-		for(Wire w : node.getAllWiresInNode()){
-			xCoordinates[id] = (short) w.getTile().getColumn();
-			yCoordinates[id] = (short) w.getTile().getRow();
-			id++;
-		}
-		
-		if(length == 1){
-			this.xlow = xCoordinates[0];
-			this.xhigh = this.xlow;
-			this.ylow = yCoordinates[0];
-			this.yhigh = this.ylow;
-		}else if(length == 2){
-			if(xCoordinates[0] < xCoordinates[1]){
-				this.xlow = xCoordinates[0];
-				this.xhigh = xCoordinates[1];
-			}else{
-				this.xlow = xCoordinates[1];
-				this.xhigh = xCoordinates[0];
-			}
-			if(yCoordinates[0] < yCoordinates[1]){
-				this.ylow = yCoordinates[0];
-				this.yhigh = yCoordinates[1];
-			}else{
-				this.ylow = yCoordinates[1];
-				this.yhigh = yCoordinates[0];
-			}
-		}else{
-			this.xlow = this.min(xCoordinates);
-			this.xhigh = this.max(xCoordinates);
-			this.ylow = this.min(yCoordinates);
-			this.yhigh = this.max(yCoordinates);
-		}
 	}
 	
 	public short max(short[] coordinates){
@@ -253,7 +217,7 @@ public class RoutableTimingGroup implements Routable{
 		s.append("RNode " + this.index + " ");
 		s.append(String.format("%-11s", coordinate));
 		s.append(", last node ");
-		s.append(this.sibTimingGroups.getSiblings().get(0).getLastNode().toString());
+		s.append(this.sibTimingGroups.getSiblings()[0].exitNode().toString());
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		
@@ -283,7 +247,7 @@ public class RoutableTimingGroup implements Routable{
 		s.append(", ");
 		s.append(String.format("level = %d", this.rnodeData.getLevel()));
 		s.append(",");
-		s.append(this.sibTimingGroups.getSiblings().get(0).getLastNode().toString());
+		s.append(this.sibTimingGroups.getSiblings()[0].exitNode().toString());
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		
@@ -299,7 +263,7 @@ public class RoutableTimingGroup implements Routable{
 		}
 		
 		StringBuilder s = new StringBuilder();
-		s.append("Last Node " + this.sibTimingGroups.getSiblings().get(0).getLastNode().toString() + " ");
+		s.append("Last Node " + this.sibTimingGroups.getSiblings()[0].exitNode().toString() + " ");
 		s.append(", ");
 		s.append(String.format("%-11s", coordinate));
 		s.append(", ");
