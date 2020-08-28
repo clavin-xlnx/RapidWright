@@ -160,8 +160,7 @@ public class SiblingsTimingGroup {
     public int hashCode() {
         return hashCode;
     }
-
-    //TODO added by Yun
+    
     public ImmutableTimingGroup[] getSiblings(){
     	return siblings;
     }

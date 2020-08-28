@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.timing.TimingEdge;
+import com.xilinx.rapidwright.timing.TimingVertex;
 
 public class Connection{
 	public final int id;
@@ -14,6 +16,12 @@ public class Connection{
 	public Netplus net;
     public final short boundingBox;
 	
+    //TODO timing-driven
+    public TimingVertex sourceTimingVertex;
+    public TimingVertex sinkTimingVertex;
+    public TimingEdge timingEdge;
+    public float criticality;
+    
 	private Routable sourceRNode;
 	private Routable sinkRNode;
 	public List<Routable> rnodes;

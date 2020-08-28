@@ -459,7 +459,7 @@ public class TimingModel {
                     }
                 }
                 result.add(midGroup);
-//                checkTimingGroup(midGroup);//TODO commented out by Yun
+                checkTimingGroup(midGroup);//TODO commented out by Yun
             }
 
         }

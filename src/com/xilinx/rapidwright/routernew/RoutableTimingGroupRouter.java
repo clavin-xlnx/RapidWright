@@ -305,14 +305,14 @@ public class RoutableTimingGroupRouter{
         
 		while(this.itry < this.nrOfTrials){
 			this.iterationStart = System.nanoTime();
-			
+			//TODO TIMING GRAPH HERE
 			this.connectionsRoutedIteration = 0;	
 			validRouting = true;	
 			if(this.trial) this.printInfo("iteration " + this.itry + " begins");
 			
 			if(!this.trial){
 				for(Connection con:this.sortedListOfConnection){
-					this.routingAndTimer(con);
+					this.routingAndTimer(con);//TODO estimator called here
 				}
 			}else{
 				for(Netplus np : trialNets){
@@ -975,10 +975,10 @@ public class RoutableTimingGroupRouter{
 		float numTG = 0;
 		
 		for(RoutableTimingGroup rn:this.rnodesCreated.values()){
-			ImmutableTimingGroup[] timingGroups = rn.getTimingGroup().getSiblings();
+			ImmutableTimingGroup[] timingGroups = rn.getTimingGroup().getSiblings();//TODO not needed later
 			numTG += timingGroups.length;
 			for(ImmutableTimingGroup tg:timingGroups){
-				Node entryNode = tg.entryNode();
+				Node entryNode = tg.entryNode();//TODO check if every entryNode has one wire
 				Node exitNode = tg.exitNode();
 				
 				if(entryNode != null){
