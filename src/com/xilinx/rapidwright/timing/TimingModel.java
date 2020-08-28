@@ -418,7 +418,9 @@ public class TimingModel {
             boolean initialHasPinbounce = false;
             initialGroup.setInitialGroup(true);
             result.add(initialGroup);
-//            checkTimingGroup(initialGroup);//TODO commented out by Yun
+            
+            // Comment out to avoid lots of printout
+            //checkTimingGroup(initialGroup);
             for (int i = !initialHasPinbounce? 1:2; i < nodes.size() - 1; ) {
                 TimingGroup midGroup = new TimingGroup(this);
                 boolean thisNodeContainsGlobal = false;
@@ -459,7 +461,7 @@ public class TimingModel {
                     }
                 }
                 result.add(midGroup);
-                checkTimingGroup(midGroup);//TODO commented out by Yun
+//                checkTimingGroup(midGroup);//TODO commented out by Yun
             }
 
         }

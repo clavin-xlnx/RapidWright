@@ -25,13 +25,14 @@ package com.xilinx.rapidwright.timing.delayestimator;
 
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.GroupDelayType;
+import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.PairUtil;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 
-import javax.swing.*;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -39,7 +40,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -134,39 +134,138 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @return
      */
     @Override
-    public short getMinDelayToSinkPin(com.xilinx.rapidwright.timing.TimingGroup timingGroup,
-                                      com.xilinx.rapidwright.timing.TimingGroup sinkPin) {
+    public short getMinDelayToSinkPin(ImmutableTimingGroup timingGroup,
+                                      ImmutableTimingGroup sinkPin) {
 
+        return getMinDelayToSinkPin(getTermInfo(timingGroup), getTermInfo(sinkPin)).getFirst();
 
-//        Node tgNode = timingGroup.getLastNode();
-// INT_X46Y110/IMUX_E17
-// INT_X45Y109/EE2_E_BEG6
-
-
-        // TODO: need to populate these from TGs
-        short begX = 0;
-        short begY = 0;
-        T.TileSide begSide = T.TileSide.E;
-        short endX = 10;
-        short endY = 15;
-        T.TileSide endSide = T.TileSide.E;
-        // end must always be CLE_IN,
-        T.TimingGroup endTg = T.TimingGroup.CLE_IN;
-        T.TimingGroup begTg = T.TimingGroup.CLE_OUT;
-
-        return begX;
-//        return getMinDelayToSinkPin(begTg, endTg, begX, begY, endX, endY, begSide, endSide).getFirst();
-        // this is taking care off in getMinDelayToSinkPin
-//        // If we store both E and W sides, the size of each entry will be double.
-//        // We also need 4x more entries. Storing only one side should produce a small difference
-//        // because all TG but LONG can switch sides.
-//        if ((begSide != TileSide.M) && (begSide != endSide)) {
-//            delay += 0;
-//        }
+////        Node tgNode = timingGroup.getLastNode();
+//// INT_X46Y110/IMUX_E17
+//// INT_X45Y109/EE2_E_BEG6
 //
-//        return delay;
+//
+//        // TODO: need to populate these from TGs
+//        short begX = 0;
+//        short begY = 0;
+//        T.TileSide begSide = T.TileSide.E;
+//        short endX = 10;
+//        short endY = 15;
+//        T.TileSide endSide = T.TileSide.E;
+//        // end must always be CLE_IN,
+//        T.TimingGroup endTg = T.TimingGroup.CLE_IN;
+//        T.TimingGroup begTg = T.TimingGroup.CLE_OUT;
+//
+////        return begX;
+//        return getMinDelayToSinkPin(begTg, endTg, begX, begY, endX, endY, begSide, endSide).getFirst();
+//        // this is taking care off in getMinDelayToSinkPin
+////        // If we store both E and W sides, the size of each entry will be double.
+////        // We also need 4x more entries. Storing only one side should produce a small difference
+////        // because all TG but LONG can switch sides.
+////        if ((begSide != TileSide.M) && (begSide != endSide)) {
+////            delay += 0;
+////        }
+////
+////        return delay;
+    }
+    class RoutingNode {
+        // INT_TILE coordinate
+        short x;
+        short y;
+        // E or W side of INT_TILE
+        T.TileSide side;
+        // U or D
+        T.Orientation orientation;
+        T.TimingGroup tg;
+
+        RoutingNode(int x, int y, String side, String direction, String tg) {
+            this.x         = (short) x;
+            this.y         = (short) y;
+            this.side      = T.TileSide.valueOf(side);
+            this.orientation = T.Orientation.valueOf(direction);
+            this.tg        = T.TimingGroup.valueOf(tg);
+        }
+        RoutingNode() {
+        }
+        public String toString() {
+            return String.format("x:%d y:%d %s %s %s", x,y,side.name(),tg.name(),orientation.name());
+        }
     }
 
+    // input node is exitNode of a tg
+    // TODO: This method is loop heavy. If TG is prebuilt, this problem will be solved because all info is pre-recorded.
+    private T.TileSide findTileSideForInternalSingle(Node node) {
+        Pattern EPattern = Pattern.compile("([\\w]+)_(E)_");
+        Pattern WPattern = Pattern.compile("([\\w]+)_(W)_");
+
+        for (Node prvNode : node.getAllUphillNodes()) { // need to get all downhill PIPs
+            String prvNodeName = prvNode.getAllWiresInNode()[0].getWireName();
+
+            Matcher EMatcher = EPattern.matcher(prvNodeName);
+            if (EMatcher.find()) {
+                return T.TileSide.E;
+            } else {
+                Matcher WMatcher = WPattern.matcher(prvNodeName);
+                if (WMatcher.find())
+                    return T.TileSide.W;
+            }
+
+        }
+        return T.TileSide.M;
+    }
+
+    // node.toString()     -  node.getAllWiresInNode()[0].getIntentCode()
+    // INT_X0Y0/BYPASS_E9  - NODE_PINBOUNCE  :
+    // INT_X0Y0/IMUX_E9  - NODE_PINFEED  :
+    // INT_X0Y0/EE2_E_BEG3  - NODE_DOUBLE  :
+    // INT_X0Y0/NN1_E_BEG3  - NODE_SINGLE  :
+    // INT_X0Y0/NN4_E_BEG2  - NODE_VQUAD  :
+    // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
+    private RoutingNode getTermInfo(ImmutableTimingGroup tg) {
+        Node node = tg.exitNode();
+        Pattern tilePattern     = Pattern.compile("X([\\d]+)Y([\\d]+)");
+
+        RoutingNode res = new RoutingNode();
+
+        // INT_X45Y109/EE2_E_BEG6
+        // TODO: should I use getTile and wire instead of spliting the name?
+        String[] int_node = node.toString().split("/");
+
+        Matcher tileMatcher = tilePattern.matcher(int_node[0]);
+        if (tileMatcher.find()) {
+            res.x = Short.valueOf(tileMatcher.group(1));
+            res.y = Short.valueOf(tileMatcher.group(2));
+        } else {
+            System.out.println("getTermInfo coordinate matching error for node " + node.toString());
+        }
+
+        String[] tg_side = int_node[1].split("_");
+
+        // THIS IF MUST BE ABOVE THE IF BELOW (for res.side).
+        if (tg_side[0].startsWith("SS") || tg_side[0].startsWith("WW"))
+            res.orientation = T.Orientation.D;
+        else if (tg_side[0].startsWith("NN") || tg_side[0].startsWith("EE"))
+            res.orientation = T.Orientation.U;
+        else
+            res.orientation = T.Orientation.S;
+
+        // THIS IF MUST BE BELOW THE IF ABOVE (for res.orientation).
+        if (tg_side[1].startsWith("E"))
+            res.side = T.TileSide.E;
+        else if (tg_side[1].startsWith("W"))
+            res.side = T.TileSide.W;
+        else
+            if (int_node[1].startsWith("INT")) {
+                // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
+                // Check intendcode is an alternative to above if condition.
+                res.side = findTileSideForInternalSingle(tg.entryNode());
+                // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
+                res.orientation = (res.side == T.TileSide.E) ? T.Orientation.D : T.Orientation.U;
+            } else {
+                res.side = T.TileSide.M;
+            }
+
+        return res;
+    }
 
     @Override
     public boolean load(String filename) {
@@ -205,7 +304,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     void build() {
         rgBuilder = new ResourceGraphBuilder(extendedWidth, extendedHeight, 0);
-        rgBuilder.plot("rggraph.dot");
+        if (this.verbose > 5 || this.verbose == -1)
+            rgBuilder.plot("rggraph.dot");
         g = rgBuilder.getGraph();
 //        initTables();
 //        trimTables();
@@ -766,6 +866,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return new Pair<Short, Short>((short) (sinkCoor.getFirst() - endX), (short) (sinkCoor.getSecond() - endY));
     }
 
+    private Pair<Short, String> getMinDelayToSinkPin(RoutingNode beg, RoutingNode end) {
+        return getMinDelayToSinkPin( beg.tg, end.tg, beg.x, beg.y, end.x, end.y, beg.side, end.side, beg.orientation, end.orientation);
+    }
 
     private Pair<Short, String> getMinDelayToSinkPin(T.TimingGroup begTg, T.TimingGroup endTg,
                                                      short begX, short begY, short endX, short endY, T.TileSide begSide, T.TileSide endSide,
@@ -1084,21 +1187,30 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
     // -----------------------   Methods to help testing ------------------------
-    class RoutingNode {
-        short x;
-        short y;
-        T.TileSide side;
-        T.Orientation direction;
-        T.TimingGroup tg;
 
-        RoutingNode(int x, int y, String side, String direction, String tg) {
-            this.x         = (short) x;
-            this.y         = (short) y;
-            this.side      = T.TileSide.valueOf(side);
-            this.direction = T.Orientation.valueOf(direction);
-            this.tg        = T.TimingGroup.valueOf(tg);
-        }
+    void testTGmap() {
+//        // i 197 j 148  INT_X21Y109
+//        Device device = Device.getDevice("xcvu3p-ffvc1517");
+//        System.out.println("device  " + device.getName());
+//        for (int i = 50; i < 200; i = i+7) {
+//            for (int j = 50; j < 200; j = j+7){
+//                Tile t = device.getTile(i, j);
+//                System.out.println(i + " " + j + " " + t.getName());
+//            }
+//        }
+
+
+//        Device device = Device.getDevice("xcvu3p-ffvc1517");
+//        Tile t = device.getTile(197, 148);
+//        Site s = t.getSites()[0];
+//        for (int i = 0; i < s.getSitePinCount(); i++) {
+//            if (s.isOutputPin(i)) {
+//
+//            }
+//        }
+//        getConnectedNode(int pinIndex)
     }
+
 
     /**
      *
@@ -1174,10 +1286,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         RoutingNode srcInfo = route.get(0);
         short offsetX = (short) (srcCoor.getFirst() - srcInfo.x);
         short offsetY = (short) (srcCoor.getSecond() - srcInfo.y);
-        Object sourceNode = rgBuilder.getNode(route.get(0).x, route.get(0).y, route.get(0).direction, route.get(0).side, route.get(0).tg);
+        Object sourceNode = rgBuilder.getNode(route.get(0).x, route.get(0).y, route.get(0).orientation, route.get(0).side, route.get(0).tg);
         for (int i = 1; i < route.size(); i++) {
             RoutingNode sinkInfo = route.get(i);
-            Object sinkNode = rgBuilder.getNode(sinkInfo.x, sinkInfo.y, sinkInfo.direction, sinkInfo.side, sinkInfo.tg);
+            Object sinkNode = rgBuilder.getNode(sinkInfo.x, sinkInfo.y, sinkInfo.orientation, sinkInfo.side, sinkInfo.tg);
 
             TimingGroupEdge e = g.getEdge(sourceNode, sinkNode);
 
@@ -1207,8 +1319,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     int testCases(String fname) {
 
+        boolean profiling = true;
+
 //        zeroDistArrays();
-        verbose = -1; // -1 for testing
+        if (profiling)
+            verbose = 1; // 1 for profiling
+        else
+            verbose = -1; // -1 for testing
 
         class ErrorComputer {
 
@@ -1295,6 +1412,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         ErrorComputer errToTgExc  = new ErrorComputer();
         ErrorComputer errToRt     = new ErrorComputer();
         ErrorComputer errToRtExc  = new ErrorComputer();
+        int numProcessed = 0;
 
         try {
             FileWriter outfile = new FileWriter(oname);
@@ -1328,45 +1446,49 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                             // TBD
 //                            System.out.println(String.format("%3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
 
-                            System.out.println(String.format("attempt %3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
+                            if (!profiling)
+                                System.out.println(String.format("attempt %3d %3d %3d %3d   %4d %4d", sx, tx, sy, ty, tgDelay, rtDelay));
                             Pair<Short,String> res = getMinDelayToSinkPin(T.TimingGroup.CLE_OUT, T.TimingGroup.CLE_IN, sx, sy, tx, ty,
                                     T.TileSide.valueOf(sSide), T.TileSide.valueOf(tSide), T.Orientation.S, T.Orientation.S);
+                            numProcessed++;
                             short est = res.getFirst();
 
 
-                            boolean exceptionCase = false;
-                            if (exceptionSet.contains(new Pair<>(res.getSecond(),refRoute))) {
-                                exceptionCase = true;
+                            if (!profiling) {
+                                boolean exceptionCase = false;
+                                if (exceptionSet.contains(new Pair<>(res.getSecond(),refRoute))) {
+                                    exceptionCase = true;
+                                }
+
+                                String note = " ";
+                                if (exceptionCase)
+                                    note = "*";
+
+                                String delayResult = String.format("%s %3d %3d %3d %3d   %4d %4d %4d", note, sx, tx, sy, ty, est, tgDelay, rtDelay);
+                                System.out.println(delayResult);
+                                outfile.write(delayResult);
+
+                                // error compare to tgDelay
+                                int err1 = est - tgDelay;
+                                float ept1 = 100 * err1 / tgDelay;
+                                String errTgDelay = String.format("%5d %5.1f%s", err1, ept1, "%");
+                                outfile.write(errTgDelay);
+                                // error compare to rtDelay
+                                int err2 = est - rtDelay;
+                                float ept2 = 100 * err2 / rtDelay;
+                                String errRtDelay = String.format("%5d %5.1f%s", err2, ept2, "%");
+                                outfile.write(errRtDelay);
+                                outfile.write("  " + res.getSecond() + "                   : " + line);
+                                outfile.write(System.lineSeparator());
+
+
+                                if (!exceptionCase) {
+                                    errToTgExc.insert(err1, ept1, resLineNo);
+                                    errToRtExc.insert(err2, ept2, resLineNo);
+                                }
+                                errToTg.insert(err1, ept1, resLineNo);
+                                errToRt.insert(err2, ept2, resLineNo);
                             }
-
-                            String note = " ";
-                            if (exceptionCase)
-                                note = "*";
-
-                            String delayResult = String.format("%s %3d %3d %3d %3d   %4d %4d %4d", note, sx, tx, sy, ty, est, tgDelay, rtDelay);
-                            System.out.println(delayResult);
-                            outfile.write(delayResult);
-
-                            // error compare to tgDelay
-                            int err1 = est - tgDelay;
-                            float ept1 = 100 * err1 / tgDelay;
-                            String errTgDelay = String.format("%5d %5.1f%s", err1, ept1, "%");
-                            outfile.write(errTgDelay);
-                            // error compare to rtDelay
-                            int err2 = est - rtDelay;
-                            float ept2 = 100 * err2 / rtDelay;
-                            String errRtDelay = String.format("%5d %5.1f%s", err2, ept2, "%");
-                            outfile.write(errRtDelay);
-                            outfile.write("  " + res.getSecond() + "                   : " + line);
-                            outfile.write(System.lineSeparator());
-
-
-                            if (!exceptionCase) {
-                                errToTgExc.insert(err1,ept1,resLineNo);
-                                errToRtExc.insert(err2,ept2,resLineNo);
-                            }
-                            errToTg.insert(err1,ept1,resLineNo);
-                            errToRt.insert(err2,ept2,resLineNo);
                         }
                     } else {
                         System.out.println("Find comment at line " + cnt);
@@ -1378,29 +1500,31 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     line = reader.readLine();
                 }
 
-                // print summary
-                outfile.write(System.lineSeparator());
-                outfile.write(System.lineSeparator());
+                if (!profiling) {
+                    // print summary
+                    outfile.write(System.lineSeparator());
+                    outfile.write(System.lineSeparator());
 
-                // compare to tgDelay
-                System.out.println(errToTg.report("Compare to tgDelay"));
-                outfile.write(errToTg.report("Compare to tgDelay"));
-                outfile.write(System.lineSeparator());
-                // compare to rtDelay
-                System.out.println(errToRt.report("Compare to rtDelay"));
-                outfile.write(errToRt.report("Compare to rtDelay"));
-                outfile.write(System.lineSeparator());
+                    // compare to tgDelay
+                    System.out.println(errToTg.report("Compare to tgDelay"));
+                    outfile.write(errToTg.report("Compare to tgDelay"));
+                    outfile.write(System.lineSeparator());
+                    // compare to rtDelay
+                    System.out.println(errToRt.report("Compare to rtDelay"));
+                    outfile.write(errToRt.report("Compare to rtDelay"));
+                    outfile.write(System.lineSeparator());
 
 
-                // exclude exception cases
-                // compare to tgDelay
-                System.out.println(errToTgExc.report("Compare to tgDelay exc "));
-                outfile.write(errToTgExc.report("Compare to tgDelay exc "));
-                outfile.write(System.lineSeparator());
-                // compare to rtDelay
-                System.out.println(errToRtExc.report("Compare to rtDelay exc "));
-                outfile.write(errToRtExc.report("Compare to rtDelay exc "));
-                outfile.write(System.lineSeparator());
+                    // exclude exception cases
+                    // compare to tgDelay
+                    System.out.println(errToTgExc.report("Compare to tgDelay exc "));
+                    outfile.write(errToTgExc.report("Compare to tgDelay exc "));
+                    outfile.write(System.lineSeparator());
+                    // compare to rtDelay
+                    System.out.println(errToRtExc.report("Compare to rtDelay exc "));
+                    outfile.write(errToRtExc.report("Compare to rtDelay exc "));
+                    outfile.write(System.lineSeparator());
+                }
 
                 System.out.println("number test cases processed " + cnt);
             } catch (IOException e) {
@@ -1414,7 +1538,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             e.printStackTrace();
         }
 
-        return errToTg.cnt;
+        return numProcessed;
     }
 
     public static void main(String args[]) {
@@ -1425,47 +1549,51 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 
-        long endBuildTime = System.nanoTime();
-        long elapsedBuildTime = endBuildTime - startTime;
-        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
 
+        est.testTGmap();
+        return;
 
-        int count = 0;
-
-        long startLookupTime = System.nanoTime();
+//        long endBuildTime = System.nanoTime();
+//        long elapsedBuildTime = endBuildTime - startTime;
+//        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+//
+//
+//        int count = 0;
+//
+//        long startLookupTime = System.nanoTime();
 //        // diagonal in table
 //        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
-
-          //  out of table
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
-
-
-        long endLookupTime = System.nanoTime();
-        long elapsedLookupTime = endLookupTime - startLookupTime;
-
-
-        System.out.println();
-        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
-        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
-
-//        est.testOne(61, 37, 180, 150, "W", "W");
-//        est.testOne(37, 53, 60, 90, "E", "E");
-//        est.testOne(37, 37, 90, 60, "E", "E");
-//        est.testOne(37, 37, 60, 90, "E", "E");
-//        est.testOne(44, 49, 123, 123, "W", "E");
-//        est.testOne(44, 49, 123, 138, "E", "E");
-//        est.testOne(44, 45, 121, 137, "E", "E");
-//        est.testOne(44, 45, 124, 124, "E", "W");
-
-
-//        est.verifyPath();
+////        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+////        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+////        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+////
+////          //  out of table
+////        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
+////        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
+////        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
+////        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
+//
+//
+//        long endLookupTime = System.nanoTime();
+//        long elapsedLookupTime = endLookupTime - startLookupTime;
+//
+//
+//        System.out.println();
+//        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+//        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
+//        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
+//
+////        est.testOne(61, 37, 180, 150, "W", "W");
+////        est.testOne(37, 53, 60, 90, "E", "E");
+////        est.testOne(37, 37, 90, 60, "E", "E");
+////        est.testOne(37, 37, 60, 90, "E", "E");
+////        est.testOne(44, 49, 123, 123, "W", "E");
+////        est.testOne(44, 49, 123, 138, "E", "E");
+////        est.testOne(44, 45, 121, 137, "E", "E");
+////        est.testOne(44, 45, 124, 124, "E", "W");
+//
+//
+////        est.verifyPath();
 
     }
 }
