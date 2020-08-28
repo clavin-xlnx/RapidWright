@@ -73,6 +73,11 @@ public class ImmutableTimingGroup {
     public Node exitNode() {
         return exitNode;
     }
+    
+    //added by Yun
+    public Node entryNode() {
+        return entryNode;
+    }
 
 
     // ------------------------------------   private ----------------------------------------

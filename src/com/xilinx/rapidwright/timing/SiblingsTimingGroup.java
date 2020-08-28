@@ -161,6 +161,10 @@ public class SiblingsTimingGroup {
         return hashCode;
     }
 
+    //TODO added by Yun
+    public ImmutableTimingGroup[] getSiblings(){
+    	return siblings;
+    }
 
     // ------------------------------------   private ----------------------------------------
 
