@@ -74,7 +74,9 @@ public class ImmutableTimingGroup {
         return exitNode;
     }
 
-
+    public Node entryNode() {
+        return entryNode;
+    }
     // ------------------------------------   private ----------------------------------------
 
 
