@@ -48,6 +48,16 @@ import java.util.regex.Pattern;
  */
 public class SiblingsTimingGroup {
 
+    public Node getExitNode() {
+        return siblings[0].exitNode();
+    }
+
+    // TODO: remove this if we know for sure that entryNode has only one wire
+    public ImmutableTimingGroup[] getSiblings() {
+        return siblings;
+    }
+
+
     /**
      * Construct SiblingsTimingGroup from a sitePin which can be input or output.
      * This is the only public constructor of this class. Other SiblingsTimingGroups can be created indirectly from an object of this class.
