@@ -946,7 +946,9 @@ public class RoutableTimingGroupRouter{
 			new_lower_bound_total_path_cost = new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * (rnode.rnodeData.getLevel() + 1);
 			if(this.timingDriven){
 				ImmutableTimingGroup immuTG = this.findImmutableTimingGroup(rnode, childRNode);
-				System.out.println("sinkPinTG chosen: " + this.sinkPinTG.exitNode().toString());
+				System.out.println("sinkPin ImmutableTimingGroup chosen with exit node: " + this.sinkPinTG.exitNode().toString());
+				System.out.printf("Get min delay from ImmuTimingGroup ( " + immuTG.entryNode().toString() + " -> " + immuTG.exitNode().toString() + " )");
+				System.out.println(" to ( " + this.sinkPinTG.entryNode().toString() + " -> " + this.sinkPinTG.exitNode().toString() + " )");
 				new_lower_bound_total_path_cost += this.estimator.getMinDelayToSinkPin(immuTG, this.sinkPinTG);
 			}
 			
@@ -989,17 +991,16 @@ public class RoutableTimingGroupRouter{
 		for(int i = 0; i < length; i++){
 			Node entryOfSecond = immus[i].entryNode();
 			if(this.twoNodesAbutted(exitofFirst, entryOfSecond)){
-				System.out.println("ImmuTG found, parent " + exitofFirst.toString() + ", child " + immus[i].exitNode().toString());
 				return immus[i];
 			}
 		}
-		System.err.println("Null ImmutableTimingGroup found between two SiblingsTimingGroup");
+		System.err.println("Null ImmutableTimingGroup found connecting two SiblingsTimingGroup");
 		return null;
 	}
 	
-	private boolean twoNodesAbutted(Node node1, Node node2){
-		for(Node n:node1.getAllDownhillNodes()){
-			if(n.equals(node2))
+	private boolean twoNodesAbutted(Node parent, Node nodeToCheck){
+		for(Node n:parent.getAllDownhillNodes()){
+			if(n.equals(nodeToCheck))
 				return true;
 		}
 		return false;
