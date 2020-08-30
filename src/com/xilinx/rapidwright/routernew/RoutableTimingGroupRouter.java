@@ -175,7 +175,7 @@ public class RoutableTimingGroupRouter{
 				
 				if(this.isRegularNetToBeRouted(n)){
 					if(!timingDriven) this.initializeNetAndCons(n, bbRange);
-					else this.initializeNetAndCons(n, bbRange);//, timingDriven);//TODO
+					else this.initializeNetAndCons(n, bbRange, timingDriven);//TODO debugging
 					
 				}else if(this.isOnePinTypeNetWithoutPips(n)){
 					this.reserveConnectedNodesOfNetPins(n);
@@ -276,9 +276,25 @@ public class RoutableTimingGroupRouter{
 				c.setSinkRNode(sinkRNode);
 				
 				//set TimingVertex/Edge of connection c
-				c.setSourceTimingVertex(spiAndTV.get(source));
-				c.setSinkTimingVertex(spiAndTV.get(sink));
-				c.setTimingEdge(this.timingGraph,edifNet, n);//TODO bug fixing
+				if(!spiAndTV.containsKey(source)){
+					System.err.println("Map<SitePinInst, TimingVertex> from TimingGraph does not contains source " 
+							+ source.getName() + " of net " + n.getName() + ", # sink pin = " + n.getSinkPins().size());
+				}else{
+					c.setSourceTimingVertex(spiAndTV.get(source));
+				}
+				
+				if(!spiAndTV.containsKey(sink)){
+					System.err.println("Map<SitePinInst, TimingVertex> from TimingGraph does not contains sink " 
+							+ sink.getName() + " of net " + n.getName() + ", # sink pin = " + n.getSinkPins().size());
+				}else{
+					c.setSinkTimingVertex(spiAndTV.get(sink));
+				}
+				
+				if(c.getSourceTimingVertex() != null && c.getSinkTimingVertex() != null){
+					c.setTimingEdge(this.timingGraph, edifNet, n);//TODO bug fixing
+				}else{
+					System.err.println();
+				}
 				
 				this.connections.add(c);
 				c.setNet(np);

@@ -21,6 +21,7 @@
 package com.xilinx.rapidwright.timing;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.device.Device;
 
 /**
@@ -59,6 +60,7 @@ public class TimingManager {
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
         this.design = design;
+        DesignTools.createMissingSitePinInsts(this.design);//TODO Yun added to check if this helps the null TimingVertex
         this.device = design.getDevice();
         if (doBuild)
             build();

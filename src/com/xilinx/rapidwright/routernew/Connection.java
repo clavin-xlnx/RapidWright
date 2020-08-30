@@ -98,13 +98,6 @@ public class Connection{
 	
 	//TODO debug
 	public void setTimingEdge(TimingGraph timingGraph, EDIFNet edifNet, Net n) {
-		if(this.sourceTimingVertex == null || this.getSinkTimingVertex() == null){
-			System.err.println("Net: " + n.getName() + ", sink pins: " + n.getSinkPins().size());
-			if(this.sourceTimingVertex == null)
-				System.err.println("  Null TimingVertex of Con source pin " + this.source.getName());
-			if(this.sinkTimingVertex == null)
-				System.err.println("  Null TimingVertex of Con sink pin " + this.sink.getName());
-		}
 		this.timingEdge = new TimingEdge(timingGraph, this.sourceTimingVertex, this.sinkTimingVertex, edifNet, n);
 	}
 
