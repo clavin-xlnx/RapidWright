@@ -54,14 +54,15 @@ public class TimingManager {
      * want to build the TimingGraph yet.
      */
     public TimingManager(Design design, boolean doBuild) {
-        timingModel = new TimingModel(design.getDevice());
-        timingGraph = new TimingGraph(design);
+    	this.design = design;
+        DesignTools.createMissingSitePinInsts(this.design);//TODO Yun added to check if this helps the null TimingVertex
+        
+        timingModel = new TimingModel(this.design.getDevice());
+        timingGraph = new TimingGraph(this.design);
         timingModel.setTimingManager(this);
         timingGraph.setTimingManager(this);
         timingGraph.setTimingModel(timingModel);
-        this.design = design;
-        DesignTools.createMissingSitePinInsts(this.design);//TODO Yun added to check if this helps the null TimingVertex
-        this.device = design.getDevice();
+        this.device = this.design.getDevice();
         if (doBuild)
             build();
     }
