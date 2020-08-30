@@ -76,7 +76,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @param width   Width of delay tables.
      * @param height  Height of delay tables.
      */
-    DelayEstimatorTable(Device device, T ictInfo, short width, short height, int verbose) {
+	//TODO changed to public by Yun
+    public DelayEstimatorTable(Device device, T ictInfo, short width, short height, int verbose) {
         super(device, ictInfo, verbose);
 
 //        assert width < ictInfo.minTableWidth() :

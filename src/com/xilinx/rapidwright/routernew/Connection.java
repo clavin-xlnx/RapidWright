@@ -3,8 +3,11 @@ package com.xilinx.rapidwright.routernew;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.timing.TimingEdge;
+import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingVertex;
 
 public class Connection{
@@ -32,6 +35,7 @@ public class Connection{
 		
 		this.source = source;
 		this.sink = sink;
+		this.criticality = 0.99f;
 		
 		this.boundingBox = this.calculateBoundingBox();
 		
@@ -72,6 +76,38 @@ public class Connection{
 		return this.net;
 	}
 	
+	public TimingVertex getSourceTimingVertex() {
+		return sourceTimingVertex;
+	}
+
+	public void setSourceTimingVertex(TimingVertex sourceTimingVertex) {
+		this.sourceTimingVertex = sourceTimingVertex;
+	}
+
+	public TimingVertex getSinkTimingVertex() {
+		return sinkTimingVertex;
+	}
+
+	public void setSinkTimingVertex(TimingVertex sinkTimingVertex) {
+		this.sinkTimingVertex = sinkTimingVertex;
+	}
+
+	public TimingEdge getTimingEdge() {
+		return timingEdge;
+	}
+	
+	//TODO debug
+	public void setTimingEdge(TimingGraph timingGraph, EDIFNet edifNet, Net n) {
+		if(this.sourceTimingVertex == null || this.getSinkTimingVertex() == null){
+			System.err.println("Net: " + n.getName() + ", sink pins: " + n.getSinkPins().size());
+			if(this.sourceTimingVertex == null)
+				System.err.println("  Null TimingVertex of Con source pin " + this.source.getName());
+			if(this.sinkTimingVertex == null)
+				System.err.println("  Null TimingVertex of Con sink pin " + this.sink.getName());
+		}
+		this.timingEdge = new TimingEdge(timingGraph, this.sourceTimingVertex, this.sinkTimingVertex, edifNet, n);
+	}
+
 	public void printInfo(String s){
 		System.out.println(s);
 	}
@@ -217,8 +253,7 @@ public class Connection{
 		this.rnodes.add(rn);	
 	}
 
-	public int getCriticality() {
-		// TODO Auto-generated method stub
-		return 0;
+	public float getCriticality() {
+		return this.criticality;
 	}
 }

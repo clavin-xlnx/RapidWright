@@ -43,7 +43,7 @@ public class TimingVertex {
      * slices of a bus (for example some pins on CARRY8 have indices).  The physical name for pins 
      * do not contain square brackets.
      */
-    TimingVertex(String name) {
+    public TimingVertex(String name) {//TODO changed to public - Yun needed
         this.name = name;
         //the lines below can be useful for debug
         //if (name.startsWith("Parser_inst/stage_0/tupleForward_inst/PktEop_d_1_i_1__1/")) { //Parser_inst/stage_0/MUX_PKT_VLD_reg/Q")) {

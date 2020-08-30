@@ -308,7 +308,7 @@ public class InterconnectInfo {
     private Map<TimingGroup, Short> minDetourMapFrTg;
     private Map<TimingGroup, Short> minDetourMapToTg;
 
-    InterconnectInfo() {
+    public InterconnectInfo() {//TODO changed to public by Yun
         buildInterconnectHier();
     }
 

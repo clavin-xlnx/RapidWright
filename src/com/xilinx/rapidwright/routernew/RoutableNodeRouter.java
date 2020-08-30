@@ -466,7 +466,7 @@ public class RoutableNodeRouter{
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
 //				this.debugRoutingCon = true;//TODO fix cycles in the tree
-//				this.fixIllegalTree(sortedListOfConnection);
+				this.fixIllegalTree(sortedListOfConnection);
 				this.routerTimer.rerouteIllegal.finish();
 			}
 			

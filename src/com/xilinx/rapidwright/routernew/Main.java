@@ -26,6 +26,7 @@ public class Main {
 	private float pres_fac_mult = 2f; 
 	private float acc_fac = 1;
 	private float base_cost_fac = 1;
+	private boolean timingDriven = false;
 	
 	public Main(String[] arguments) {
 		if(arguments.length < 2){
@@ -80,6 +81,8 @@ public class Main {
 					this.base_cost_fac = Float.parseFloat(arguments[++i]);
 //				}
 				
+			}else if(arguments[i].contains("timingDriven")){
+				this.timingDriven = true;
 			}
 		}
 	}
@@ -196,7 +199,8 @@ public class Main {
 						this.initial_pres_fac,
 						this.pres_fac_mult,
 						this.acc_fac,
-						this.base_cost_fac);
+						this.base_cost_fac,
+						this.timingDriven);
 				
 				router.designInfo();
 				this.routerConfigurationInfo();

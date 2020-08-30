@@ -291,7 +291,7 @@ public class RoutableTimingGroup implements Routable{
 		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
 	}
 
-	public SiblingsTimingGroup getTimingGroup() {
+	public SiblingsTimingGroup getSiblingsTimingGroup() {
 		return this.sibTimingGroups;
 	}
 	

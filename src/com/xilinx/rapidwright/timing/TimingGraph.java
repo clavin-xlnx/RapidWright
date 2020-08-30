@@ -51,6 +51,7 @@ import java.util.LinkedHashMap;
 import java.util.Queue;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.Collection;
@@ -82,6 +83,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     ArrayList<EDIFHierCellInst> set;
     private HashMap<String, TimingVertex> safeVertexCheck = new HashMap<>();
     static HashSet<String> unisimFlipFlopTypes;
+    
+    //TODO Yun needed
+    Map<SitePinInst, TimingVertex> spiAndtimingVertex = new HashMap<>();
 
     static {
         
@@ -1092,7 +1096,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
         logicDelay = 0f;
 
-
+       
+        
         for (EDIFHierPortInst hport : hports) {
             String portName = hport.getPortInst().getName();
             String cellName = hport.getFullHierarchicalInstName();
@@ -1205,7 +1210,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             e = getEdge(vS, vD);
             if (e == null)
                 e = new TimingEdge(this, vS, vD, edifNet, net);
-
+            
+            //Yun
+            if(vS == null || vD == null)
+            	System.err.println("vS / vD is null");//Yun - no printouts - move Design.createMissingSitePin... before timing graph?
+          //TODO Yun needed
+            this.spiAndtimingVertex.put(local_spi_source, vS);
+            this.spiAndtimingVertex.put(spi_sink, vD);
 
             boolean forceUpdateEdge = false;
             float netDelay = 0f;
@@ -1266,8 +1277,17 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             e.setSecondSitePinInst(spi_sink);
             safeAddEdge(vS, vD, e);
             setEdgeWeight(e, e.getDelay());
+            
         }
         return 1;
+    }
+    
+    /**
+     * Returns a map of <SitePinInst, TimingVertex> for the timing-driven router
+     * Yun needed
+     */
+    public Map<SitePinInst, TimingVertex> getSpiAndTimingVertex(){
+    	return this.spiAndtimingVertex;
     }
 
     /**

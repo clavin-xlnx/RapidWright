@@ -114,7 +114,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      */
     private void buildDistanceArrays(TimingModel tm) {
 
-        boolean usePMTable = true;
+        boolean usePMTable = false;//TODO Yun changed to false, because of missing .txt files
 
         // TODO: somehow I cannot use Function<T,R>. I get "target method is generic" error.
         BuildAccumulativeList<Short> buildAccumulativeList = (list) ->
