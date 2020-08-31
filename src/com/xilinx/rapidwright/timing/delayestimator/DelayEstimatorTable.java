@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.timing.delayestimator;
 
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
@@ -186,6 +187,26 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         }
         RoutingNode() {
         }
+        void setHorTG(short len) {
+            if (len == 1)
+                this.tg = T.TimingGroup.valueOf("HORT_SINGLE");
+            else if (len == 2)
+                this.tg = T.TimingGroup.valueOf("HORT_DOUBLE");
+            else if (len == 4)
+                this.tg = T.TimingGroup.valueOf("HORT_QUAD");
+            else
+                this.tg = T.TimingGroup.valueOf("HORT_LONG");
+        }
+        void setVerTG(short len) {
+            if (len == 1)
+                this.tg = T.TimingGroup.valueOf("VERT_SINGLE");
+            else if (len == 2)
+                this.tg = T.TimingGroup.valueOf("VERT_DOUBLE");
+            else if (len == 4)
+                this.tg = T.TimingGroup.valueOf("VERT_QUAD");
+            else
+                this.tg = T.TimingGroup.valueOf("VERT_LONG");
+        }
         public String toString() {
             return String.format("x:%d y:%d %s %s %s", x,y,side.name(),tg.name(),orientation.name());
         }
@@ -222,7 +243,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
     private RoutingNode getTermInfo(ImmutableTimingGroup tg) {
         Node node = tg.exitNode();
-        Pattern tilePattern     = Pattern.compile("X([\\d]+)Y([\\d]+)");
+        Pattern tilePattern = Pattern.compile("X([\\d]+)Y([\\d]+)");
+        Pattern EE          = Pattern.compile("EE([\\d]+)");
+        Pattern WW          = Pattern.compile("WW([\\d]+)");
+        Pattern NN          = Pattern.compile("NN([\\d]+)");
+        Pattern SS          = Pattern.compile("SS([\\d]+)");
 
         RoutingNode res = new RoutingNode();
 
@@ -241,12 +266,39 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         String[] tg_side = int_node[1].split("_");
 
         // THIS IF MUST BE ABOVE THE IF BELOW (for res.side).
-        if (tg_side[0].startsWith("SS") || tg_side[0].startsWith("WW"))
-            res.orientation = T.Orientation.D;
-        else if (tg_side[0].startsWith("NN") || tg_side[0].startsWith("EE"))
+        // Can't use intendCode because there are two kinds of NODE_SINGLE, internal and not
+        Matcher EEMatcher = EE.matcher(tg_side[0]);
+        if (EEMatcher.find()) {
             res.orientation = T.Orientation.U;
-        else
-            res.orientation = T.Orientation.S;
+            res.setHorTG(Short.valueOf(EEMatcher.group(1)));
+        } else {
+            Matcher WWMatcher = WW.matcher(tg_side[0]);
+            if (WWMatcher.find()) {
+                res.orientation = T.Orientation.D;
+                res.setHorTG(Short.valueOf(WWMatcher.group(1)));
+            } else {
+                Matcher NNMatcher = NN.matcher(tg_side[0]);
+                if (NNMatcher.find()) {
+                    res.orientation = T.Orientation.U;
+                    res.setVerTG(Short.valueOf(NNMatcher.group(1)));
+                } else {
+                    Matcher SSMatcher = SS.matcher(tg_side[0]);
+                    if (SSMatcher.find()) {
+                        res.orientation = T.Orientation.D;
+                        res.setVerTG(Short.valueOf(SSMatcher.group(1)));
+                    } else {
+                        res.orientation = T.Orientation.S;
+                        // For internal single, it will be set by the below
+                        if (tg_side[0].startsWith("BYPASS"))
+                            res.tg = T.TimingGroup.valueOf("BOUNCE");
+                        else if (tg_side[0].startsWith("IMUX"))
+                            res.tg = T.TimingGroup.valueOf("CLE_IN");
+                        else
+                            res.tg = T.TimingGroup.valueOf("CLE_OUT");
+                    }
+                }
+            }
+        }
 
         // THIS IF MUST BE BELOW THE IF ABOVE (for res.orientation).
         if (tg_side[1].startsWith("E"))
@@ -260,6 +312,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 res.side = findTileSideForInternalSingle(tg.entryNode());
                 // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
                 res.orientation = (res.side == T.TileSide.E) ? T.Orientation.D : T.Orientation.U;
+                res.tg = T.TimingGroup.valueOf("BOUNCE");
             } else {
                 res.side = T.TileSide.M;
             }
@@ -1541,6 +1594,26 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return numProcessed;
     }
 
+    ImmutableTimingGroup createTG(String exitNodeName, String entryNodeName, Device device) {
+        Node exitNode  = new Node(exitNodeName, device);
+        Node entryNode = new Node(entryNodeName, device);
+        // check if they are connected. Can't check if it indeed a valid TG.
+        boolean connected = false;
+        for (Node n : entryNode.getAllDownhillNodes()) {
+            if (n.equals(exitNode)) {
+                connected = true;
+                break;
+            }
+        }
+
+        if (!connected)
+            System.out.println(entryNodeName + " and " + exitNodeName + " are not connected.");
+
+        IntentCode exitIC  = exitNode.getAllWiresInNode()[0].getIntentCode();
+        IntentCode entryIC = exitNode.getAllWiresInNode()[0].getIntentCode();
+        return new ImmutableTimingGroup(exitNode, entryNode, exitIC, entryIC);
+    }
+
     public static void main(String args[]) {
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
@@ -1550,7 +1623,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 
 
-        est.testTGmap();
+        ImmutableTimingGroup src = est.createTG("INT_X11Y108/EE4_W_BEG1",
+                                  "INT_X11Y108/INT_NODE_SDQ_53_INT_OUT0", device);
+        ImmutableTimingGroup dst = est.createTG("INT_X11Y107/IMUX_W2",
+                                                "INT_X11Y107/VCC_WIRE", device);
+
+        est.getMinDelayToSinkPin(src, dst);
+//        est.testTGmap();
         return;
 
 //        long endBuildTime = System.nanoTime();

@@ -74,21 +74,17 @@ public class InterconnectInfo {
     //
     // override must be a superset. length and index can be changed.
     public static enum TimingGroup {
+        // TODO: add global
         // direction, length and index (to lookup d)
         VERT_SINGLE (Direction.VERTICAL, GroupDelayType.SINGLE,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'S'),
         VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 2, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'D'),
         VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 4, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'Q'),
         VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 12, Behavior.GO_BOTH_SIDES, new TileSide[]{TileSide.M},'L'),
-//        VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'D'),
-//        VERT_QUAD   (Direction.VERTICAL, GroupDelayType.QUAD,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'Q'),
-//        VERT_LONG   (Direction.VERTICAL, GroupDelayType.LONG,(short) 1, Behavior.GO_BOTH_SIDES, new TileSide[]{TileSide.M},'L'),
 
         HORT_SINGLE  (Direction.HORIZONTAL, GroupDelayType.SINGLE,(short) 1, Behavior.SWITCH_SIDE_EXTERNAL, new TileSide[]{TileSide.E,TileSide.W},'s'),
         HORT_DOUBLE  (Direction.HORIZONTAL, GroupDelayType.DOUBLE,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'d'),
         HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 2, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'q'),
         HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 6, Behavior.GO_BOTH_SIDES, new TileSide[]{TileSide.M},'l'),
-//        HORT_QUAD    (Direction.HORIZONTAL, GroupDelayType.QUAD,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'q'),
-//        HORT_LONG    (Direction.HORIZONTAL, GroupDelayType.LONG,(short) 1, Behavior.GO_BOTH_SIDES, new TileSide[]{TileSide.M},'l'),
 
         CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0, Behavior.STATIONARY, new TileSide[]{TileSide.E,TileSide.W}, '-'),
         CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0, Behavior.STATIONARY, new TileSide[]{TileSide.E,TileSide.W}, '-'),
