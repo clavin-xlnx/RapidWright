@@ -32,15 +32,12 @@ import com.xilinx.rapidwright.util.Pair;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
 /**
@@ -114,7 +111,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      */
     private void buildDistanceArrays(TimingModel tm) {
 
-        boolean usePMTable = true;
+        boolean usePMTable = false;
 
         // TODO: somehow I cannot use Function<T,R>. I get "target method is generic" error.
         BuildAccumulativeList<Short> buildAccumulativeList = (list) ->
@@ -194,6 +191,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         distArrays.get(T.Direction.INPUT).put(GroupDelayType.PINFEED, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
         distArrays.get(T.Direction.LOCAL).put(GroupDelayType.PIN_BOUNCE, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
         distArrays.get(T.Direction.OUTPUT).put(GroupDelayType.OTHER, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
+        distArrays.get(T.Direction.HORIZONTAL).put(GroupDelayType.GLOBAL, new ArrayList<Short>(Collections.nCopies(Math.max(numRow,numCol), (short) 0)));
 
 
         if (false) {
@@ -263,6 +261,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             tk0.put(GroupDelayType.DOUBLE, 43f);
             tk0.put(GroupDelayType.QUAD, 43f);
             tk0.put(GroupDelayType.LONG, 43f);
+            tk0.put(GroupDelayType.GLOBAL, 43f);
             K0.put(T.Direction.HORIZONTAL, tk0);
 
             Map<GroupDelayType, Float> tk1 = new EnumMap<>(GroupDelayType.class);
@@ -270,6 +269,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             tk1.put(GroupDelayType.DOUBLE, 3.5f);
             tk1.put(GroupDelayType.QUAD, 3.5f);
             tk1.put(GroupDelayType.LONG, 3.5f);
+            tk1.put(GroupDelayType.GLOBAL, 3.5f);
             K1.put(T.Direction.HORIZONTAL, tk1);
 
             Map<GroupDelayType, Float> tk2 = new EnumMap<>(GroupDelayType.class);
@@ -277,6 +277,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             tk2.put(GroupDelayType.DOUBLE, 2.3f);
             tk2.put(GroupDelayType.QUAD, 2.4f);
             tk2.put(GroupDelayType.LONG, 1.3f);
+            tk2.put(GroupDelayType.GLOBAL, 1.3f);
             K2.put(T.Direction.HORIZONTAL, tk2);
 
             Map<GroupDelayType, Short> tl = new EnumMap<>(GroupDelayType.class);
@@ -284,6 +285,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             tl.put(GroupDelayType.DOUBLE, (short) 5);
             tl.put(GroupDelayType.QUAD, (short) 10);
             tl.put(GroupDelayType.LONG, (short) 14);
+            tl.put(GroupDelayType.GLOBAL, (short) 13);
             L.put(T.Direction.HORIZONTAL, tl);
         }
 
