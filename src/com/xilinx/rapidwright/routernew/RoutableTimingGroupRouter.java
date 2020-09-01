@@ -118,9 +118,11 @@ public class RoutableTimingGroupRouter{
 		this.timingModel = tm.getTimingModel();
 		this.timingGraph = tm.getTimingGraph();
 		
-		Device device = Device.getDevice("xcvu3p-ffvc1517");
-		InterconnectInfo ictInfo = new InterconnectInfo();
-        this.estimator = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
+		if(timingDriven){
+			Device device = Device.getDevice("xcvu3p-ffvc1517");
+			InterconnectInfo ictInfo = new InterconnectInfo();
+	        this.estimator = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
+		}
 		
 		this.reservedNodes = new HashSet<>();
 		this.rnodesCreated = new HashMap<>();
@@ -599,7 +601,8 @@ public class RoutableTimingGroupRouter{
 	
 	public void fixIllegalTree(List<Connection> cons) {
 //		this.printInfo("checking if there is any illegal node");	
-		int numIllegal = this.getIllegalNumRNodes(cons);	
+		int numIllegal = this.getIllegalNumRNodes(cons);
+		GraphHelper graphHelper = new GraphHelper();
 		if(numIllegal > 0){
 //			this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
 			
@@ -619,51 +622,61 @@ public class RoutableTimingGroupRouter{
 //			this.printInfo("There are " + illegalTrees.size() + " illegal trees");
 			//find the illegal connections and fix illegal trees
 			for(Netplus illegalTree : illegalTrees){
-				Routable illegalRNode;
-				while((illegalRNode = illegalTree.getIllegalRNode()) != null){
-					List<Connection> illegalCons = new ArrayList<>();
-					for(Connection con : illegalTree.getConnection()) {
-						for(Routable rnode : con.rnodes) {
-							if(rnode.equals(illegalRNode)) {
-								illegalCons.add(con);
-							}
-						}
-					}
-					
-					//fixing the illegal trees, since there is no criticality info, use the hops info
-					//Find the illegal connection with maximum number of RNodes (hops)
-					Connection maxCriticalConnection = illegalCons.get(0);
-					for(Connection illegalConnection : illegalCons) {
-						if(illegalConnection.rnodes.size() > maxCriticalConnection.rnodes.size()) {
-							maxCriticalConnection = illegalConnection;
-						}
-					}
-					
-					//Get the path from the connection with maximum hops
-					List<Routable> newRouteNodes = new ArrayList<>();
-					boolean add = false;
-					for(Routable newRouteNode : maxCriticalConnection.rnodes) {
-						if(newRouteNode.equals(illegalRNode)) add = true;
-						if(add) newRouteNodes.add(newRouteNode);
-					}
-					
-					//Replace the path of each illegal connection with the path from the connection with maximum hops
-					for(Connection illegalConnection : illegalCons) {
-						this.ripup(illegalConnection);
-						
-						//Remove illegal path from routing tree
-						while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode));
-						
-						//Add new path to routing tree
-						for(Routable newRouteNode : newRouteNodes) {
-							illegalConnection.addRNode(newRouteNode);
-						}
-						
-						this.add(illegalConnection);
-					}
-					
+				boolean isCyclic = graphHelper.isCyclic(illegalTree);
+				if(isCyclic){
+					//remove cycles
+					graphHelper.cutOffCycles(illegalTree);
+				}else{
+					this.handleNoCyclicIllegalRoutingTree(illegalTree);
 				}
 			}
+		}
+	}
+	
+	public void handleNoCyclicIllegalRoutingTree(Netplus illegalTree){
+		Routable illegalRNode;
+		while((illegalRNode = illegalTree.getIllegalRNode()) != null){
+			List<Connection> illegalCons = new ArrayList<>();
+			for(Connection con : illegalTree.getConnection()) {
+				for(Routable rnode : con.rnodes) {
+					if(rnode.equals(illegalRNode)) {
+						illegalCons.add(con);
+					}
+				}
+			}
+			
+			//fixing the illegal trees, since there is no criticality info, use the hops info
+			//Find the illegal connection with maximum number of RNodes (hops)
+			Connection maxCriticalConnection = illegalCons.get(0);
+			for(Connection illegalConnection : illegalCons) {
+				if(illegalConnection.rnodes.size() > maxCriticalConnection.rnodes.size()) {
+					maxCriticalConnection = illegalConnection;
+				}
+			}
+			
+			//Get the path from the connection with maximum hops
+			List<Routable> newRouteNodes = new ArrayList<>();
+			boolean add = false;
+			for(Routable newRouteNode : maxCriticalConnection.rnodes) {
+				if(newRouteNode.equals(illegalRNode)) add = true;
+				if(add) newRouteNodes.add(newRouteNode);
+			}
+			
+			//Replace the path of each illegal connection with the path from the connection with maximum hops
+			for(Connection illegalConnection : illegalCons) {
+				this.ripup(illegalConnection);
+				
+				//Remove illegal path from routing tree
+				while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode));
+				
+				//Add new path to routing tree
+				for(Routable newRouteNode : newRouteNodes) {
+					illegalConnection.addRNode(newRouteNode);
+				}
+				
+				this.add(illegalConnection);
+			}
+			
 		}
 	}
 	
