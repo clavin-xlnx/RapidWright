@@ -193,4 +193,9 @@ public class RoutableWire implements Routable{
 		this.target = isTarget;	
 	}
 
+	@Override
+	public RoutableType getRoutableType() {
+		return this.type;
+	}
+
 }

@@ -22,4 +22,6 @@ public interface Routable {
 	public boolean isInBoundingBoxLimit(Connection con);
 	public String toString();
 	public int hashCode();
+	public RoutableType getRoutableType();
+
 }

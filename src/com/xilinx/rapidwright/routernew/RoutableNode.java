@@ -301,5 +301,10 @@ public class RoutableNode implements Routable{
 	public void setTarget(boolean isTarget) {
 		this.target = isTarget;	
 	}
+
+	@Override
+	public RoutableType getRoutableType() {
+		return this.type;
+	}
 	
 }

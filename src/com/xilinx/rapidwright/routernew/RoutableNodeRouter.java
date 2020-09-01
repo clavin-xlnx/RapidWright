@@ -670,19 +670,19 @@ public class RoutableNodeRouter{
 	}
 	public int getIllegalNumRNodes(List<Connection> cons){
 		Set<Routable> illegal = new HashSet<>();
-		Map<Routable, Set<Integer>> illegalRNandNets = new HashMap<>();
+		Map<Routable, Set<String>> illegalRNandNets = new HashMap<>();
 		for(Connection c:cons){
 			for(Routable rn:c.rnodes){
 				if(rn.illegal()){
 					illegal.add(rn);
 					if(this.debugRoutingCon){
 						if(!illegalRNandNets.containsKey(rn.hashCode())){
-							Set<Integer> nets = new HashSet<>();
-							nets.add(c.getNet().getId());
+							Set<String> nets = new HashSet<>();
+							nets.add(c.getNet().getNet().getName());
 							illegalRNandNets.put(rn, nets);
 						}else{
-							Set<Integer> tmp = illegalRNandNets.get(rn.hashCode());
-							tmp.add(c.getNet().getId());
+							Set<String> tmp = illegalRNandNets.get(rn.hashCode());
+							tmp.add(c.getNet().getNet().getName());
 							illegalRNandNets.put(rn, tmp);
 						}
 					}
@@ -705,11 +705,12 @@ public class RoutableNodeRouter{
 	}
 	
 	public void fixIllegalTree(List<Connection> cons) {
-// 		if(this.debugRoutingCon) this.printInfo("fix illegal tree"); 
-//		if(this.debugRoutingCon) this.printInfo("checking if there is any illegal node");	
+ 		if(this.debugRoutingCon) this.printInfo("fix illegal tree"); 
+		if(this.debugRoutingCon) this.printInfo("checking if there is any illegal node");	
 		int numIllegal = this.getIllegalNumRNodes(cons);	
+		GraphHelper graphHelper = new GraphHelper();
 		if(numIllegal > 0){
-//			if(this.debugRoutingCon) this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
+			if(this.debugRoutingCon) this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
 			
 			List<Netplus> illegalTrees = new ArrayList<>();
 			for(Netplus net : this.nets) {
@@ -735,91 +736,98 @@ public class RoutableNodeRouter{
 				}
 			}*/
 			//find the illegal connections and fix illegal trees
-			for(Netplus illegalTree : illegalTrees){
-//				if(this.debugRoutingCon) this.printInfo("fixing net: " + illegalTree.hashCode());
-				Routable illegalRNode;
-				//TODO bug fixing, gnl_2_4_7_1.3_gnl_2500_05_7_80_80 routing got stuck here
-				while((illegalRNode = illegalTree.getIllegalRNode()) != null){
-//					if(this.debugRoutingCon) System.out.println("dealing rnode: " + illegalRNode.hashCode());
-					Set<Connection> illegalCons = new HashSet<>();
-					for(Connection con : illegalTree.getConnection()) {
-						for(Routable rnode : con.rnodes) {
-							if(rnode.equals(illegalRNode)) {
-								illegalCons.add(con);
-							}
-						}
+			for(Netplus illegalTree:illegalTrees){
+				if(this.debugRoutingCon) System.out.println("Net " + illegalTree.getNet().getName() + " routing tree is cyclic? ");
+				
+				boolean isCyclic = graphHelper.isCyclic(illegalTree);
+				if(isCyclic){
+					//remove cycles
+					System.out.println("is cyclic");
+//					for(Connection con:illegalTree.getConnection()){
+//						System.out.println(con.toString());
+//						this.printConRNodes(con);
+//					}
+					graphHelper.cutOffCycles(illegalTree);
+				}else{
+					if(this.debugRoutingCon) this.printInfo("fixing net: " + illegalTree.hashCode());
+					this.handleNoCyclicIllegalRoutingTree(illegalTree);
+				}
+//				
+			}
+		}
+	}
+	
+	public void handleNoCyclicIllegalRoutingTree(Netplus illegalTree){
+		Routable illegalRNode;
+		while((illegalRNode = illegalTree.getIllegalRNode()) != null){
+//			if(this.debugRoutingCon) System.out.println("dealing rnode: " + illegalRNode.hashCode());
+			Set<Connection> illegalCons = new HashSet<>();
+			for(Connection con : illegalTree.getConnection()) {
+				for(Routable rnode : con.rnodes) {
+					if(rnode.equals(illegalRNode)) {
+						illegalCons.add(con);
 					}
-					
-					/*if(this.debugRoutingCon){
-						if(illegalTree.hashCode() == 697){
-							this.printInfo("illegal rnode id = " + illegalRNode.hashCode());
-							for(Connection con:illegalCons){
-								this.printInfo("  illegal con id = " + con.id);
-							}
-							System.out.println();
-						}
-					}*/
-					
-					//fixing the illegal trees, since there is no criticality info, use the hops info
-					//Find the illegal connection with maximum number of RNodes (hops)
-					Connection maxCriticalConnection = (Connection) illegalCons.toArray()[0];
-					for(Connection illegalConnection : illegalCons) {
-						if(illegalConnection.rnodes.size() < maxCriticalConnection.rnodes.size()) {
-							maxCriticalConnection = illegalConnection;
-						}
-					}
-//					if(this.debugRoutingCon) this.printInfo("  max con" + maxCriticalConnection.id);
-					//Get the path from the connection with maximum hops
-					List<Routable> newRouteNodes = new ArrayList<>();
-					boolean add = false;
-					for(Routable newRouteNode : maxCriticalConnection.rnodes) {
-						if(newRouteNode.equals(illegalRNode)) add = true;
-						if(add) newRouteNodes.add(newRouteNode);
-					}
-					
-					/*if(this.debugRoutingCon){
-						System.out.println("new rnodes: " + newRouteNodes.size());
-						for(Routable r:newRouteNodes){
-							System.out.println(r.hashCode());
-						}
-						
-					}*/
-					
-					//Replace the path of each illegal connection with the path from the connection with maximum hops
-					for(Connection illegalConnection : illegalCons) {
-						this.ripup(illegalConnection);
-						
-						//Remove illegal path from routing tree
-						while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode));
-						
-						/*if(this.debugRoutingCon){
-							System.out.println("Con rnodes after removing: " + illegalConnection.rnodes.size());
-							for(Routable rn:illegalConnection.rnodes){
-								System.out.println(rn.hashCode());
-							}
-						}*/
-						
-						//Add new path to routing tree
-						for(Routable newRouteNode : newRouteNodes) {
-							illegalConnection.addRNode(newRouteNode);
-						}
-						
-						/*if(this.debugRoutingCon){
-							System.out.println("Con " + illegalConnection.id + " rnodes after adding: " + illegalConnection.rnodes.size());
-							for(Routable rn:illegalConnection.rnodes){
-								System.out.println("rnode id = " + rn.hashCode());
-							}
-						}*/
-						
-						this.add(illegalConnection);
-						/*if(this.debugRoutingCon) {
-							this.printInfo(illegalConnection.toString());
-							this.printConRNodes(illegalConnection);
-						}*/
-					}
-					
 				}
 			}
+			
+			//fixing the illegal trees, since there is no criticality info, use the hops info
+			//Find the illegal connection with maximum number of RNodes (hops)
+			Connection maxCriticalConnection = (Connection) illegalCons.toArray()[0];
+			for(Connection illegalConnection : illegalCons) {
+				if(illegalConnection.rnodes.size() > maxCriticalConnection.rnodes.size()) {
+					maxCriticalConnection = illegalConnection;
+				}
+			}
+			if(this.debugRoutingCon) this.printInfo("  max con" + maxCriticalConnection.id);
+			//Get the path from the connection with maximum hops
+			List<Routable> newRouteNodes = new ArrayList<>();
+			boolean add = false;
+			for(Routable newRouteNode : maxCriticalConnection.rnodes) {
+				if(newRouteNode.equals(illegalRNode)) add = true;
+				if(add) newRouteNodes.add(newRouteNode);
+			}
+			
+			/*if(this.debugRoutingCon){
+				System.out.println("new rnodes: " + newRouteNodes.size());
+				for(Routable r:newRouteNodes){
+					System.out.println(r.hashCode());
+				}
+				
+			}*/
+			
+			//Replace the path of each illegal connection with the path from the connection with maximum hops
+			for(Connection illegalConnection : illegalCons) {
+				this.ripup(illegalConnection);
+				
+				//Remove illegal path from routing tree
+				while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode));
+				
+				/*if(this.debugRoutingCon){
+					System.out.println("Con rnodes after removing: " + illegalConnection.rnodes.size());
+					for(Routable rn:illegalConnection.rnodes){
+						System.out.println(rn.hashCode());
+					}
+				}*/
+				
+				//Add new path to routing tree
+				for(Routable newRouteNode : newRouteNodes) {
+					illegalConnection.addRNode(newRouteNode);
+				}
+				
+				/*if(this.debugRoutingCon){
+					System.out.println("Con " + illegalConnection.id + " rnodes after adding: " + illegalConnection.rnodes.size());
+					for(Routable rn:illegalConnection.rnodes){
+						System.out.println("rnode id = " + rn.hashCode());
+					}
+				}*/
+				
+				this.add(illegalConnection);
+				/*if(this.debugRoutingCon) {
+					this.printInfo(illegalConnection.toString());
+					this.printConRNodes(illegalConnection);
+				}*/
+			}
+			
 		}
 	}
 	
@@ -1018,7 +1026,9 @@ public class RoutableNodeRouter{
 	
 	public void printConRNodes(Connection con){
 		if(this.debugRoutingCon){
-			for(Routable rn:con.rnodes){
+//			for(Routable rn:con.rnodes){
+			for(int i = con.rnodes.size() - 1; i >= 0; i-- ){
+				Routable rn = con.rnodes.get(i);
 				this.printInfo(((RoutableNode)(rn)).toString());
 			}
 			this.printInfo("");	

@@ -304,5 +304,10 @@ public class RoutableTimingGroup implements Routable{
 	public void setTarget(boolean isTarget) {
 		this.target = isTarget;	
 	}
+
+	@Override
+	public RoutableType getRoutableType() {
+		return this.type;
+	}
 	
 }
