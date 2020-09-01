@@ -162,6 +162,8 @@ public class RoutableTimingGroupRouter{
 		this.nets = new ArrayList<>();
 		this.connections = new ArrayList<>();
 		
+		DesignTools.createMissingSitePinInsts(design);//TODO this is moved to TimingGraph for timing-driven version
+		
 		//source pin only for creating a timing group using a sitePinInst
 		for(Net n:this.design.getNets()){
 			
