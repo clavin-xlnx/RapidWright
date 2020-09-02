@@ -74,7 +74,6 @@ public class InterconnectInfo {
     //
     // override must be a superset. length and index can be changed.
     public static enum TimingGroup {
-        // TODO: add global
         // direction, length and index (to lookup d)
         VERT_SINGLE (Direction.VERTICAL, GroupDelayType.SINGLE,(short) 1, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'S'),
         VERT_DOUBLE (Direction.VERTICAL, GroupDelayType.DOUBLE,(short) 2, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'D'),
@@ -88,8 +87,14 @@ public class InterconnectInfo {
 
         CLE_OUT      (Direction.OUTPUT, GroupDelayType.OTHER,(short) 0, Behavior.STATIONARY, new TileSide[]{TileSide.E,TileSide.W}, '-'),
         CLE_IN       (Direction.INPUT, GroupDelayType.PINFEED,(short) 0, Behavior.STATIONARY, new TileSide[]{TileSide.E,TileSide.W}, '-'),
-        BOUNCE       (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0, Behavior.SWITCH_SIDE_INTERNAL, new TileSide[]{TileSide.E,TileSide.W}, 'i');
-
+        // actual BOUNCE jump within the same side. But, there is no used of that in delay estimator.
+        INTERNAL_SINGLE (Direction.LOCAL, GroupDelayType.PIN_BOUNCE,(short) 0, Behavior.SWITCH_SIDE_INTERNAL, new TileSide[]{TileSide.E,TileSide.W}, 'i'),
+        // global has a very high delay and thus is not on a min delay path. Thus, its use case is when it is a source for a lookup.
+        // global go to PIN_BOUNCE and PINFEED, ie., INT_X0Y0/BYPASS_E9  - NODE_PINBOUNCE and INT_X0Y0/IMUX_E9  - NODE_PINFEED
+        // global node drive only one side of INT_TILE, but its driver drive 2 globals, one for one side.
+        // because we only consider when global is a source of a lookup, logically a global node has side. However, it side must be derived from its grandchild.
+        // TODO: if global is used often, consider adding cache for it instead of look at its grandchild every time.
+        GLOBAL  (Direction.HORIZONTAL, GroupDelayType.GLOBAL,(short) 0, Behavior.SAME_SIDE, new TileSide[]{TileSide.E,TileSide.W},'g');
 
         private final Direction direction;
         private final GroupDelayType type;
@@ -341,7 +346,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
         // HORT_SINGLE can't to another HORT_SINGLE , why ?
         ictHier.put(TimingGroup.HORT_SINGLE, new ArrayList<TimingGroup>() {{
@@ -351,7 +356,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
         ictHier.put(TimingGroup.HORT_DOUBLE, new ArrayList<TimingGroup>() {{
 //          Don't use single, in general, it will be added in listPaths when dist is 1
@@ -362,7 +367,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
         ictHier.put(TimingGroup.HORT_QUAD, new ArrayList<TimingGroup>() {{
 //          Don't use single, in general, it will be added in listPaths when dist is 1
@@ -374,7 +379,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
             add(TimingGroup.VERT_LONG);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
         // LONG can drive quad, but that is incompatible with that LONG must go to SINGLE/DOUBLE to get to CLE_IN.
         // it is not incompatible, if long go to quad it will eventually go to single/double because quad can't drive CLE_IN either.
@@ -388,7 +393,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
             add(TimingGroup.VERT_LONG);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
         ictHier.put(TimingGroup.VERT_SINGLE, new ArrayList<TimingGroup>() {{
             add(TimingGroup.HORT_SINGLE);
@@ -398,7 +403,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
         ictHier.put(TimingGroup.VERT_DOUBLE, new ArrayList<TimingGroup>() {{
             add(TimingGroup.HORT_SINGLE);
@@ -408,7 +413,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
         ictHier.put(TimingGroup.VERT_QUAD, new ArrayList<TimingGroup>() {{
             add(TimingGroup.HORT_SINGLE);
@@ -419,7 +424,7 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
             add(TimingGroup.VERT_LONG);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
         ictHier.put(TimingGroup.VERT_LONG, new ArrayList<TimingGroup>() {{
             add(TimingGroup.HORT_SINGLE);
@@ -430,17 +435,21 @@ public class InterconnectInfo {
             add(TimingGroup.VERT_DOUBLE);
             add(TimingGroup.VERT_QUAD);
             add(TimingGroup.VERT_LONG);
-            add(TimingGroup.BOUNCE);
+            add(TimingGroup.INTERNAL_SINGLE);
         }});
 
-        // TODO: What's about bounce?
-        ictHier.put(TimingGroup.BOUNCE, new ArrayList<TimingGroup>() {{
+        ictHier.put(TimingGroup.INTERNAL_SINGLE, new ArrayList<TimingGroup>() {{
             add(TimingGroup.CLE_IN);
             add(TimingGroup.HORT_SINGLE);
             add(TimingGroup.HORT_DOUBLE);
             add(TimingGroup.VERT_SINGLE);
             add(TimingGroup.VERT_DOUBLE);
         }});
+
+        ictHier.put(TimingGroup.GLOBAL, new ArrayList<TimingGroup>() {{
+            add(TimingGroup.CLE_IN);
+        }});
+
         // No one has access to the modifiable version, ictHier.
         // Thus, the content of interconnectHier never changes.
         fanoutInterconnectHier = Collections.unmodifiableMap(ictHier);

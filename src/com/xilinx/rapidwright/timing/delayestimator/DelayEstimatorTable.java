@@ -219,7 +219,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         Pattern EPattern = Pattern.compile("([\\w]+)_(E)_");
         Pattern WPattern = Pattern.compile("([\\w]+)_(W)_");
 
-        for (Node prvNode : node.getAllUphillNodes()) { // need to get all downhill PIPs
+        for (Node prvNode : node.getAllUphillNodes()) {
             String prvNodeName = prvNode.getAllWiresInNode()[0].getWireName();
 
             Matcher EMatcher = EPattern.matcher(prvNodeName);
@@ -235,6 +235,29 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return T.TileSide.M;
     }
 
+    // TODO: This method is loop heavy. If TG is prebuilt, this problem will be solved because all info is pre-recorded.
+    private T.TileSide findTileSideForGlobal(Node node) {
+        Pattern EPattern = Pattern.compile("([\\w]+)_(E)_");
+        Pattern WPattern = Pattern.compile("([\\w]+)_(W)_");
+
+        for (Node nxtNode : node.getAllDownhillNodes()) {
+            for (Node nxtNxtNode : nxtNode.getAllDownhillNodes()) {
+                String nxtNxtNodeName = nxtNxtNode.getAllWiresInNode()[0].getWireName();
+
+                Matcher EMatcher = EPattern.matcher(nxtNxtNodeName);
+                if (EMatcher.find()) {
+                    return T.TileSide.E;
+                } else {
+                    Matcher WMatcher = WPattern.matcher(nxtNxtNodeName);
+                    if (WMatcher.find())
+                        return T.TileSide.W;
+                }
+            }
+
+        }
+        return T.TileSide.M;
+    }
+
     // node.toString()     -  node.getAllWiresInNode()[0].getIntentCode()
     // INT_X0Y0/BYPASS_E9  - NODE_PINBOUNCE  :
     // INT_X0Y0/IMUX_E9  - NODE_PINFEED  :
@@ -244,6 +267,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
     private RoutingNode getTermInfo(ImmutableTimingGroup tg) {
         Node node = tg.exitNode();
+        IntentCode ic = node.getAllWiresInNode()[0].getIntentCode();
         Pattern tilePattern = Pattern.compile("X([\\d]+)Y([\\d]+)");
         Pattern EE          = Pattern.compile("EE([\\d]+)");
         Pattern WW          = Pattern.compile("WW([\\d]+)");
@@ -290,11 +314,20 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     } else {
                         res.orientation = T.Orientation.S;
                         // For internal single, it will be set by the below
-                        if (tg_side[0].startsWith("BYPASS"))
-                            res.tg = T.TimingGroup.valueOf("BOUNCE");
-                        else if (tg_side[0].startsWith("IMUX"))
+                        if (ic == IntentCode.NODE_PINBOUNCE)
+                            // FF input
+                            // TODO: Getting to FF has higher delay. How to handle that?
                             res.tg = T.TimingGroup.valueOf("CLE_IN");
-                        else
+                        else if (ic == IntentCode.NODE_PINFEED)
+                            // LUT input
+                            res.tg = T.TimingGroup.valueOf("CLE_IN");
+                        else if (ic == IntentCode.NODE_LOCAL) {
+                            // the only exitNode that can be NODE_LOCAL is GLOBAL node
+                            res.tg = T.TimingGroup.valueOf("GLOBAL");
+                            // have E_U_GLOBAL and E_D_GLOBAL (because reuse "SAME_SIDE" rule) connect to E_S_CLE_IN
+                            // always use U, and waste D node
+                            res.orientation = T.Orientation.U;
+                        } else // can be CLE_OUT or INTERNAL_SINGLE. the next if will change it if INTERNAL_SINGLE
                             res.tg = T.TimingGroup.valueOf("CLE_OUT");
                     }
                 }
@@ -308,12 +341,16 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             res.side = T.TileSide.W;
         else
             if (int_node[1].startsWith("INT")) {
-                // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
-                // Check intendcode is an alternative to above if condition.
-                res.side = findTileSideForInternalSingle(tg.entryNode());
-                // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
-                res.orientation = (res.side == T.TileSide.E) ? T.Orientation.D : T.Orientation.U;
-                res.tg = T.TimingGroup.valueOf("BOUNCE");
+                if (ic == IntentCode.NODE_LOCAL) {
+                    res.side = findTileSideForGlobal(node);
+                } else {
+                    // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
+                    // Check intendcode is an alternative to above if condition.
+                    res.side = findTileSideForInternalSingle(tg.entryNode());
+                    // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
+                    res.orientation = (res.side == T.TileSide.E) ? T.Orientation.D : T.Orientation.U;
+                    res.tg = T.TimingGroup.valueOf("INTERNAL_SINGLE");
+                }
             } else {
                 res.side = T.TileSide.M;
             }
@@ -619,56 +656,16 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     }
                 }
             }
+
+            // for global
+            for (short x = minX; x < maxX; x++) {
+                for (short y = minY; y < maxY; y++) {
+                    connectNodesFrom(x, y, box,
+                            ictInfo.getTimingGroup((T.TimingGroup e) -> (e.type() == GroupDelayType.GLOBAL)));
+                }
+            }
         }
 
-//        // TODO: this should be combined with connectNodeFrom method below
-//        List<T.TimingGroup> getTgFrom(short i, short j, Rectangle box, List<T.TimingGroup> tgs) {
-//            for (T.TimingGroup frTg : tgs) {
-//                for (T.TileSide frSide : frTg.getExsistence()) {
-//                    for (T.Orientation frOrientation : frTg.getOrientation(frSide)) {
-//                        short deltaX = frTg.direction() == InterconnectInfo.Direction.HORIZONTAL ? frTg.length() : 0;
-//                        short deltaY = frTg.direction() == InterconnectInfo.Direction.VERTICAL ? frTg.length() : 0;
-//                        short m = (short) (i + ((frOrientation == T.Orientation.U) ? +deltaX : -deltaX));
-//                        short n = (short) (j + ((frOrientation == T.Orientation.U) ? +deltaY : -deltaY));
-//
-//                        if (!box.contains(m,n))
-//                            continue;
-//                        if (verboseLevel > 0)
-//                            System.out.println("fromTG " + i + " " + j + " " + frTg + " " + frSide + " " + frOrientation);
-//
-//                        List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(frTg);
-//                        for (T.TimingGroup toTg : nxtTgs) {
-//                            if (verboseLevel > 0)
-//                                System.out.println("     toTG " + toTg);
-//                            for (T.TileSide toSide : frTg.toSide(frSide)) {
-//                                if (verboseLevel > 0)
-//                                    System.out.println("          toSide " + toSide);
-//                                for (T.Orientation toOrientation : toTg.getOrientation(toSide)) {
-//                                    deltaX = toTg.direction() == T.Direction.HORIZONTAL ? toTg.length() : 0;
-//                                    deltaY = toTg.direction() == T.Direction.VERTICAL ? toTg.length() : 0;
-//                                    short u = (short) (m + ((toOrientation == T.Orientation.U) ? +deltaX : -deltaX));
-//                                    short v = (short) (n + ((toOrientation == T.Orientation.U) ? +deltaY : -deltaY));
-//
-//                                    if (u >= extendedWidth || v >= extendedHeight || u < 0 || v < 0)
-//                                        continue;
-//                                    if (verboseLevel > 0)
-//                                        System.out.println("               toOri " + toOrientation);
-//
-//                                    // not go back to where it is from with the same tg
-//                                    if (!((toTg == frTg) && (toOrientation != frOrientation))) {
-//                                        if (verboseLevel > 0)
-//                                            System.out.println("                    add connection");
-////                                        System.out.println(i + " " + j + " " + frTg + " " + frSide + " " + toTg + " " + toOrientation);
-//                                        only diff
-////                                        nodeMan.connectNodes(i, j, m, n, frOrientation, frSide, toOrientation, toSide, frTg, toTg);
-//                                    }
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//        }
 
         void connectNodesFrom(short i, short j, Rectangle box, List<T.TimingGroup> tgs) {
             for (T.TimingGroup frTg : tgs) {
@@ -719,6 +716,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
         void plot(String fname) {
+            // something wrong with formatting. But at least can inspect the text file
             nodeMan.plot(fname);
         }
 
@@ -1615,65 +1613,83 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return new ImmutableTimingGroup(exitNode, entryNode, exitIC, entryIC);
     }
 
+    // for TG with only one node
+    ImmutableTimingGroup createTG(String exitNodeName, Device device) {
+        Node exitNode  = new Node(exitNodeName, device);
+        IntentCode exitIC  = exitNode.getAllWiresInNode()[0].getIntentCode();
+        return new ImmutableTimingGroup(exitNode, exitIC);
+    }
+
+
+    void testSpecialCase(Device device) {
+        verbose = 6;
+//        ImmutableTimingGroup src = createTG("INT_X9Y107/EE4_W_BEG1",
+//                "INT_X9Y107/INT_NODE_SDQ_53_INT_OUT0", device);
+        // tileSide W
+//        ImmutableTimingGroup src = createTG("INT_X11Y107/INT_NODE_GLOBAL_6_INT_OUT0", device);
+        // tileSide E
+        ImmutableTimingGroup src = createTG("INT_X11Y107/INT_NODE_GLOBAL_6_INT_OUT1", device);
+        ImmutableTimingGroup dst = createTG("INT_X11Y107/IMUX_W2",
+                "INT_X11Y107/VCC_WIRE", device);
+        short dly = getMinDelayToSinkPin(src, dst);
+        System.out.println("delay " + dly);
+        return;
+    }
+
     public static void main(String args[]) {
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         InterconnectInfo ictInfo = new InterconnectInfo();
 
         long startTime = System.nanoTime();
 
+//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
+//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 2, (short) 2, 6);
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 
+//        est.testSpecialCase(device);
 
-        ImmutableTimingGroup src = est.createTG("INT_X11Y108/EE4_W_BEG1",
-                                  "INT_X11Y108/INT_NODE_SDQ_53_INT_OUT0", device);
-        ImmutableTimingGroup dst = est.createTG("INT_X11Y107/IMUX_W2",
-                                                "INT_X11Y107/VCC_WIRE", device);
 
-        est.getMinDelayToSinkPin(src, dst);
-//        est.testTGmap();
-        return;
+        long endBuildTime = System.nanoTime();
+        long elapsedBuildTime = endBuildTime - startTime;
+        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
 
-//        long endBuildTime = System.nanoTime();
-//        long elapsedBuildTime = endBuildTime - startTime;
-//        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-//
-//
-//        int count = 0;
-//
-//        long startLookupTime = System.nanoTime();
-//        // diagonal in table
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-////        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-////        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-////        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
-////
-////          //  out of table
-////        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
-////        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
-////        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
-////        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
-//
-//
-//        long endLookupTime = System.nanoTime();
-//        long elapsedLookupTime = endLookupTime - startLookupTime;
-//
-//
-//        System.out.println();
-//        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-//        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
-//        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
-//
-////        est.testOne(61, 37, 180, 150, "W", "W");
-////        est.testOne(37, 53, 60, 90, "E", "E");
-////        est.testOne(37, 37, 90, 60, "E", "E");
-////        est.testOne(37, 37, 60, 90, "E", "E");
-////        est.testOne(44, 49, 123, 123, "W", "E");
-////        est.testOne(44, 49, 123, 138, "E", "E");
-////        est.testOne(44, 45, 121, 137, "E", "E");
-////        est.testOne(44, 45, 124, 124, "E", "W");
-//
-//
-////        est.verifyPath();
+
+        int count = 0;
+
+        long startLookupTime = System.nanoTime();
+        // diagonal in table
+        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+
+          //  out of table
+        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
+
+
+        long endLookupTime = System.nanoTime();
+        long elapsedLookupTime = endLookupTime - startLookupTime;
+
+
+        System.out.println();
+        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
+        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
+
+//        est.testOne(61, 37, 180, 150, "W", "W");
+//        est.testOne(37, 53, 60, 90, "E", "E");
+//        est.testOne(37, 37, 90, 60, "E", "E");
+//        est.testOne(37, 37, 60, 90, "E", "E");
+//        est.testOne(44, 49, 123, 123, "W", "E");
+//        est.testOne(44, 49, 123, 138, "E", "E");
+//        est.testOne(44, 45, 121, 137, "E", "E");
+//        est.testOne(44, 45, 124, 124, "E", "W");
+
+
+//        est.verifyPath();
 
     }
 }

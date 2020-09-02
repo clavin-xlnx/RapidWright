@@ -29,7 +29,12 @@ import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
  * To estimate a route delay from a TG to a site-pin  TG.
  */
 public interface DelayEstimator {
-    // TODO: Define what is this TimingGroup.
+    /**
+     * Find an estimated min delay of a path from a TG to a TG of an input site pin.
+     * @param TG Timing group for the begin of the path. It can be any timing group except an input site pin.
+     * @param sinkPin Timing grooup for the end of the path. It must be an input site pin.
+     * @return An estimated delay including the delay of the TG and sinkPin.
+     */
     public short getMinDelayToSinkPin (ImmutableTimingGroup TG, ImmutableTimingGroup sinkPin);
     public boolean load (String fileName);
     public boolean store (String fileName);
