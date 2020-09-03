@@ -146,7 +146,7 @@ public class Connection{
 		s.append(", ");
 		s.append(String.format("%22s", coordinate));
 		s.append(", ");
-		s.append(String.format("net = %5s", this.net.getId()));
+		s.append("net = " + this.net.getNet().getName());
 		s.append(", ");
 		s.append(String.format("net fanout = %3s", this.net.fanout));
 		s.append(", ");

@@ -598,6 +598,7 @@ public class RoutableNodeRouter{
 		int err = 0;
 		for(RoutableNode rn:this.rnodesCreated.values()){
 			if(rn.overUsed() || rn.illegal()){
+				System.err.println(rn.toString());//TODO because the fixingIllegalTree method in GraphHelper does not change records of RNodes
 				err++;
 			}
 		}

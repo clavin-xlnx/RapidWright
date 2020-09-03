@@ -262,9 +262,20 @@ public class RoutableTimingGroupRouter{
 			inet++;			
 			
 			SitePinInst source = n.getSource();
+			//TODO remove
+			/*if(source.getName().contains("MUX")){
+				
+				if(n.getAlternateSource() == null){
+					System.out.println(n.getName() + ", source " + source.toString() + ", null alternative source");
+				}else{
+					source = n.getAlternateSource();
+					System.out.println(n.getName() + ", source " + source.toString());
+				}
+			}*/
+			////
 			RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
 			for(SitePinInst sink:n.getSinkPins()){
-				if(RouterHelper.isExternalConnectionToCout(source, sink)){
+				if(RouterHelper.isExternalConnectionToCout(source, sink)){//|| n.getName().equals("ncda") || n.getName().equals("ncfe") || n.getName().equals("ncf8")
 					source = n.getAlternateSource();
 					if(source == null){
 						String errMsg = "net alternative source is null: " + n.toStringFull();
@@ -790,21 +801,58 @@ public class RoutableTimingGroupRouter{
 	
 	public List<PIP> conPIPs(Connection con){
 		List<PIP> conPIPs = new ArrayList<>();
-		//TODO
-		/*for(int i = con.rnodes.size() -1; i > 0; i--){
-			Node nodeFormer = ((RoutableTimingGroup) (con.rnodes.get(i))).getTimingGroup().getLastNode();
-			Node nodeLatter = ((RoutableTimingGroup) (con.rnodes.get(i-1))).getTimingGroup().getNodes().get(0);
+		System.out.println(con.toString());
+		for(int i = 0; i < con.rnodes.size(); i++){
+			System.out.println(con.rnodes.get(i).toString());
+		}
+		List<Node> conNodes = new ArrayList<>();
+		
+		for(int i = 0; i < con.rnodes.size() - 1; i++){
 			
-			Wire pipStartWire = this.findEndWireOfNode(nodeFormer.getAllWiresInNode(), nodeLatter.getTile());
+			RoutableTimingGroup rtgFormer = ((RoutableTimingGroup) (con.rnodes.get(i + 1)));
+			RoutableTimingGroup rtgLatter = ((RoutableTimingGroup) (con.rnodes.get(i)));
 			
-			if(pipStartWire != null){
-				PIP pip = new PIP(nodeLatter.getTile(), pipStartWire.getWireIndex(), nodeLatter.getWire());
+			//TODO bug fixing
+//			System.out.println(rtgFormer.type + ", " + rtgFormer.toString());
+//			System.out.println(rtgLatter.type + ", " + rtgLatter.toString());
+			
+			ImmutableTimingGroup immu = this.findImmutableTimingGroup(rtgFormer, rtgLatter);
+			
+			if(immu == null){
+				this.debuggingITG(rtgFormer.getSiblingsTimingGroup().getExitNode(), rtgLatter.getSiblingsTimingGroup().getExitNode());
+			}
+			
+			conNodes.add(immu.exitNode());
+			if(immu.entryNode() != null){
+				conNodes.add(immu.entryNode());
+			}
+			
+		}
+		Node sourcePinNode = con.source.getConnectedNode();
+		conNodes.add(sourcePinNode);
+		
+		for(int i = conNodes.size() - 1; i > 0; i--){
+			Node nodeFormer = conNodes.get(i);
+			Node nodeLatter = conNodes.get(i - 1);
+			PIP pip = RouterHelper.findThePIPbetweenTwoNodes(nodeFormer.getAllWiresInNode(), nodeLatter);
+			if(pip != null){
 				conPIPs.add(pip);
 			}else{
-				System.out.println("pip start wire is null");
-			}			
-		}*/
+				System.err.println("Null PIP connecting node " + nodeFormer.toString() + " and node " + nodeLatter.toString());
+			}
+		}
 		return conPIPs;
+	}
+	
+	public void debuggingITG(Node formerExitNode, Node latterExitNode){
+		System.out.println("former exit node: " + formerExitNode.toString() + ", " 
+							+ "latter exit node: " + latterExitNode.toString());
+		for(Node next:formerExitNode.getAllDownhillNodes()){
+			System.out.println("next of former exit node: " + next.toString());
+			for(Node nextNext:latterExitNode.getAllDownhillNodes()){
+				System.out.println("	next of next: " + nextNext.toString());
+			}
+		}
 	}
 	
 	public Wire findEndWireOfNode(Wire[] wires, Tile tile){
@@ -1090,7 +1138,7 @@ public class RoutableTimingGroupRouter{
 		
 		//set the sink rrg node of con as the target
 		con.getSinkRNode().setTarget(true);
-		this.sinkPinTG = ((RoutableTimingGroup)con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[0];//Choose one for the estimator
+		this.sinkPinTG = ((RoutableTimingGroup)con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[1];//TODO Choose one for the estimator
 		
 		// Add source to queue
 		RoutableTimingGroup source = (RoutableTimingGroup) con.getSourceRNode();
@@ -1116,7 +1164,7 @@ public class RoutableTimingGroupRouter{
 				if(entryNode != null){
 					sumNodes += 1;
 					sumWire += entryNode.getAllWiresInNode().length;//not always 1
-					/*if(entryNode.getAllWiresInNode().length != 1){
+					if(entryNode.getAllWiresInNode().length != 1){
 						System.out.println("ImmutabletTimingGroup, exit node:" + tg.exitNode().toString() + ", delay type: " + tg.delayType());
 						System.out.println("entry node: " + entryNode.toString() + ", wires: " + entryNode.getAllWiresInNode().length);
 						for(Wire wire:entryNode.getAllWiresInNode()){
@@ -1127,7 +1175,7 @@ public class RoutableTimingGroupRouter{
 							System.out.println("  wire tile: " + wire.getTile().getName() + ", name: " + wire.getWireName());
 						}
 						System.out.println();
-					}*/
+					}
 				}
 				//exit always exists
 				sumNodes += 1;

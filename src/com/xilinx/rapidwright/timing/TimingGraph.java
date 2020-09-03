@@ -1069,6 +1069,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
      * @return Returns -1 or 0 on failure.  Returns 1 on success.
      */
     int addNetDelayEdges(Net n) {
+    	
+    	if(n.getName().equals("ncda")){
+    		System.out.println();
+    	}
+    	
         float logicDelay;
         spi_sinks = new ArrayList<>();
         local_spi_source = null;
@@ -1099,6 +1104,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
        
         
         for (EDIFHierPortInst hport : hports) {
+        	
+        	if(n.getName().equals("ncda") && hport.isOutput()){
+        		System.out.println("hport found in net ncda");
+        	}
+        	
             String portName = hport.getPortInst().getName();
             String cellName = hport.getFullHierarchicalInstName();
             Cell cell = design.getCell(cellName);

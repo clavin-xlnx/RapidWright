@@ -63,9 +63,9 @@ public class RoutableTimingGroup implements Routable{
 			RoutableTimingGroup childRNode;
 			//the last node of timing group siblings is unique, used as the key
 			
-			Node key = stGroups.getSiblings()[0].exitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
+			Node key = stGroups.getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
 			
-			if(debug) System.out.println(stGroups.getSiblings()[0].exitNode().toString());
+			if(debug) System.out.println(stGroups.getExitNode().toString());
 			if(!createdRoutable.containsKey(key)){
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups);
 				childRNode.setBaseCost(base_cost_fac);
@@ -217,7 +217,7 @@ public class RoutableTimingGroup implements Routable{
 		s.append("RNode " + this.index + " ");
 		s.append(String.format("%-11s", coordinate));
 		s.append(", last node ");
-		s.append(this.sibTimingGroups.getSiblings()[0].exitNode().toString());
+		s.append(this.sibTimingGroups.getExitNode().toString());
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		

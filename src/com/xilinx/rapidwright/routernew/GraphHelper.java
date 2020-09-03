@@ -105,7 +105,7 @@ public class GraphHelper{
 	}
 	
 	public void cutOffCycles(Netplus netp){
-		boolean cycleExists = this.isCyclic(this.vertices, this.routableEdges, this.visited, this.stack);
+		boolean cycleExists = true;
 		while(cycleExists){
 			//TODO to store info of the back edge
 //			System.out.println("start " + this.backEdgeStart.toString() + ", end" + this.backEdgeEnd.toString());
