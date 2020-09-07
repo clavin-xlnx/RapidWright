@@ -24,6 +24,7 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.TimingEdge;
@@ -51,6 +52,7 @@ public class RoutableTimingGroupRouter{
 	public int icon;
 	public int iNullEDIFNet;
 	
+	public RouteThruHelper routethruHelper;
 	public Set<Node> reservedNodes;
 	public PriorityQueue<QueueElement> queue;
 	public Collection<RoutableData> rnodesTouched;
@@ -145,6 +147,8 @@ public class RoutableTimingGroupRouter{
 				
 		this.sortedListOfConnection = new ArrayList<>();
 		this.sortedListOfNetplus = new ArrayList<>();
+		
+		this.routethruHelper = new RouteThruHelper(this.design.getDevice());
 		
 		this.connectionsRouted = 0;
 		this.connectionsRoutedIteration = 0;
@@ -731,18 +735,26 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public void pipsAssignment(){
-		for(Netplus np:this.sortedListOfNetplus){
-			Set<PIP> netPIPs = new HashSet<>();
-			
-			for(Connection c:np.getConnection()){
-				netPIPs.addAll(this.conPIPs(c));
-			}
-			np.getNet().setPIPs(netPIPs);
-		}
-		
-		this.checkPIPsUsage();
+//		for(Netplus np:this.sortedListOfNetplus){
+//			Set<PIP> netPIPs = new HashSet<>();
+//			
+//			for(Connection c:np.getConnection()){
+//				netPIPs.addAll(this.conPIPs(c));
+//			}
+//			np.getNet().setPIPs(netPIPs);
+//		}
+//		
+//		this.checkPIPsUsage();
 //		this.checkNetRoutedPins();
 //		this.printWrittenPIPs();
+		System.out.println("net n887: ");
+//		this.checkSiblingsOfInvalidlyRoutedNet("n887");
+		this.checkPIPsOfInvalidlyRoutedNet("n887");
+		
+		System.out.println("\n net LUT6_2_0_16/O5: ");
+		
+//		this.checkSiblingsOfInvalidlyRoutedNet("LUT6_2_16/O5");
+		this.checkPIPsOfInvalidlyRoutedNet("LUT6_2_16/O5");
 	}
 	
 	public void printWrittenPIPs(){
@@ -775,14 +787,27 @@ public class RoutableTimingGroupRouter{
 			System.out.println("No PIP oversage");
 	}
 	
-	public void checkInvalidlyRoutedNets(String netname){
+	public void checkSiblingsOfInvalidlyRoutedNet(String netname){
+		for(Netplus net:this.sortedListOfNetplus){
+			if(net.getNet().getName().equals(netname)){
+				for(Connection con:net.getConnection()){
+					for(Routable rn:con.rnodes){
+						Node exitNode = ((RoutableTimingGroup)rn).getSiblingsTimingGroup().getExitNode();
+						System.out.println(exitNode.toString());
+					}
+				}
+			}
+		}
+	}
+	
+	public void checkPIPsOfInvalidlyRoutedNet(String netname){
 		boolean foundInRWrouter = false;
 		for(Netplus net:this.sortedListOfNetplus){
 			if(net.getNet().getName().equals(netname)){
 				foundInRWrouter = true;
 				System.out.println(net.getNet().toString());
 				for(Connection c: net.getConnection()){
-					System.out.println(((RoutableTimingGroup)c.getSinkRNode()).getSiblingsTimingGroup().toString() + " - " + c.sink.getName());
+//					System.out.println(((RoutableTimingGroup)c.getSinkRNode()).getSiblingsTimingGroup().toString() + " - " + c.sink.getName());
 					for(PIP p:this.conPIPs(c)){
 						System.out.println("\t" + p.toString());
 					}
@@ -801,10 +826,10 @@ public class RoutableTimingGroupRouter{
 	
 	public List<PIP> conPIPs(Connection con){
 		List<PIP> conPIPs = new ArrayList<>();
-		System.out.println(con.toString());
+/*		System.out.println(con.toString());
 		for(int i = 0; i < con.rnodes.size(); i++){
 			System.out.println(con.rnodes.get(i).toString());
-		}
+		}*/
 		List<Node> conNodes = new ArrayList<>();
 		
 		for(int i = 0; i < con.rnodes.size() - 1; i++){
@@ -813,14 +838,21 @@ public class RoutableTimingGroupRouter{
 			RoutableTimingGroup rtgLatter = ((RoutableTimingGroup) (con.rnodes.get(i)));
 			
 			//TODO bug fixing
-//			System.out.println(rtgFormer.type + ", " + rtgFormer.toString());
-//			System.out.println(rtgLatter.type + ", " + rtgLatter.toString());
-			
-			ImmutableTimingGroup immu = this.findImmutableTimingGroup(rtgFormer, rtgLatter);
-			
-			if(immu == null){
-				this.debuggingITG(rtgFormer.getSiblingsTimingGroup().getExitNode(), rtgLatter.getSiblingsTimingGroup().getExitNode());
+			/*System.out.println(rtgFormer.type + ", " + rtgFormer.toString());
+			System.out.println(rtgLatter.type + ", " + rtgLatter.toString());
+			System.out.println("rtg latter size: " + rtgLatter.getSiblingsTimingGroup().getSiblings().length);*/
+			ImmutableTimingGroup immu = null;
+			if(rtgLatter.getSiblingsTimingGroup().getSiblings().length > 1){
+				immu = this.findImmutableTimingGroup(rtgFormer, rtgLatter);
+			}else{
+				immu = rtgLatter.getSiblingsTimingGroup().getSiblings()[0];
 			}
+			
+			this.checkImmuTGofNet(con, "n887", "LUT6_2_16/O5", immu);
+			
+			/*if(immu == null){
+				this.debuggingITG(rtgFormer.getSiblingsTimingGroup().getExitNode(), rtgLatter.getSiblingsTimingGroup().getExitNode());
+			}*/
 			
 			conNodes.add(immu.exitNode());
 			if(immu.entryNode() != null){
@@ -842,6 +874,12 @@ public class RoutableTimingGroupRouter{
 			}
 		}
 		return conPIPs;
+	}
+	
+	public void checkImmuTGofNet(Connection con, String net1, String net2, ImmutableTimingGroup immu){
+		if(con.getNet().getNet().getName().equals(net1) || con.getNet().getNet().getName().equals(net2)){
+			System.out.println(con.getNet().getNet().getName() + " Immu exit node " + immu.exitNode().toString() + ", entry node " + immu.entryNode().toString());
+		}
 	}
 	
 	public void debuggingITG(Node formerExitNode, Node latterExitNode){
@@ -932,7 +970,7 @@ public class RoutableTimingGroupRouter{
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
 //				System.out.println(this.rrgNodeId);
-				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, this.reservedNodes);
+				this.rrgNodeId = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, this.reservedNodes, this.routethruHelper);
 			}
 			this.routerTimer.rnodesCreation.finish();
 			
@@ -1164,7 +1202,7 @@ public class RoutableTimingGroupRouter{
 				if(entryNode != null){
 					sumNodes += 1;
 					sumWire += entryNode.getAllWiresInNode().length;//not always 1
-					if(entryNode.getAllWiresInNode().length != 1){
+					/*if(entryNode.getAllWiresInNode().length != 1){
 						System.out.println("ImmutabletTimingGroup, exit node:" + tg.exitNode().toString() + ", delay type: " + tg.delayType());
 						System.out.println("entry node: " + entryNode.toString() + ", wires: " + entryNode.getAllWiresInNode().length);
 						for(Wire wire:entryNode.getAllWiresInNode()){
@@ -1175,7 +1213,7 @@ public class RoutableTimingGroupRouter{
 							System.out.println("  wire tile: " + wire.getTile().getName() + ", name: " + wire.getWireName());
 						}
 						System.out.println();
-					}
+					}*/
 				}
 				//exit always exists
 				sumNodes += 1;

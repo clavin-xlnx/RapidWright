@@ -130,7 +130,7 @@ public class Main {
 				routingRuntime = router.routingRuntime();
 				this.t.stop();
 				
-//				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
+				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
 				
 				router.getAllHopsAndManhattanD();
 				

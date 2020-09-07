@@ -24,6 +24,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.device.e;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
@@ -254,7 +255,6 @@ public class RoutableNodeRouter{
 	}
 	//TODO having this list of node, the target RoutableNode of a connection will change, not the connected node to the sink pin
 	public List<Routable> findInputPinFeed(Connection con){
-		//TODO is the path unique?
 		Site site = con.sink.getSite();
 		String pinName = con.sink.getName();
 		Tile tile = site.getTile();
@@ -263,6 +263,63 @@ public class RoutableNodeRouter{
 		Node node = new Node(tile,wire);
 		System.out.println(node.toString() + " " + con.sink.getConnectedNode().toString());
 		return this.findInputPinFeed(node);
+	}
+	
+	public List<Routable> findINTNodeOfOutputPin(){
+		//TODO for CLBs, it is true that there is only one possible connected tile
+		List<Routable> rns = new ArrayList<>();
+		for(Netplus netp:this.sortedListOfNetplus){
+			
+			rns = this.findOutoutPinINTNode(netp.getNet().getSource());
+			System.out.println(netp.getNet().toString() + ", " + rns.size());
+			for(Routable rn:rns){
+				System.out.println(rn.toString());
+			}
+			System.out.println();
+		}
+		return rns;
+	}
+	
+	public List<Routable> findOutoutPinINTNode(SitePinInst source){
+		List<Routable> partialPath = new ArrayList<>();
+		Node sourceNode = source.getConnectedNode();
+		RoutableNode rnode = this.createRoutableNodeAndAdd(this.rrgNodeId, sourceNode, RoutableType.SOURCERR, this.base_cost_fac);
+		rnode.rnodeData.setPrev(null);
+		Queue<RoutableNode> q = new LinkedList<>();
+		q.add(rnode);
+		while(!q.isEmpty()){
+			rnode = q.poll();
+			Node tmpNode = rnode.getNode();
+			if(this.isSwitchBox(tmpNode)){
+				while(rnode != null){
+					partialPath.add(rnode);//TODO rip-up and re-routing should not clear this path?
+					rnode = (RoutableNode) rnode.rnodeData.getPrev();
+				}
+				//TODO add all INT nodes to partial path as the sources of a con
+				return partialPath;
+			}
+			
+			for(PIP pip:tmpNode.getAllDownhillPIPs()){	
+				Tile tile = pip.getStartWire().getTile();
+				Wire tmpWire = new Wire(tile, pip.getEndWireIndex());
+				Node newNode = new Node(tmpWire.getTile(),tmpWire.getWireIndex());
+				RoutableNode rnewNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newNode, RoutableType.INTERRR, this.base_cost_fac);
+				rnewNode.rnodeData.setPrev(rnode);
+				q.add(rnewNode);
+				
+				
+				Wire newNodeHead = tmpWire.getStartWire();
+				if(!newNodeHead.equals(tmpWire)){
+					Node newHeadNode = new Node(newNodeHead.getTile(), newNodeHead.getWireIndex());
+					RoutableNode rnewHeadNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newHeadNode, RoutableType.INTERRR, this.base_cost_fac);
+					rnewHeadNode.rnodeData.setPrev(rnode);
+					q.add(rnewHeadNode);
+				}
+			}
+			
+		}
+		
+		return null;
 	}
 	
 	public List<Routable> findInputPinFeed(Node node){
@@ -438,6 +495,9 @@ public class RoutableNodeRouter{
         		System.out.println();*/
         	}
         }
+        
+        //TODO check INT node of con.source
+//        this.findINTNodeOfOutputPin();
         
 		while(this.itry < this.nrOfTrials){
 			this.iterationStart = System.nanoTime();
@@ -726,16 +786,6 @@ public class RoutableNodeRouter{
 				}
 			}
 			
-			/*if(this.debugRoutingCon) {
-				this.printInfo("There are " + illegalTrees.size() + " illegal trees");
-				for(Netplus np:illegalTrees){
-					for(Connection con:np.getConnection()){
-						System.out.println(con.toString());
-						this.printConRNodes(con);
-					}
-					this.printInfo("");
-				}
-			}*/
 			//find the illegal connections and fix illegal trees
 			for(Netplus illegalTree:illegalTrees){
 				if(this.debugRoutingCon) System.out.println("Net " + illegalTree.getNet().getName() + " routing tree is cyclic? ");
@@ -743,11 +793,6 @@ public class RoutableNodeRouter{
 				boolean isCyclic = graphHelper.isCyclic(illegalTree);
 				if(isCyclic){
 					//remove cycles
-					System.out.println("is cyclic");
-//					for(Connection con:illegalTree.getConnection()){
-//						System.out.println(con.toString());
-//						this.printConRNodes(con);
-//					}
 					graphHelper.cutOffCycles(illegalTree);
 				}else{
 					if(this.debugRoutingCon) this.printInfo("fixing net: " + illegalTree.hashCode());
@@ -788,14 +833,6 @@ public class RoutableNodeRouter{
 				if(add) newRouteNodes.add(newRouteNode);
 			}
 			
-			/*if(this.debugRoutingCon){
-				System.out.println("new rnodes: " + newRouteNodes.size());
-				for(Routable r:newRouteNodes){
-					System.out.println(r.hashCode());
-				}
-				
-			}*/
-			
 			//Replace the path of each illegal connection with the path from the connection with maximum hops
 			for(Connection illegalConnection : illegalCons) {
 				this.ripup(illegalConnection);
@@ -803,30 +840,12 @@ public class RoutableNodeRouter{
 				//Remove illegal path from routing tree
 				while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode));
 				
-				/*if(this.debugRoutingCon){
-					System.out.println("Con rnodes after removing: " + illegalConnection.rnodes.size());
-					for(Routable rn:illegalConnection.rnodes){
-						System.out.println(rn.hashCode());
-					}
-				}*/
-				
 				//Add new path to routing tree
 				for(Routable newRouteNode : newRouteNodes) {
 					illegalConnection.addRNode(newRouteNode);
 				}
 				
-				/*if(this.debugRoutingCon){
-					System.out.println("Con " + illegalConnection.id + " rnodes after adding: " + illegalConnection.rnodes.size());
-					for(Routable rn:illegalConnection.rnodes){
-						System.out.println("rnode id = " + rn.hashCode());
-					}
-				}*/
-				
 				this.add(illegalConnection);
-				/*if(this.debugRoutingCon) {
-					this.printInfo(illegalConnection.toString());
-					this.printConRNodes(illegalConnection);
-				}*/
 			}
 			
 		}

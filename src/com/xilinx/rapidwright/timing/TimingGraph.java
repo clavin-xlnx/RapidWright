@@ -1221,18 +1221,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (e == null)
                 e = new TimingEdge(this, vS, vD, edifNet, net);
             
-            //Yun
-            if(vS == null || vD == null)
-            	System.err.println("vS / vD is null");//Yun - no printouts - move Design.createMissingSitePin... before timing graph?
           //TODO Yun needed
             if(!this.spiAndtimingVertex.containsKey(local_spi_source)){
             	this.spiAndtimingVertex.put(local_spi_source, vS);
             }
             if(!this.spiAndtimingVertex.containsKey(spi_sink)){
-            	if(n.getName().equals("n8fe") && spi_sink.getName().equals("D1")){
-            		System.out.println(spi_sink.getName() + ", Vertex: " + vD.toString());
-            		System.out.println();
-            	}
             	this.spiAndtimingVertex.put(spi_sink, vD);
             }
 

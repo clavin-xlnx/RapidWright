@@ -29,6 +29,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 
 import java.util.ArrayList;
@@ -104,13 +105,12 @@ public class SiblingsTimingGroup {
      * @return a list of list of timing groups representing a list of siblings -- timing groups sharing the same last nodes,
      * instead of an array of timing groups, returned by getNextTimingGroups().
      */
-    public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes) {
+    public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes, RouteThruHelper rthHelper) {
         List<SiblingsTimingGroup> result = new ArrayList<>();
         Node prevNode = siblings[0].exitNode();
-
         // I don't see pip is used in computeTypes or delay calculation. Thus, I don't populate it.
         for (Node nextNode : prevNode.getAllDownhillNodes()) {
-            if (!reservedNodes.contains(nextNode)) {
+            if (!reservedNodes.contains(nextNode) && (rthHelper!= null && !rthHelper.isRouteThru(prevNode, nextNode))) {//TODO Yun to check
                 IntentCode ic = nextNode.getAllWiresInNode()[0].getIntentCode();
 
                 // TODO: is there a better way then relying on name?
@@ -312,6 +312,7 @@ public class SiblingsTimingGroup {
         SiteInst siteInst = new SiteInst(siteName, SiteTypeEnum.SLICEL);
         siteInst.place(device.getSite(siteName));
         SitePinInst pin = new SitePinInst("AQ", siteInst);
+        RouteThruHelper helper = new RouteThruHelper(device);
 
         int numExpansion = 10;
         SiblingsTimingGroup s = new SiblingsTimingGroup(pin);
@@ -319,7 +320,7 @@ public class SiblingsTimingGroup {
         Set<Node> empty = new HashSet<Node>();
         for (int i = 0; i < numExpansion; i++) {
             System.out.println("----");
-            List<SiblingsTimingGroup> next = s.getNextSiblingTimingGroups(empty);
+            List<SiblingsTimingGroup> next = s.getNextSiblingTimingGroups(empty, helper);
             for (SiblingsTimingGroup sb : next) {
                 System.out.println(sb.toString());
             }

@@ -9,6 +9,7 @@ import java.util.Set;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.SiblingsTimingGroup;
 import com.xilinx.rapidwright.timing.TimingModel;
@@ -53,13 +54,16 @@ public class RoutableTimingGroup implements Routable{
 		this.setXY();
 	}
 	
-	public int setChildren(int globalIndex, float base_cost_fac, Map<Node, RoutableTimingGroup> createdRoutable, Set<Node> reservedNodes){
+	public int setChildren(int globalIndex, float base_cost_fac, 
+			Map<Node, RoutableTimingGroup> createdRoutable, 
+			Set<Node> reservedNodes,
+			RouteThruHelper helper){
 		if(debug) this.downHillNodesodTheLastNode();
 		
 		this.children = new ArrayList<>();
 		if(debug) System.out.println("set children");
 		//TODO getNextSiblingTimingGroups does not return right list of siblingsTimingGroups
-		for(SiblingsTimingGroup stGroups:this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes)){
+		for(SiblingsTimingGroup stGroups:this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper)){
 			RoutableTimingGroup childRNode;
 			//the last node of timing group siblings is unique, used as the key
 			
