@@ -501,7 +501,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @param tg
      * @param begLoc
      * @param endLoc
-     * @return
+     * @return delay of the tg. return negative (-1.0) to indicate the tg is out of device bound and should be ignored.
      */
     protected double calcTimingGroupDelay(T.TimingGroup tg, short begLoc, short endLoc, Double dly) {
 //        if (tg == T.TimingGroup.CLE_OUT) {
@@ -509,6 +509,9 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 //                System.out.println();
 //            return (short) 0;
 //        }
+        int size = (tg.direction() == T.Direction.VERTICAL) ? numRow : numCol;
+        if (endLoc < 0 || endLoc >= size || begLoc < 0 || begLoc >= size)
+            return -1.0;
 
         float k0 = K0.get(tg.direction()).get(tg.type());
         float k1 = K1.get(tg.direction()).get(tg.type());
