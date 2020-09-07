@@ -183,7 +183,7 @@ public class RoutableTimingGroupRouter{
 				
 				if(this.isRegularNetToBeRouted(n)){
 					if(!timingDriven) this.initializeNetAndCons(n, bbRange);
-					else this.initializeNetAndCons(n, bbRange, timingDriven);//TODO debugging
+					else this.initializeNetAndCons(n, bbRange);//, timingDriven);//TODO debugging
 					
 				}else if(this.isOnePinTypeNetWithoutPips(n)){
 					this.reserveConnectedNodesOfNetPins(n);
@@ -735,26 +735,29 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public void pipsAssignment(){
-//		for(Netplus np:this.sortedListOfNetplus){
-//			Set<PIP> netPIPs = new HashSet<>();
-//			
-//			for(Connection c:np.getConnection()){
-//				netPIPs.addAll(this.conPIPs(c));
-//			}
-//			np.getNet().setPIPs(netPIPs);
-//		}
-//		
-//		this.checkPIPsUsage();
+		/*for(Netplus np:this.sortedListOfNetplus){
+			Set<PIP> netPIPs = new HashSet<>();
+			
+			for(Connection c:np.getConnection()){
+				netPIPs.addAll(this.conPIPs(c));
+			}
+			np.getNet().setPIPs(netPIPs);
+		}
+		
+		this.checkPIPsUsage();*/
 //		this.checkNetRoutedPins();
 //		this.printWrittenPIPs();
 		System.out.println("net n887: ");
-//		this.checkSiblingsOfInvalidlyRoutedNet("n887");
 		this.checkPIPsOfInvalidlyRoutedNet("n887");
 		
-		System.out.println("\n net LUT6_2_0_16/O5: ");
-		
-//		this.checkSiblingsOfInvalidlyRoutedNet("LUT6_2_16/O5");
+		System.out.println("\nnet LUT6_2_0_16/O5: ");
 		this.checkPIPsOfInvalidlyRoutedNet("LUT6_2_16/O5");
+		
+		System.out.println("\nn2fd: ");
+		this.checkPIPsOfInvalidlyRoutedNet("n2fd");
+		
+		System.out.println("\nnet LUT6_2_0_14/O5: ");
+		this.checkPIPsOfInvalidlyRoutedNet("LUT6_2_14/O5");
 	}
 	
 	public void printWrittenPIPs(){
@@ -805,7 +808,7 @@ public class RoutableTimingGroupRouter{
 		for(Netplus net:this.sortedListOfNetplus){
 			if(net.getNet().getName().equals(netname)){
 				foundInRWrouter = true;
-				System.out.println(net.getNet().toString());
+				
 				for(Connection c: net.getConnection()){
 //					System.out.println(((RoutableTimingGroup)c.getSinkRNode()).getSiblingsTimingGroup().toString() + " - " + c.sink.getName());
 					for(PIP p:this.conPIPs(c)){
@@ -849,6 +852,7 @@ public class RoutableTimingGroupRouter{
 			}
 			
 			this.checkImmuTGofNet(con, "n887", "LUT6_2_16/O5", immu);
+			this.checkImmuTGofNet(con, "n2fd", "LUT6_2_14/O5", immu);
 			
 			/*if(immu == null){
 				this.debuggingITG(rtgFormer.getSiblingsTimingGroup().getExitNode(), rtgLatter.getSiblingsTimingGroup().getExitNode());
@@ -1062,11 +1066,24 @@ public class RoutableTimingGroupRouter{
 			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
 			new_lower_bound_total_path_cost = new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * (rnode.rnodeData.getLevel() + 1);
 			if(this.timingDriven){
-				ImmutableTimingGroup immuTG = this.findImmutableTimingGroup(rnode, childRNode);
+				ImmutableTimingGroup immuTG = null;
+				if(childRNode.getSiblingsTimingGroup().getSiblings().length > 1){
+					immuTG = this.findImmutableTimingGroup(rnode, childRNode);
+				}else{
+					immuTG = childRNode.getSiblingsTimingGroup().getSiblings()[0];
+				}
+				
 				System.out.println("sinkPin ImmutableTimingGroup chosen with exit node: " + this.sinkPinTG.exitNode().toString());
-				System.out.printf("Get min delay from ImmuTimingGroup ( " + immuTG.entryNode().toString() + " -> " + immuTG.exitNode().toString() + " )");
+				if(immuTG.entryNode() != null) 
+					System.out.printf("Get min delay from ImmuTimingGroup ( " + immuTG.entryNode().toString() + " -> " + immuTG.exitNode().toString() + " )");
+				else 
+					System.out.printf("Get min delay from ImmuTimingGroup ( " + immuTG.exitNode().toString() + " )");
+				
 				System.out.println(" to ( " + this.sinkPinTG.entryNode().toString() + " -> " + this.sinkPinTG.exitNode().toString() + " )");
-				new_lower_bound_total_path_cost += this.estimator.getMinDelayToSinkPin(immuTG, this.sinkPinTG);
+				short delay = this.estimator.getMinDelayToSinkPin(immuTG, this.sinkPinTG);
+				System.out.println(" delay = " + delay);
+				
+				new_lower_bound_total_path_cost += delay;
 			}
 			
 		}else{//lut input pin (sink)

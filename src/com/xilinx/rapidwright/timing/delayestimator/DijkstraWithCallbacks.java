@@ -71,12 +71,15 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
         GraphPath<V, E> p = this.getPath(source, sink);
         double w = p == null ? 1.0D / 0.0 : p.getWeight();
         boolean predicateIsTrue = false;
-        for (E e : p.getEdgeList()) {
-           if (edgePredicate.test(e)) {
-               predicateIsTrue = true;
-               break;
-           }
+        if(p != null){//TODO Yun changed for debugging
+        	for (E e : p.getEdgeList()) {
+                if (edgePredicate.test(e)) {
+                    predicateIsTrue = true;
+                    break;
+                }
+             }
         }
+        
         return new Pair<>(w,predicateIsTrue);
     }
 
