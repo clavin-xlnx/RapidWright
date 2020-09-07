@@ -1103,12 +1103,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
        
         
-        for (EDIFHierPortInst hport : hports) {
-        	
-        	if(n.getName().equals("ncda") && hport.isOutput()){
-        		System.out.println("output hport found in net ncda");
-        	}
-        	
+        for (EDIFHierPortInst hport : hports) {       	
             String portName = hport.getPortInst().getName();
             String cellName = hport.getFullHierarchicalInstName();
             Cell cell = design.getCell(cellName);

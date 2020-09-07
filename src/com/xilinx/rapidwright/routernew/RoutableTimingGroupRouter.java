@@ -97,6 +97,7 @@ public class RoutableTimingGroupRouter{
 	public boolean trial = false;
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
+	public boolean debugTiming = false;
 	
 	public RoutableTimingGroupRouter(Design design,
 			String dcpFileName,
@@ -1077,9 +1078,13 @@ public class RoutableTimingGroupRouter{
 				if(immuTG.entryNode() != null) 
 					System.out.printf("Get min delay from ImmuTimingGroup ( " + immuTG.entryNode().toString() + " -> " + immuTG.exitNode().toString() + " )");
 				else 
-					System.out.printf("Get min delay from ImmuTimingGroup ( " + immuTG.exitNode().toString() + " )");
+					System.out.printf("Get min delay from ImmuTimingGroup exit node only ( " + immuTG.exitNode().toString() + " )");
 				
-				System.out.println(" to ( " + this.sinkPinTG.entryNode().toString() + " -> " + this.sinkPinTG.exitNode().toString() + " )");
+				if(this.sinkPinTG.entryNode() != null) 
+					System.out.println(" to ( " + this.sinkPinTG.entryNode().toString() + " -> " + this.sinkPinTG.exitNode().toString() + " )");
+				else
+					System.out.println(" to ( " + this.sinkPinTG.exitNode().toString() + " )");
+				
 				short delay = this.estimator.getMinDelayToSinkPin(immuTG, this.sinkPinTG);
 				System.out.println(" delay = " + delay);
 				
