@@ -4,11 +4,6 @@ package com.xilinx.rapidwright.timing.delayestimator;
 // add callback
 
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Objects;
 import org.jgrapht.Graph;
 import org.jgrapht.Graphs;
 import org.jgrapht.alg.interfaces.ShortestPathAlgorithm;
@@ -16,6 +11,12 @@ import org.jgrapht.alg.shortestpath.TreeSingleSourcePathsImpl;
 import org.jgrapht.alg.util.Pair;
 import org.jgrapht.util.FibonacciHeap;
 import org.jgrapht.util.FibonacciHeapNode;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 
 class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
 
@@ -96,11 +97,11 @@ class DijkstraClosestFirstIterator<V, E> implements Iterator<V> {
                 V u = Graphs.getOppositeVertex(this.graph, e, v);
                 examineEdge.apply(this.graph, u, e, x, y, vDistance);
                 double eWeight = this.graph.getEdgeWeight(e);
-                if (eWeight < 0.0D) {
-                    throw new IllegalArgumentException("Negative edge weight not allowed");
+                // edge with neg weight indicating that the edge is invalid and should not be used in updateDistance
+                // ie., the edge go out of device bound
+                if (eWeight >= 0.0D) {
+                    this.updateDistance(u, e, vDistance + eWeight);
                 }
-
-                this.updateDistance(u, e, vDistance + eWeight);
             }
 
             return v;
