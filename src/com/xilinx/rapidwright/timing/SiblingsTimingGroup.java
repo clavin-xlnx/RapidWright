@@ -30,6 +30,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.Pair;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -104,8 +105,8 @@ public class SiblingsTimingGroup {
      * @return a list of list of timing groups representing a list of siblings -- timing groups sharing the same last nodes,
      * instead of an array of timing groups, returned by getNextTimingGroups().
      */
-    public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes) {
-        List<SiblingsTimingGroup> result = new ArrayList<>();
+    public List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> getNextSiblingTimingGroups(Set<Node> reservedNodes) {
+        List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> result = new ArrayList<Pair<SiblingsTimingGroup,ImmutableTimingGroup>>();
         Node prevNode = siblings[0].exitNode();
 
         // I don't see pip is used in computeTypes or delay calculation. Thus, I don't populate it.
@@ -126,7 +127,7 @@ public class SiblingsTimingGroup {
                 if (nextNodeHasGlobalWire || ic == IntentCode.NODE_CLE_OUTPUT ||
                         ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNode, ic);
-                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}));
+                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}),newTS));
                 } else {
                     // for other TGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
@@ -134,6 +135,7 @@ public class SiblingsTimingGroup {
                             IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
 
                             List<ImmutableTimingGroup> tgs = new ArrayList<>();
+                            ImmutableTimingGroup throughTg = null;
                             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) { // need to get all downhill PIPs
                                 // TODO: Currently the whole sibling is considered together as a whole.
                                 // TODO: (need to revisit this if the assumption changes.)
@@ -141,8 +143,10 @@ public class SiblingsTimingGroup {
                                 IntentCode nextPrvIc       = nextPrvNode.getAllWiresInNode()[0].getIntentCode();
                                 ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNextNode, nextPrvNode, nextNextIc, nextPrvIc);
                                 tgs.add(newTS);
+                                if (nextPrvNode == nextNode)
+                                    throughTg = newTS;
                             }
-                            result.add(new SiblingsTimingGroup(tgs));
+                            result.add(new Pair<>(new SiblingsTimingGroup(tgs),throughTg));
                         }
                     }
                 }
@@ -319,14 +323,13 @@ public class SiblingsTimingGroup {
         Set<Node> empty = new HashSet<Node>();
         for (int i = 0; i < numExpansion; i++) {
             System.out.println("----");
-            List<SiblingsTimingGroup> next = s.getNextSiblingTimingGroups(empty);
-            for (SiblingsTimingGroup sb : next) {
+            List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = s.getNextSiblingTimingGroups(empty);
+            for (Pair<SiblingsTimingGroup,ImmutableTimingGroup> sb : next) {
                 System.out.println(sb.toString());
             }
             // just pack one to expand
-            s = next.get(0);
+            s = next.get(0).getFirst();
         }
-
     }
 }
 
