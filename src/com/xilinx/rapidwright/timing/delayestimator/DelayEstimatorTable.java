@@ -373,8 +373,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     private short extendedWidth;
     private short extendedHeight;
 
-    private short horizontalDetourDistance = 3;
-    private short verticalDetourDistance = 5;
+    // TODO: should come from architecture
+    private short horizontalDetourDistance = 6;
+    private short verticalDetourDistance = 12;
 
     // Right and top are inclusive!
     private Pair<Short, Short> topLeft, topRight, botLeft, botRight;
@@ -1630,9 +1631,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        ImmutableTimingGroup src = createTG("INT_X11Y107/INT_NODE_GLOBAL_6_INT_OUT1", device);
 //        ImmutableTimingGroup dst = createTG("INT_X11Y107/IMUX_W2",
 //                "INT_X11Y107/VCC_WIRE", device);
-        ImmutableTimingGroup src = createTG("INT_X11Y108/EE4_W_BEG1","INT_X11Y108/INT_NODE_SDQ_53_INT_OUT0",device);
-        ImmutableTimingGroup dst = createTG("INT_X11Y107/IMUX_W2","INT_X11Y106/INODE_W_60_FT0", device);
-        short dly = getMinDelayToSinkPin(src, dst);
+//        ImmutableTimingGroup src = createTG("INT_X11Y108/EE4_W_BEG1","INT_X11Y108/INT_NODE_SDQ_53_INT_OUT0",device);
+//        ImmutableTimingGroup dst = createTG("INT_X11Y107/IMUX_W2","INT_X11Y106/INODE_W_60_FT0", device);
+        ImmutableTimingGroup src = createTG("INT_X11Y112/EE12_BEG2",device);
+        ImmutableTimingGroup dst = createTG("INT_X11Y114/IMUX_W33","INT_X11Y114/INT_NODE_IMUX_40_INT_OUT0", device);                   short dly = getMinDelayToSinkPin(src, dst);
         System.out.println("delay " + dly);
         return;
     }
