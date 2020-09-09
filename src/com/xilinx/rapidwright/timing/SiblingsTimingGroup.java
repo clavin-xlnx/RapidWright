@@ -59,6 +59,10 @@ public class SiblingsTimingGroup {
         return siblings;
     }
 
+    public GroupDelayType type() {
+        return this.type;
+    }
+
 
     /**
      * Construct SiblingsTimingGroup from a sitePin which can be input or output.
@@ -99,6 +103,7 @@ public class SiblingsTimingGroup {
 
         this.siblings = siblings.toArray(new ImmutableTimingGroup[siblings.size()]);
         this.hashCode = this.siblings[0].exitNode().hashCode();
+        this.type     = GroupDelayType.PINFEED;
     }
 
     /**
@@ -124,10 +129,18 @@ public class SiblingsTimingGroup {
 
                 // CLE_OUT, GLOBAL, LONG TGs have only one node, others have 2 nodes.
                 // TG with one node has no siblings.
-                if (nextNodeHasGlobalWire || ic == IntentCode.NODE_CLE_OUTPUT ||
-                        ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
+                if (nextNodeHasGlobalWire) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNode, ic);
-                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}),newTS));
+                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}},
+                                                                  GroupDelayType.GLOBAL), newTS));
+                } else if (ic == IntentCode.NODE_CLE_OUTPUT) {
+                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNode, ic);
+                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
+                                                                  GroupDelayType.OTHER),newTS));
+                } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
+                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNode, ic);
+                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
+                                                                  GroupDelayType.LONG),newTS));
                 } else {
                     // for other TGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
@@ -146,7 +159,8 @@ public class SiblingsTimingGroup {
                                 if (nextPrvNode == nextNode)
                                     throughTg = newTS;
                             }
-                            result.add(new Pair<>(new SiblingsTimingGroup(tgs),throughTg));
+                            // TODO: find out the type if the type is needed. Don't do it to reduce runtime
+                            result.add(new Pair<>(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER),throughTg));
                         }
                     }
                 }
@@ -199,11 +213,13 @@ public class SiblingsTimingGroup {
 
     final private ImmutableTimingGroup[] siblings;
     final private int                    hashCode;
+    final private GroupDelayType         type;
 
 
-    private SiblingsTimingGroup (List<ImmutableTimingGroup> tgs) {
+    private SiblingsTimingGroup (List<ImmutableTimingGroup> tgs, GroupDelayType type) {
         this.siblings = tgs.toArray(new ImmutableTimingGroup[tgs.size()]);
         this.hashCode = this.siblings[0].hashCode();
+        this.type     = type;
     }
 
 
