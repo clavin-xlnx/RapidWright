@@ -64,16 +64,16 @@ public class RoutableTimingGroup implements Routable{
 		
 		this.children = new ArrayList<>();
 		if(debug) System.out.println("set children");
-		//TODO getNextSiblingTimingGroups does not return right list of siblingsTimingGroups
-		for(SiblingsTimingGroup stGroups:this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper)){
+		List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper);
+		for(Pair<SiblingsTimingGroup,ImmutableTimingGroup> stGroups : next){
 			RoutableTimingGroup childRNode;
 			//the last node of timing group siblings is unique, used as the key
 			
-			Node key = stGroups.getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
-			
-			if(debug) System.out.println(stGroups.getExitNode().toString());
+			Node key = stGroups.getFirst().getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
+			//TODO store entry nodes
+			if(debug) System.out.println(stGroups.getFirst().getExitNode().toString());
 			if(!createdRoutable.containsKey(key)){
-				childRNode = new RoutableTimingGroup(globalIndex, stGroups);
+				childRNode = new RoutableTimingGroup(globalIndex, stGroups.getFirst());
 				childRNode.setBaseCost(base_cost_fac);
 				globalIndex++;
 				children.add(childRNode);
