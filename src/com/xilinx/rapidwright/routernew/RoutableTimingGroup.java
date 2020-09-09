@@ -29,7 +29,7 @@ public class RoutableTimingGroup implements Routable{
 	
 	public boolean target;
 	public List<RoutableTimingGroup> children;
-	public List<Pair<RoutableTimingGroup, Node>> childrenEntryNode;
+	public List<Pair<RoutableTimingGroup, ImmutableTimingGroup>> childrenImmuTG;
 	public boolean childrenSet;
 	
 	public boolean debug = false;
@@ -60,13 +60,16 @@ public class RoutableTimingGroup implements Routable{
 			Map<Node, RoutableTimingGroup> createdRoutable, 
 			Set<Node> reservedNodes,
 			RouteThruHelper helper){
-		if(debug) this.downHillNodesodTheLastNode();
 		
+		if(debug) this.downHillNodesodTheLastNode();
 		this.children = new ArrayList<>();
+//		this.childrenImmuTG = new ArrayList<>();
 		if(debug) System.out.println("set children");
+		
 		List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper);
 		for(Pair<SiblingsTimingGroup,ImmutableTimingGroup> stGroups : next){
 			RoutableTimingGroup childRNode;
+			Pair<RoutableTimingGroup,ImmutableTimingGroup> child;
 			//the last node of timing group siblings is unique, used as the key
 			
 			Node key = stGroups.getFirst().getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
@@ -75,11 +78,19 @@ public class RoutableTimingGroup implements Routable{
 			if(!createdRoutable.containsKey(key)){
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups.getFirst());
 				childRNode.setBaseCost(base_cost_fac);
+				
+//				child = new Pair<>(new RoutableTimingGroup(globalIndex, stGroups.getFirst()), stGroups.getSecond());
+//				child.getFirst().setBaseCost(base_cost_fac);
+				
+				
 				globalIndex++;
-				children.add(childRNode);
+				this.children.add(childRNode);
+//				this.childrenImmuTG.add(child);
 				createdRoutable.put(key, childRNode);
+//				createdRoutable.put(key, child.getFirst());
 			}else{
-				children.add(createdRoutable.get(key));
+				this.children.add(createdRoutable.get(key));
+//				this.childrenImmuTG.add();//TODO
 			}
 		}
 		if(debug){

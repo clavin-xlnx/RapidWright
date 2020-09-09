@@ -9,6 +9,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 
 public class RouterHelper {
 	//TODO a collections of methods for routing functionality
@@ -71,6 +72,33 @@ public class RouterHelper {
 			}	
 		}
 		return pip;
+	}
+	
+	public static ImmutableTimingGroup findImmutableTimingGroup(RoutableTimingGroup rtgFirst, RoutableTimingGroup rtgSecond){
+		if(rtgSecond.getSiblingsTimingGroup().getSiblings().length > 1){
+			Node exitofFirst = rtgFirst.getSiblingsTimingGroup().getExitNode();
+			ImmutableTimingGroup[] immus = rtgSecond.getSiblingsTimingGroup().getSiblings();
+			int length = immus.length;
+			for(int i = 0; i < length; i++){
+				Node entryOfSecond = immus[i].entryNode();
+				if(twoNodesAbutted(exitofFirst, entryOfSecond)){
+					return immus[i];
+				}
+			}
+		}else{
+			return rtgSecond.getSiblingsTimingGroup().getSiblings()[0];
+		}
+		
+		System.err.println("Null ImmutableTimingGroup found connecting two SiblingsTimingGroup");
+		return null;
+	}
+	
+	public static boolean twoNodesAbutted(Node parent, Node nodeToCheck){
+		for(Node n:parent.getAllDownhillNodes()){
+			if(n.equals(nodeToCheck))
+				return true;
+		}
+		return false;
 	}
 	
 }

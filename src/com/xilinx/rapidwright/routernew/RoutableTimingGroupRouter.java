@@ -845,12 +845,7 @@ public class RoutableTimingGroupRouter{
 			/*System.out.println(rtgFormer.type + ", " + rtgFormer.toString());
 			System.out.println(rtgLatter.type + ", " + rtgLatter.toString());
 			System.out.println("rtg latter size: " + rtgLatter.getSiblingsTimingGroup().getSiblings().length);*/
-			ImmutableTimingGroup immu = null;
-			if(rtgLatter.getSiblingsTimingGroup().getSiblings().length > 1){
-				immu = this.findImmutableTimingGroup(rtgFormer, rtgLatter);
-			}else{
-				immu = rtgLatter.getSiblingsTimingGroup().getSiblings()[0];
-			}
+			ImmutableTimingGroup immu = RouterHelper.findImmutableTimingGroup(rtgFormer, rtgLatter);
 			
 			this.checkImmuTGofNet(con, "n887", "LUT6_2_16/O5", immu);
 			this.checkImmuTGofNet(con, "n2fd", "LUT6_2_14/O5", immu);
@@ -1067,12 +1062,7 @@ public class RoutableTimingGroupRouter{
 			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
 			new_lower_bound_total_path_cost = new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * (rnode.rnodeData.getLevel() + 1);
 			if(this.timingDriven){
-				ImmutableTimingGroup immuTG = null;
-				if(childRNode.getSiblingsTimingGroup().getSiblings().length > 1){
-					immuTG = this.findImmutableTimingGroup(rnode, childRNode);
-				}else{
-					immuTG = childRNode.getSiblingsTimingGroup().getSiblings()[0];
-				}
+				ImmutableTimingGroup immuTG = RouterHelper.findImmutableTimingGroup(rnode, childRNode);
 				
 				System.out.println("sinkPin ImmutableTimingGroup chosen with exit node: " + this.sinkPinTG.exitNode().toString());
 				if(immuTG.entryNode() != null) 
@@ -1121,28 +1111,6 @@ public class RoutableTimingGroupRouter{
 			if(rnode != null) data.setLevel(rnode.rnodeData.getLevel()+1);
 			this.queue.add(new QueueElement(childRNode, new_lower_bound_total_path_cost));
 		}
-	}
-	
-	private ImmutableTimingGroup findImmutableTimingGroup(RoutableTimingGroup rtgFirst, RoutableTimingGroup rtgSecond){
-		Node exitofFirst = rtgFirst.getSiblingsTimingGroup().getExitNode();
-		ImmutableTimingGroup[] immus = rtgSecond.getSiblingsTimingGroup().getSiblings();
-		int length = immus.length;
-		for(int i = 0; i < length; i++){
-			Node entryOfSecond = immus[i].entryNode();
-			if(this.twoNodesAbutted(exitofFirst, entryOfSecond)){
-				return immus[i];
-			}
-		}
-		System.err.println("Null ImmutableTimingGroup found connecting two SiblingsTimingGroup");
-		return null;
-	}
-	
-	private boolean twoNodesAbutted(Node parent, Node nodeToCheck){
-		for(Node n:parent.getAllDownhillNodes()){
-			if(n.equals(nodeToCheck))
-				return true;
-		}
-		return false;
 	}
 	
 	private float getRouteNodeCost(RoutableTimingGroup rnode, Connection con, int countSourceUses) {
