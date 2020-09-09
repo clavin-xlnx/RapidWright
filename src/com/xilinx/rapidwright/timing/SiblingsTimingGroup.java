@@ -111,7 +111,7 @@ public class SiblingsTimingGroup {
         Node prevNode = siblings[0].exitNode();
         // I don't see pip is used in computeTypes or delay calculation. Thus, I don't populate it.
         for (Node nextNode : prevNode.getAllDownhillNodes()) {
-            if (!reservedNodes.contains(nextNode) && (rthHelper!= null && !rthHelper.isRouteThru(prevNode, nextNode))) {//TODO Yun to check
+            if (!reservedNodes.contains(nextNode) && (rthHelper!= null && !rthHelper.isRouteThru(prevNode, nextNode))) {
                 IntentCode ic = nextNode.getAllWiresInNode()[0].getIntentCode();
 
                 // TODO: is there a better way then relying on name?
