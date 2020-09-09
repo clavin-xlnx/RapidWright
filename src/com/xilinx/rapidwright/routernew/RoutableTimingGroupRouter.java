@@ -117,11 +117,11 @@ public class RoutableTimingGroupRouter{
 		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
 		
-		TimingManager tm = new TimingManager(this.design, true);//slacks calculated
-		this.timingModel = tm.getTimingModel();
-		this.timingGraph = tm.getTimingGraph();
-		
 		if(timingDriven){
+			TimingManager tm = new TimingManager(this.design, true);//slacks calculated
+			this.timingModel = tm.getTimingModel();
+			this.timingGraph = tm.getTimingGraph();
+			
 			Device device = Device.getDevice("xcvu3p-ffvc1517");
 			InterconnectInfo ictInfo = new InterconnectInfo();
 	        this.estimator = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);

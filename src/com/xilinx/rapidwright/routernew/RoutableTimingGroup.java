@@ -13,6 +13,7 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.SiblingsTimingGroup;
 import com.xilinx.rapidwright.timing.TimingModel;
+import com.xilinx.rapidwright.util.Pair;
 
 public class RoutableTimingGroup implements Routable{
 	public int index;
@@ -28,6 +29,7 @@ public class RoutableTimingGroup implements Routable{
 	
 	public boolean target;
 	public List<RoutableTimingGroup> children;
+	public List<Pair<RoutableTimingGroup, Node>> childrenEntryNode;
 	public boolean childrenSet;
 	
 	public boolean debug = false;

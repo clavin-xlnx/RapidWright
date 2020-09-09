@@ -55,6 +55,18 @@ public class TimingVertex {
         this.isFlopOutput = false;
         this.printed = false;
     }
+    
+    /**
+     * Create a timing vertex for insertion into the timing graph
+     * @param name - name is the cell name of an input or output pin
+     * @param isFlopInput - to indicate if it is an input or output
+     */
+    public TimingVertex(String name, boolean isFlopInput) {
+    	this.name = name;
+    	this.isFlopInput = isFlopInput;
+        this.isFlopOutput = !isFlopInput;
+//        this.printed = false;
+    }
 
     /**
      * Returns a String representation of this object.
