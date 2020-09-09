@@ -267,17 +267,7 @@ public class RoutableTimingGroupRouter{
 			inet++;			
 			
 			SitePinInst source = n.getSource();
-			//TODO remove
-			/*if(source.getName().contains("MUX")){
-				
-				if(n.getAlternateSource() == null){
-					System.out.println(n.getName() + ", source " + source.toString() + ", null alternative source");
-				}else{
-					source = n.getAlternateSource();
-					System.out.println(n.getName() + ", source " + source.toString());
-				}
-			}*/
-			////
+			
 			RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
 			for(SitePinInst sink:n.getSinkPins()){
 				if(RouterHelper.isExternalConnectionToCout(source, sink)){//|| n.getName().equals("ncda") || n.getName().equals("ncfe") || n.getName().equals("ncf8")
@@ -830,29 +820,16 @@ public class RoutableTimingGroupRouter{
 	
 	public List<PIP> conPIPs(Connection con){
 		List<PIP> conPIPs = new ArrayList<>();
-/*		System.out.println(con.toString());
-		for(int i = 0; i < con.rnodes.size(); i++){
-			System.out.println(con.rnodes.get(i).toString());
-		}*/
 		List<Node> conNodes = new ArrayList<>();
 		
-		for(int i = 0; i < con.rnodes.size() - 1; i++){
-			
+		for(int i = 0; i < con.rnodes.size() - 1; i++){		
 			RoutableTimingGroup rtgFormer = ((RoutableTimingGroup) (con.rnodes.get(i + 1)));
-			RoutableTimingGroup rtgLatter = ((RoutableTimingGroup) (con.rnodes.get(i)));
+			RoutableTimingGroup rtgLatter = ((RoutableTimingGroup) (con.rnodes.get(i)));		
 			
-			//TODO bug fixing
-			/*System.out.println(rtgFormer.type + ", " + rtgFormer.toString());
-			System.out.println(rtgLatter.type + ", " + rtgLatter.toString());
-			System.out.println("rtg latter size: " + rtgLatter.getSiblingsTimingGroup().getSiblings().length);*/
 			ImmutableTimingGroup immu = RouterHelper.findImmutableTimingGroup(rtgFormer, rtgLatter);
 			
 			this.checkImmuTGofNet(con, "n887", "LUT6_2_16/O5", immu);
 			this.checkImmuTGofNet(con, "n2fd", "LUT6_2_14/O5", immu);
-			
-			/*if(immu == null){
-				this.debuggingITG(rtgFormer.getSiblingsTimingGroup().getExitNode(), rtgLatter.getSiblingsTimingGroup().getExitNode());
-			}*/
 			
 			conNodes.add(immu.exitNode());
 			if(immu.entryNode() != null){

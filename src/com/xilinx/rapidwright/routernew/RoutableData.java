@@ -15,7 +15,7 @@ public class RoutableData {
 	
 	private Routable prev;
 	
-	private int occupation;
+	private int occupancy;
 	private int level;
 	
 	//SitePinInst -> source and sink of the connection
@@ -26,7 +26,7 @@ public class RoutableData {
     	this.index = index;
     	this.pres_cost = 1;
     	this.acc_cost = 1;
-    	this.occupation = 0;
+    	this.occupancy = 0;
     	this.setTouched(false);
 
 		this.sourcesSet = null;
@@ -109,14 +109,14 @@ public class RoutableData {
 	
 	public int getOccupation() {
 		if(this.sourcesSet == null)
-			this.occupation = 0;
+			this.occupancy = 0;
 		else
-			this.occupation = this.sourcesSet.uniqueSize();
-		return this.occupation;
+			this.occupancy = this.sourcesSet.uniqueSize();
+		return this.occupancy;
 	}
 	
 	public void setOccupation(int occupation) {
-		this.occupation = occupation;
+		this.occupancy = occupation;
 	}
 	
 	public Routable getPrev() {
