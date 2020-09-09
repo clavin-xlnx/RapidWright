@@ -306,5 +306,17 @@ public class RoutableNode implements Routable{
 	public RoutableType getRoutableType() {
 		return this.type;
 	}
+
+	@Override
+	public boolean isGlobal() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean isBounce() {
+		// TODO Auto-generated method stub
+		return false;
+	}
 	
 }

@@ -29,8 +29,10 @@ public class RoutableTimingGroup implements Routable{
 	
 	public boolean target;
 	public List<RoutableTimingGroup> children;
-	public List<Pair<RoutableTimingGroup, ImmutableTimingGroup>> childrenImmuTG;
+	public List<Pair<RoutableTimingGroup, ImmutableTimingGroup>> childrenImmuTG;//TODO use this one
 	public boolean childrenSet;
+	
+	//TODO move occupancy here
 	
 	public boolean debug = false;
 	
@@ -63,7 +65,7 @@ public class RoutableTimingGroup implements Routable{
 		
 		if(debug) this.downHillNodesodTheLastNode();
 		this.children = new ArrayList<>();
-//		this.childrenImmuTG = new ArrayList<>();
+		this.childrenImmuTG = new ArrayList<>();
 		if(debug) System.out.println("set children");
 		
 		List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper);
@@ -79,18 +81,18 @@ public class RoutableTimingGroup implements Routable{
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups.getFirst());
 				childRNode.setBaseCost(base_cost_fac);
 				
-//				child = new Pair<>(new RoutableTimingGroup(globalIndex, stGroups.getFirst()), stGroups.getSecond());
-//				child.getFirst().setBaseCost(base_cost_fac);
-				
+				child = new Pair<>(childRNode, stGroups.getSecond());
 				
 				globalIndex++;
 				this.children.add(childRNode);
-//				this.childrenImmuTG.add(child);
+				this.childrenImmuTG.add(child);
 				createdRoutable.put(key, childRNode);
 //				createdRoutable.put(key, child.getFirst());
 			}else{
-				this.children.add(createdRoutable.get(key));
-//				this.childrenImmuTG.add();//TODO
+				childRNode = createdRoutable.get(key);
+				this.children.add(childRNode);
+				ImmutableTimingGroup immu = RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key));
+				this.childrenImmuTG.add(new Pair<>(childRNode, immu));
 			}
 		}
 		if(debug){
@@ -325,6 +327,19 @@ public class RoutableTimingGroup implements Routable{
 	@Override
 	public RoutableType getRoutableType() {
 		return this.type;
+	}
+
+	@Override
+	public boolean isGlobal() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean isBounce() {
+		// TODO Auto-generated method stub
+		
+		return false;
 	}
 	
 }

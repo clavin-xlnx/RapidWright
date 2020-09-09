@@ -23,5 +23,7 @@ public interface Routable {
 	public String toString();
 	public int hashCode();
 	public RoutableType getRoutableType();
+	public boolean isGlobal();
+	public boolean isBounce();
 
 }

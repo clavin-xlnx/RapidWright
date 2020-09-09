@@ -1023,8 +1023,9 @@ public class RoutableTimingGroupRouter{
 		if(this.debugExpansion){
 			this.printInfo("\t\t childRNode " + childRNode.toString());
 		}
-		//TODO timing info
+		
 		float partial_path_cost = rnode.rnodeData.getPartialPathCost();//upstream path cost
+		//TODO pass info of rnode to childRNode (entry node)
 		float rnodeCost = this.getRouteNodeCost(childRNode, con, countSourceUses);
 		float new_partial_path_cost = partial_path_cost + rnodeCost;//upstream path cost + cost of node under consideration
 		float new_lower_bound_total_path_cost;
@@ -1097,11 +1098,11 @@ public class RoutableTimingGroupRouter{
 		//Present congestion cost
 		float pres_cost;
 		if(containsSource) {
-			int overoccupation = data.numUniqueSources() - Routable.capacity;
-			if(overoccupation < 0) {
+			int overoccupancy = data.numUniqueSources() - Routable.capacity;//TODO use entry node
+			if(overoccupancy < 0) {
 				pres_cost = 1;
 			}else{
-				pres_cost = 1 + overoccupation * this.pres_fac;
+				pres_cost = 1 + overoccupancy * this.pres_fac;
 			}
 		}else{
 			pres_cost = data.getPres_cost();

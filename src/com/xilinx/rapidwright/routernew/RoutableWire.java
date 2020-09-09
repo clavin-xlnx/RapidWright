@@ -198,4 +198,16 @@ public class RoutableWire implements Routable{
 		return this.type;
 	}
 
+	@Override
+	public boolean isGlobal() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean isBounce() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
 }
