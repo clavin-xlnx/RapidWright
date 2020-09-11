@@ -68,6 +68,8 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     protected T     ictInfo;
 
     protected int   verbose;
+    // this is only need DelayEstimatorTable.loadBounceDelay
+    protected Device device;
 
 
 
@@ -78,6 +80,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @param device target device.
      */
     DelayEstimatorBase(Device device, T ictInfo, int verbose) {
+        this.device  = device;
         this.verbose = verbose;
         this.ictInfo = ictInfo;
         // Is it ok to build timingModel again in here?
