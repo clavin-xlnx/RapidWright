@@ -27,8 +27,10 @@ package com.xilinx.rapidwright.timing.delayestimator;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
+import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.PairUtil;
 import org.jgrapht.Graph;
@@ -39,14 +41,18 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -137,8 +143,17 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     @Override
     public short getMinDelayToSinkPin(ImmutableTimingGroup timingGroup,
                                       ImmutableTimingGroup sinkPin) {
-
-        return getMinDelayToSinkPin(getTermInfo(timingGroup), getTermInfo(sinkPin)).getFirst();
+        // TODO: consider puting this to graph to avoid this if
+        if (timingGroup.delayType() == GroupDelayType.PIN_BOUNCE) {
+            NodePair np = new NodePair(timingGroup, sinkPin);
+            if (delayFrBounceToSink.containsKey(np))
+                // add input sitepin delay
+                return (short) (delayFrBounceToSink.get(np) + K0.get(T.Direction.INPUT).get(GroupDelayType.PINFEED));
+            else
+                return Short.MAX_VALUE;
+        } else {
+            return getMinDelayToSinkPin(getTermInfo(timingGroup), getTermInfo(sinkPin)).getFirst();
+        }
 
 ////        Node tgNode = timingGroup.getLastNode();
 //// INT_X46Y110/IMUX_E17
@@ -168,6 +183,20 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 ////
 ////        return delay;
     }
+
+    // TODO: load and store if it turns out to be slow to build
+    @Override
+    public boolean load(String filename) {
+        return true;
+    }
+
+    @Override
+    public boolean store(String filename) {
+        return true;
+    }
+
+    // ------------------------------------   private ----------------------------------------
+
     class RoutingNode {
         // INT_TILE coordinate
         short x;
@@ -357,16 +386,6 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return res;
     }
 
-    @Override
-    public boolean load(String filename) {
-        return true;
-    }
-
-
-    @Override
-    public boolean store(String filename) {
-        return true;
-    }
 
     private short width;
     private short height;
@@ -393,7 +412,92 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     // temp to be deleted
     private Graph<Object, TimingGroupEdge> g;
 
-    void build() {
+    // The delay does not include the source bounce.
+    // if a bounce has no path to a sink, the sink is not reachble from the bounce.
+    // IMPLEMENTATION NOTE:
+    // the map is supposed to not tie to specific INT TILE. To accomplish that
+    // 1) store node with tile_1. The sink can be in tile_0, tile_1 or tile_2.
+    // 2) to look up need to translate to tile_0/1/2.
+    class NodePair {
+        // From Vivado, I see almost 1500 wires in an INT tile.
+        // these slices should match the slice in the file read in below
+//        tile_2 = getIntTileOfSite("SLICE_X37Y142");
+//        tile_1 = getIntTileOfSite("SLICE_X37Y141");
+//        tile_0 = getIntTileOfSite("SLICE_X30Y140");
+
+        /**
+         * Construct NodePair representing non-reachable
+         * If hash contain this key, its value must be MAX.
+         */
+        NodePair() {
+            tileOffset = -2;
+            srcWireIdx = -1;
+            srcWireIdx = -1;
+        }
+        /**
+         * create NodePair from strings during loading
+         *
+         * @param src source node as in INT_X24Y140/BYPASS_E11
+         * @param dst sink node
+         */
+        NodePair(String src, String dst) {
+            this();
+            Node srcNode = new Node(src, device);
+            Node dstNode = new Node(dst, device);
+            construct(srcNode, dstNode);
+
+            // catch problem in the source txt input
+            if (tileOffset == -2) {
+                throw new IllegalArgumentException("Error in NodePair. " + src + " is too far from " + dst + ".");
+            }
+        }
+
+        // to convert timing groups for lookup
+        NodePair(ImmutableTimingGroup src, ImmutableTimingGroup dst) {
+            this();
+            Node srcNode = src.exitNode();
+            Node dstNode = dst.exitNode();
+            construct(srcNode, dstNode);
+        }
+
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            NodePair nodePair = (NodePair) o;
+            return tileOffset == nodePair.tileOffset &&
+                    srcWireIdx == nodePair.srcWireIdx &&
+                    dstWireIdx == nodePair.dstWireIdx;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(tileOffset, srcWireIdx, dstWireIdx);
+        }
+
+        private byte tileOffset; // -1,0,+1
+        private short srcWireIdx;
+        private short dstWireIdx;
+
+        private void construct(Node srcNode, Node dstNode) {
+            Tile srcTile = srcNode.getTile();
+            Tile dstTile = dstNode.getTile();
+            int srcCoor = srcTile.getTileYCoordinate();
+            int dstCoor = dstTile.getTileYCoordinate();
+
+            if(Math.abs(dstCoor -srcCoor)<2) {
+                tileOffset = (byte) (dstCoor - srcCoor);
+                srcWireIdx = (short) srcNode.getAllWiresInNode()[0].getWireIndex();
+                dstWireIdx = (short) dstNode.getAllWiresInNode()[0].getWireIndex();
+            }
+        }
+    }
+
+    private Map<NodePair,Short> delayFrBounceToSink;
+
+
+    private void build() {
         rgBuilder = new ResourceGraphBuilder(extendedWidth, extendedHeight, 0);
         if (this.verbose > 5 || this.verbose == -1)
             rgBuilder.plot("rggraph.dot");
@@ -401,6 +505,74 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        initTables();
 //        trimTables();
 //        cleanup();
+        loadBounceDelay("bounce_sitepin.txt");
+    }
+
+
+
+    void loadBounceDelay(String fileName) {
+
+        delayFrBounceToSink = new HashMap<>();
+
+        // add an entry to represent unreachable
+        NodePair unreachable = new NodePair();
+        delayFrBounceToSink.put(unreachable,Short.MAX_VALUE);
+
+        // bounce is considered a horizontal single with d 0
+        float k0 = K0.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE);
+        float k1 = K1.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE);
+        short l  = L .get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE);
+        // need abs in case the tg is going to the left.
+        short bounceDelay = (short) (k0 + k1 * l);
+
+
+
+        InputStream inputStream = null;
+        Scanner sc = null;
+
+        try {
+            // sink source numBounce
+            // INT_X24Y140/BYPASS_E11 INT_X24Y141/BYPASS_E9 4
+            inputStream = FileTools.getRapidWrightResourceInputStream(fileName);
+            sc = new Scanner(inputStream, "UTF-8");
+            while (sc.hasNextLine()) {
+                String line = sc.nextLine().trim();
+
+                String testLine = line.replaceAll("\\s+", "");
+                boolean lineIsBlank = testLine.isEmpty();
+
+                if (lineIsBlank || line.trim().matches("^#.*")) { // if not a comment line
+//                    System.out.println("skip " + line);
+                } else {
+                    List<String> items  = Arrays.asList(line.trim().split("\\s+"));
+//                    System.out.println("*" + items.get(0) + " * " + items.get(1) + " * " + items.get(2));
+                    short numBounces = Short.parseShort(items.get(2));
+                    NodePair np = new NodePair(items.get(1), items.get(0));
+                    short delay = (short) (numBounces * bounceDelay);
+                    delayFrBounceToSink.put(np, delay);
+                }
+            }
+            // Note that Scanner suppresses exceptions
+            if (sc.ioException() != null) {
+                throw sc.ioException();
+            }
+        } catch (IOException ex) {
+            System.out.println (ex.toString());
+            System.out.println("IOException during reading file " + fileName);
+        }
+
+        try {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+        } catch (IOException ex) {
+            System.out.println (ex.toString());
+            System.out.println("IOException during reading file " + fileName);
+        } finally {
+            if (sc != null) {
+                sc.close();
+            }
+        }
     }
 
     // make this generic
@@ -1239,6 +1411,52 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
     // -----------------------   Methods to help testing ------------------------
+    void testBounceToSink() {
+        {  // exact tile as in the data
+            ImmutableTimingGroup d1 = createTG("INT_X24Y140/IMUX_W29", device);
+            ImmutableTimingGroup s1 = createTG("INT_X24Y141/BYPASS_W10", device);
+            short dly1 = getMinDelayToSinkPin(s1, d1);
+            System.out.println("1 " + dly1);
+            ImmutableTimingGroup d2 = createTG("INT_X24Y140/IMUX_W10", device);
+            ImmutableTimingGroup s2 = createTG("INT_X24Y141/BYPASS_W1", device);
+            short dly2 = getMinDelayToSinkPin(s2, d2);
+            System.out.println("2 " + dly2);
+            ImmutableTimingGroup d3 = createTG("INT_X24Y140/BOUNCE_E_0_FT1", device);
+            ImmutableTimingGroup s3 = createTG("INT_X24Y141/BYPASS_E14", device);
+            short dly3 = getMinDelayToSinkPin(s3, d3);
+            System.out.println("3 " + dly3);
+            ImmutableTimingGroup d4 = createTG("INT_X24Y140/BOUNCE_E_0_FT1", device);
+            ImmutableTimingGroup s4 = createTG("INT_X24Y141/BYPASS_W9", device);
+            short dly4 = getMinDelayToSinkPin(s4, d4);
+            System.out.println("4 " + dly4);
+        }
+        {  // diff tile from the data
+            ImmutableTimingGroup d1 = createTG("INT_X24Y10/IMUX_W29", device);
+            ImmutableTimingGroup s1 = createTG("INT_X24Y11/BYPASS_W10", device);
+            short dly1 = getMinDelayToSinkPin(s1, d1);
+            System.out.println("1 " + dly1);
+            ImmutableTimingGroup d2 = createTG("INT_X24Y10/IMUX_W10", device);
+            ImmutableTimingGroup s2 = createTG("INT_X24Y11/BYPASS_W1", device);
+            short dly2 = getMinDelayToSinkPin(s2, d2);
+            System.out.println("2 " + dly2);
+            ImmutableTimingGroup d3 = createTG("INT_X24Y10/BOUNCE_E_0_FT1", device);
+            ImmutableTimingGroup s3 = createTG("INT_X24Y11/BYPASS_E14", device);
+            short dly3 = getMinDelayToSinkPin(s3, d3);
+            System.out.println("3 " + dly3);
+            ImmutableTimingGroup d4 = createTG("INT_X24Y10/BOUNCE_E_0_FT1", device);
+            ImmutableTimingGroup s4 = createTG("INT_X24Y11/BYPASS_W9", device);
+            short dly4 = getMinDelayToSinkPin(s4, d4);
+            System.out.println("4 " + dly4);
+        }
+//        INT_X24Y142/INT_NODE_IMUX_47_INT_OUT0  INT_X24Y142/IMUX_W39
+//        INT_X24Y141/INT_NODE_IMUX_44_INT_OUT0  INT_X24Y141/BYPASS_W10  4
+//        INT_X24Y142/INT_NODE_IMUX_46_INT_OUT0  INT_X24Y142/IMUX_W10
+//        INT_X24Y141/INT_NODE_IMUX_33_INT_OUT1  INT_X24Y141/BYPASS_W1  0
+//        INT_X24Y141/INODE_E_5_FT1              INT_X24Y140/BOUNCE_E_0_FT1
+//        INT_X24Y141/INT_NODE_IMUX_23_INT_OUT0  INT_X24Y141/BYPASS_E14  5
+//        INT_X24Y141/INODE_E_5_FT1              INT_X24Y140/BOUNCE_E_0_FT1
+//        INT_X24Y141/INT_NODE_IMUX_45_INT_OUT0  INT_X24Y141/BYPASS_W9 -1
+    }
 
     void testTGmap() {
 //        // i 197 j 148  INT_X21Y109
@@ -1649,6 +1867,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 2, (short) 2, 6);
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 
+        est.testBounceToSink();
         est.testSpecialCase(device);
 
 
