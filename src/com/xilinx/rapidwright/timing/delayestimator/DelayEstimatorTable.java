@@ -131,10 +131,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         this(Device.getDevice(partName), ictInfo, verbose);
     }
     /**
-     * Get the min delay between two (com.xilinx.rapidwright.timing) timing groups.
-     */
-    /**
-     * Get the min estimated delay between two (com.xilinx.rapidwright.timing) timing groups.
+     * Get the min estimated delay between two timing groups.
+     *
+     * The beginning timing group can be of type Global or Bounce. However, Bounce is used to jump around within the INT tile of the sink.
+     * Thus, it must not be considered until the router expansion is at the sink column.
+     * If you call from bounce node to a sink node in different coloumns, the model don’t store x coordinate.
      *
      * @param timingGroup Timing group at the beginning of the route
      * @param sinkPin     Timing group at the end. It must be a sinkPin
@@ -146,11 +147,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         // TODO: consider puting this to graph to avoid this if
         if (timingGroup.delayType() == GroupDelayType.PIN_BOUNCE) {
             NodePair np = new NodePair(timingGroup, sinkPin);
-            if (delayFrBounceToSink.containsKey(np))
-                // add input sitepin delay
-                return (short) (delayFrBounceToSink.get(np) + K0.get(T.Direction.INPUT).get(GroupDelayType.PINFEED));
-            else
+            Short dly = delayFrBounceToSink.get(np);
+            if (dly == null)
                 return Short.MAX_VALUE;
+            else
+                // add input sitepin delay
+                return (short) (dly + K0.get(T.Direction.INPUT).get(GroupDelayType.PINFEED));
         } else {
             return getMinDelayToSinkPin(getTermInfo(timingGroup), getTermInfo(sinkPin)).getFirst();
         }
@@ -548,7 +550,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //                    System.out.println("*" + items.get(0) + " * " + items.get(1) + " * " + items.get(2));
                     short numBounces = Short.parseShort(items.get(2));
                     NodePair np = new NodePair(items.get(1), items.get(0));
-                    short delay = (short) (numBounces * bounceDelay);
+                    // the source itself is a bounce and the estimate must contain the delay of the source.
+                    short delay = (short) ((1+numBounces) * bounceDelay);
                     delayFrBounceToSink.put(np, delay);
                 }
             }
