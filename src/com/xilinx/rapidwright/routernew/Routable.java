@@ -17,7 +17,14 @@ public interface Routable {
 	public boolean isTarget();
 	public void setTarget(boolean isTarget);
 	
+	public int getOccupancy();
+	
 	public void updatePresentCongestionPenalty(float pres_fac);
+	public float getPres_cost();
+	public void setPres_cost(float pres_cost);
+	public float getAcc_cost();
+	public void setAcc_cost(float acc_cost);
+	
 	public float getManhattanD();
 	public boolean isInBoundingBoxLimit(Connection con);
 	public String toString();

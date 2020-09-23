@@ -89,12 +89,12 @@ public class RoutableWire implements Routable{
 	
 	@Override
 	public boolean overUsed() {
-		return Routable.capacity < this.rnodeData.getOccupation();
+		return Routable.capacity < this.rnodeData.getOccupancy();
 	}
 	
 	@Override
 	public boolean used(){
-		return this.rnodeData.getOccupation() > 0;
+		return this.rnodeData.getOccupancy() > 0;
 	}
 	
 	@Override
@@ -122,8 +122,6 @@ public class RoutableWire implements Routable{
 		} else {
 			data.setPres_cost(1 + (occ - cap + 1) * pres_fac);
 		}
-
-		data.setOccupation(occ);
 	}
 
 	@Override
@@ -152,7 +150,7 @@ public class RoutableWire implements Routable{
 		s.append(", ");
 		s.append(String.format("capacity = %d", Routable.capacity));
 		s.append(", ");
-		s.append(String.format("occupation = %d", this.rnodeData.getOccupation()));
+		s.append(String.format("occupation = %d", this.rnodeData.getOccupancy()));
 		s.append(", ");
 		s.append(String.format("num_unique_sources = %d", this.rnodeData.numUniqueSources()));
 		s.append(", ");
@@ -210,4 +208,28 @@ public class RoutableWire implements Routable{
 		return false;
 	}
 
+	@Override
+	public int getOccupancy() {
+		return this.rnodeData.getOccupancy();
+	}
+	
+	@Override
+	public float getPres_cost() {
+		return this.rnodeData.getPres_cost();
+	}
+
+	@Override
+	public void setPres_cost(float pres_cost) {	
+		this.rnodeData.setPres_cost(pres_cost);
+	}
+
+	@Override
+	public float getAcc_cost() {
+		return this.rnodeData.getAcc_cost();
+	}
+
+	@Override
+	public void setAcc_cost(float acc_cost) {
+		this.rnodeData.setAcc_cost(acc_cost);	
+	}
 }

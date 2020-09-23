@@ -7,10 +7,8 @@ import java.util.Map;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
@@ -22,7 +20,7 @@ public class RoutableNode implements Routable{
 	
 	public short xlow, xhigh;
 	public short ylow, yhigh;
-		
+	
 	public float base_cost;
 	
 	public final RoutableData rnodeData;
@@ -140,12 +138,12 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public boolean overUsed() {
-		return Routable.capacity < this.rnodeData.getOccupation();
+		return Routable.capacity < this.getOccupancy();
 	}
 	
 	@Override
 	public boolean used(){
-		return this.rnodeData.getOccupation() > 0;
+		return this.getOccupancy() > 0;
 	}
 	
 	@Override
@@ -215,7 +213,7 @@ public class RoutableNode implements Routable{
 		
 		RoutableData data = this.rnodeData;
 		
-		int occ = data.numUniqueSources();
+		int occ = this.getOccupancy();
 		int cap = Routable.capacity;
 		
 		if (occ < cap) {
@@ -223,8 +221,6 @@ public class RoutableNode implements Routable{
 		} else {
 			data.setPres_cost(1 + (occ - cap + 1) * pres_fac);
 		}
-
-		data.setOccupation(occ);
 	}
 
 	@Override
@@ -317,6 +313,32 @@ public class RoutableNode implements Routable{
 	public boolean isBounce() {
 		// TODO Auto-generated method stub
 		return false;
+	}
+
+	@Override
+	public int getOccupancy() {
+		
+		return this.rnodeData.getOccupancy();
+	}
+
+	@Override
+	public float getPres_cost() {
+		return this.rnodeData.getPres_cost();
+	}
+
+	@Override
+	public void setPres_cost(float pres_cost) {	
+		this.rnodeData.setPres_cost(pres_cost);
+	}
+
+	@Override
+	public float getAcc_cost() {
+		return this.rnodeData.getAcc_cost();
+	}
+
+	@Override
+	public void setAcc_cost(float acc_cost) {
+		this.rnodeData.setAcc_cost(acc_cost);	
 	}
 	
 }

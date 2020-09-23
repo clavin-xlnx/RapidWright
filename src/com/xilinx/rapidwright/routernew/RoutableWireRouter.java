@@ -383,14 +383,13 @@ public class RoutableWireRouter{
 	
 	private void updateCost(float pres_fac, float acc_fac) {
 		for(RoutableWire rnode:this.rnodesCreated.values()){
-			RoutableData data = rnode.rnodeData;
-			int overuse = data.getOccupation() - Routable.capacity;
+			int overuse = rnode.getOccupancy() - Routable.capacity;
 			//Present congestion penalty
 			if(overuse == 0) {
-				data.setPres_cost(1 + pres_fac);
+				rnode.setPres_cost(1 + pres_fac);
 			} else if (overuse > 0) {
-				data.setPres_cost(1 + (overuse + 1) * pres_fac);
-				data.setAcc_cost(data.getAcc_cost() + overuse * acc_fac);
+				rnode.setPres_cost(1 + (overuse + 1) * pres_fac);
+				rnode.setAcc_cost(rnode.getAcc_cost() + overuse * acc_fac);
 			}
 		}	
 	}
@@ -872,21 +871,19 @@ public class RoutableWireRouter{
 		}
 	}
 	
-	private float getRouteNodeCost(RoutableWire rnode, Connection con, int countSourceUses) {
-		RoutableData data = rnode.rnodeData;
-		
+	private float getRouteNodeCost(RoutableWire rnode, Connection con, int countSourceUses) {	
 		boolean containsSource = countSourceUses != 0;
 		//Present congestion cost
 		float pres_cost;
 		if(containsSource) {
-			int overoccupation = data.numUniqueSources() - Routable.capacity;
+			int overoccupation = rnode.getOccupancy() - Routable.capacity;
 			if(overoccupation < 0) {
 				pres_cost = 1;
 			}else{
 				pres_cost = 1 + overoccupation * this.pres_fac;
 			}
 		}else{
-			pres_cost = data.getPres_cost();
+			pres_cost = rnode.getPres_cost();
 		}
 		
 		//Bias cost
@@ -898,9 +895,9 @@ public class RoutableWireRouter{
 		}
 		
 		/*if(this.debugExpansion)
-			this.printInfo("\t\t rnode cost = b(n)*h(n)*p(n)/(1+sourceUsage) = " + rnode.base_cost + " * " + data.getAcc_cost()+ " * " + pres_cost + " / (1 + " + countSourceUses + ") + " + bias_cost);
+			this.printInfo("\t\t rnode cost = b(n)*h(n)*p(n)/(1+sourceUsage) = " + rnode.base_cost + " * " + rnode.getAcc_cost()+ " * " + pres_cost + " / (1 + " + countSourceUses + ") + " + bias_cost);
 		*/
-		return rnode.base_cost * data.getAcc_cost() * pres_cost / (1 + countSourceUses) + bias_cost;
+		return rnode.base_cost * rnode.getAcc_cost() * pres_cost / (1 + countSourceUses) + bias_cost;
 	}
 	
 	private float expectMahatD(RoutableWire childRNode, Connection con){
