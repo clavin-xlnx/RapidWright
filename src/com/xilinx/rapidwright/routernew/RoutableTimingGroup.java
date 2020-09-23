@@ -2,6 +2,7 @@ package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -10,6 +11,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.SiblingsTimingGroup;
 import com.xilinx.rapidwright.timing.TimingModel;
@@ -18,44 +20,60 @@ import com.xilinx.rapidwright.util.Pair;
 public class RoutableTimingGroup implements Routable{
 	public int index;
 	private SiblingsTimingGroup sibTimingGroups;
+	public GroupDelayType groupType;
 	public RoutableType type;
+	private ImmutableTimingGroup thruImmuTg;//could be removed? TODO
 	
 	public short xlow, xhigh;
 	public short ylow, yhigh;
 	
 	public float base_cost;
 	
-	public final RoutableData rnodeData;
+	public final RoutableData rnodeData;//data for the siblings, that is for the exit nodes
+	
+	//belong to the class, visible to all RoutableTimingGroup
+	static Map<Node, CountingSet<SitePinInst>> entryNodeSources;
+	static Map<Node, CountingSet<Routable>> entryNodeParents;
+	static Map<Node, Pair<Float, Float>> entryNodePresHistCosts;//lazy adding approach: creating a pair of costs when meet an entry node
 	
 	public boolean target;
-	public List<RoutableTimingGroup> children;
+//	public List<RoutableTimingGroup> children;
 	public List<Pair<RoutableTimingGroup, ImmutableTimingGroup>> childrenImmuTG;//TODO use this one
 	public boolean childrenSet;
 	
-	//TODO move occupancy here
-	
 	public boolean debug = false;
+	
+	static {
+		//Node - CountingSet maps are needed for per-connection routing
+		//retaining per connection routing is needed for future connection-aware parallelization
+		entryNodeSources = new HashMap<>();
+		entryNodeParents  = new HashMap<>();
+		entryNodePresHistCosts = new HashMap<>();
+	}
 	
 	public RoutableTimingGroup(int index, SitePinInst sitePinInst, RoutableType type, TimingModel tmodel){
 		this.index = index;
 		this.type = type;
 		
 		this.sibTimingGroups = new SiblingsTimingGroup(sitePinInst);
-		
+		this.groupType = this.sibTimingGroups.type();		
 		this.rnodeData = new RoutableData(this.index);
 		this.target = false;
 		this.childrenSet = false;
 		this.setXY();
+		this.thruImmuTg = null;
 	}
 	
 	public RoutableTimingGroup(int index, SiblingsTimingGroup sTimingGroups){
 		this.index = index;
 		this.type = RoutableType.INTERRR;
 		this.sibTimingGroups = sTimingGroups;
+		this.groupType = this.sibTimingGroups.type();
 		this.rnodeData = new RoutableData(this.index);
 		this.target= false;
 		this.childrenSet = false;	
 		this.setXY();
+		this.thruImmuTg = null;
 	}
 	
 	public int setChildren(int globalIndex, float base_cost_fac, 
@@ -63,42 +81,64 @@ public class RoutableTimingGroup implements Routable{
 			Set<Node> reservedNodes,
 			RouteThruHelper helper){
 		
-		if(debug) this.downHillNodesodTheLastNode();
-		this.children = new ArrayList<>();
+//		if(debug) this.downHillNodesodTheLastNode();
+//		this.children = new ArrayList<>();
 		this.childrenImmuTG = new ArrayList<>();
-		if(debug) System.out.println("set children");
+//		if(debug) System.out.println("set children");
 		
 		List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper);
+		
 		for(Pair<SiblingsTimingGroup,ImmutableTimingGroup> stGroups : next){
+			
 			RoutableTimingGroup childRNode;
-			Pair<RoutableTimingGroup,ImmutableTimingGroup> child;
+			ImmutableTimingGroup thruImmuTg;
+			Pair<RoutableTimingGroup,ImmutableTimingGroup> childThruImmuTg;
+			
 			//the last node of timing group siblings is unique, used as the key
+			if(debug){
+				if(stGroups.getSecond() != null){
+					ImmutableTimingGroup immu = stGroups.getSecond();
+					System.out.println("immu exists: " + immu.toString());
+				}else{
+					System.out.println("immu not exist, siblings = " + stGroups.getFirst().getSiblings().length);
+				}
+			}
 			
 			Node key = stGroups.getFirst().getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
-			//TODO store entry nodes
-			if(debug) System.out.println(stGroups.getFirst().getExitNode().toString());
+			
+//			if(debug) System.out.println(stGroups.getFirst().getExitNode().toString());
 			if(!createdRoutable.containsKey(key)){
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups.getFirst());
 				childRNode.setBaseCost(base_cost_fac);
 				
-				child = new Pair<>(childRNode, stGroups.getSecond());
+				thruImmuTg = stGroups.getSecond();
+				
+				childThruImmuTg = new Pair<>(childRNode, thruImmuTg);
 				
 				globalIndex++;
-				this.children.add(childRNode);
-				this.childrenImmuTG.add(child);
+
+				this.childrenImmuTG.add(childThruImmuTg);
 				createdRoutable.put(key, childRNode);
-//				createdRoutable.put(key, child.getFirst());
 			}else{
 				childRNode = createdRoutable.get(key);
-				this.children.add(childRNode);
-				ImmutableTimingGroup immu = RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key));
-				this.childrenImmuTG.add(new Pair<>(childRNode, immu));
+
+				thruImmuTg = RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key));
+
+				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
+			}
+			
+			//TODO store entry nodes and initialize the costs of entry nodes
+			//in consistent with the initialization of each routable
+			Node entry = thruImmuTg.entryNode();
+			if(entry != null && !entryNodePresHistCosts.containsKey(entry)){
+				entryNodePresHistCosts.put(entry, new Pair<>(1f, 1f));
 			}
 		}
+		
 		if(debug){
-			System.out.println("children size = " + this.children.size());
-			for(RoutableTimingGroup rtg:this.children){
-				System.out.println(rtg.toString());
+			System.out.println("children size = " + this.childrenImmuTG.size());
+			for(Pair<RoutableTimingGroup, ImmutableTimingGroup> rtg:this.childrenImmuTG){
+				System.out.println(rtg.getFirst().toString());
 			}
 			System.out.println();
 		}
@@ -140,17 +180,46 @@ public class RoutableTimingGroup implements Routable{
 
 	@Override
 	public boolean overUsed() {
-		return Routable.capacity < this.rnodeData.getOccupation();
+		return Routable.capacity < this.rnodeData.getOccupancy();
 	}
 	
 	@Override
 	public boolean used(){
-		return this.rnodeData.getOccupation() > 0;
+		return this.rnodeData.getOccupancy() > 0;
 	}
 	
 	@Override
 	public boolean illegal(){
 		return Routable.capacity < this.rnodeData.numUniqueParents();
+	}
+	
+	//TODO separate occupancy methods of rnode and the entry node?
+	public int getOccupancy(){
+		return Math.max(this.findMaximumOccEntryNodes(), this.rnodeData.getOccupancy());
+//		return this.rnodeData.getOccupancy();
+	}
+	
+	public int findMaximumOccEntryNodes(){
+		int occ = 0;
+		ImmutableTimingGroup[] itgs = this.sibTimingGroups.getSiblings();
+		for(int i = 0; i < itgs.length; i++){
+			Node entry = itgs[i].entryNode();
+			if(entry != null && RoutableTimingGroup.entryNodeSources.containsKey(entry)){
+				int usage = RoutableTimingGroup.entryNodeSources.get(entry).uniqueSize();
+				if(usage > occ){
+					occ = usage;
+				}
+			}
+		}
+		return occ;
+	}
+
+	public ImmutableTimingGroup getThruImmuTg() {
+		return thruImmuTg;
+	}
+
+	public void setThruImmuTg(ImmutableTimingGroup thruImmuTg) {
+		this.thruImmuTg = thruImmuTg;
 	}
 
 	@Override
@@ -201,7 +270,7 @@ public class RoutableTimingGroup implements Routable{
 		
 		RoutableData data = this.rnodeData;
 		
-		int occ = data.numUniqueSources();
+		int occ = data.numUniqueSources();//TODO max? a specific entry node occ and rnode data occ 
 		int cap = Routable.capacity;
 		
 		if (occ < cap) {
@@ -209,8 +278,51 @@ public class RoutableTimingGroup implements Routable{
 		} else {
 			data.setPres_cost(1 + (occ - cap + 1) * pres_fac);
 		}
-
-		data.setOccupation(occ);
+	}
+	
+	public static void updatePeresetCongestionPenaltyOfEntryNode(Node entry, float pres_fac){
+		int occ = entryNodeSources.get(entry).uniqueSize();
+		int cap = Routable.capacity;
+		Pair<Float, Float> presHistCosts = entryNodePresHistCosts.get(entry);
+		if (occ < cap) {
+			presHistCosts.setFirst(1f);
+		} else {
+			presHistCosts.setFirst(1 + (occ - cap + 1) * pres_fac);
+		}
+		entryNodePresHistCosts.put(entry, presHistCosts);
+	}
+	
+	public static void updateEntryNodeCosts(float pres_fac, float acc_fac){
+		for(Node entry : entryNodePresHistCosts.keySet()){
+			int overuse;
+			if(entryNodeSources.get(entry) == null){
+				overuse = -1;
+			}else{
+				overuse = entryNodeSources.get(entry).uniqueSize() - Routable.capacity;
+			}
+			Pair<Float, Float> presHistCosts = entryNodePresHistCosts.get(entry);
+			if(overuse == 0){
+				presHistCosts.setFirst(1 + pres_fac);
+			}else if(overuse > 0){
+				presHistCosts.setFirst(1 + (overuse + 1) * pres_fac);
+				presHistCosts.setSecond(presHistCosts.getSecond() + overuse * acc_fac);
+			}
+			entryNodePresHistCosts.put(entry, presHistCosts);
+		}
+	}
+	
+	public void updatePresentCongestionPenalty(float pres_fac, Node entryNode) {
+		
+		RoutableData data = this.rnodeData;
+		
+		int occ = Math.max(data.numUniqueSources(), entryNodeSources.get(entryNode).uniqueSize());//TODO max? a specific entry node occ and rnode data occ 
+		int cap = Routable.capacity;
+		
+		if (occ < cap) {
+			data.setPres_cost(1);
+		} else {
+			data.setPres_cost(1 + (occ - cap + 1) * pres_fac);
+		}
 	}
 
 	@Override
@@ -244,33 +356,39 @@ public class RoutableTimingGroup implements Routable{
 	}
 	
 	public String toStringFull(){
-		String coordinate = "";
-		if(this.xlow == this.xhigh && this.ylow == this.yhigh) {
-			coordinate = "(" + this.xlow + "," + this.ylow + ")";
-		} else {
-			coordinate = "(" + this.xlow + "," + this.ylow + ") to (" + this.xhigh + "," + this.yhigh + ")";
-		}
 		
 		StringBuilder s = new StringBuilder();
-		s.append("RNode " + this.index + " ");
-		s.append(String.format("%-11s", coordinate));
-		s.append(String.format("basecost = %.2e", this.base_cost));
+		s.append(this.toString());
 		s.append(", ");
-		s.append(String.format("capacity = %d", Routable.capacity));
-		s.append(", ");
-		s.append(String.format("occupation = %d", this.rnodeData.getOccupation()));
+		s.append(String.format("occupation = %d", this.getOccupancy()));
 		s.append(", ");
 		s.append(String.format("num_unique_sources = %d", this.rnodeData.numUniqueSources()));
 		s.append(", ");
 		s.append(String.format("num_unique_parents = %d", this.rnodeData.numUniqueParents()));
-		s.append(", ");
-		s.append(String.format("level = %d", this.rnodeData.getLevel()));
+//		s.append(", ");
+//		s.append(String.format("level = %d", this.rnodeData.getLevel()));
 		s.append(",");
 		s.append(this.sibTimingGroups.getSiblings()[0].exitNode().toString());
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		
 		return s.toString();
+	}
+	
+	public String toStringEntriesAndExit(){
+		String s = "{ ";
+		ImmutableTimingGroup[] immuTgs = sibTimingGroups.getSiblings();
+		if(immuTgs.length == 1){
+			s += immuTgs[0].exitNode().toString() + " }";
+		}else{
+			s += "( ";
+			for(int i = 0; i < immuTgs.length; i++){
+				s += immuTgs[i].entryNode().toString() + "  ";
+			}
+			s += " ) -> " + immuTgs[0].exitNode() + " }"; 
+		}
+		
+		return s;
 	}
 	
 	public String toStringShort(){
@@ -338,8 +456,26 @@ public class RoutableTimingGroup implements Routable{
 	@Override
 	public boolean isBounce() {
 		// TODO Auto-generated method stub
-		
 		return false;
 	}
 	
+	@Override
+	public float getPres_cost() {
+		return this.rnodeData.getPres_cost();
+	}
+
+	@Override
+	public void setPres_cost(float pres_cost) {	
+		this.rnodeData.setPres_cost(pres_cost);
+	}
+
+	@Override
+	public float getAcc_cost() {
+		return this.rnodeData.getAcc_cost();
+	}
+
+	@Override
+	public void setAcc_cost(float acc_cost) {
+		this.rnodeData.setAcc_cost(acc_cost);	
+	}	
 }

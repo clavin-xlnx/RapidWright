@@ -77,6 +77,16 @@ public class ImmutableTimingGroup {
     public Node entryNode() {
         return entryNode;
     }
+    
+    public String toString(){
+    	String s = "( ";
+    	if(entryNode != null)
+    		s += entryNode.toString();
+    	else 
+    		s += "exit only";
+    	s += ", " + exitNode.toString() + " )";
+    	return s;
+    }
     // ------------------------------------   private ----------------------------------------
 
 

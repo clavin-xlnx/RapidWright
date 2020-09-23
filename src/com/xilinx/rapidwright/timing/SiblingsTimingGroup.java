@@ -156,7 +156,7 @@ public class SiblingsTimingGroup {
                                 IntentCode nextPrvIc       = nextPrvNode.getAllWiresInNode()[0].getIntentCode();
                                 ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNextNode, nextPrvNode, nextNextIc, nextPrvIc);
                                 tgs.add(newTS);
-                                if (nextPrvNode == nextNode)
+                                if (nextPrvNode.equals(nextNode))
                                     throughTg = newTS;
                             }
                             // TODO: find out the type if the type is needed. Don't do it to reduce runtime

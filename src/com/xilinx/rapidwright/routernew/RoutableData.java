@@ -15,10 +15,8 @@ public class RoutableData {
 	
 	private Routable prev;
 	
-	private int occupancy;
 	private int level;
 	
-	//SitePinInst -> source and sink of the connection
 	public CountingSet<SitePinInst> sourcesSet;
 	public CountingSet<Routable> parentsSet;//the drivers of the route node
 	
@@ -26,7 +24,6 @@ public class RoutableData {
     	this.index = index;
     	this.pres_cost = 1;
     	this.acc_cost = 1;
-    	this.occupancy = 0;
     	this.setTouched(false);
 
 		this.sourcesSet = null;
@@ -107,16 +104,8 @@ public class RoutableData {
 		}
 	}
 	
-	public int getOccupation() {
-		if(this.sourcesSet == null)
-			this.occupancy = 0;
-		else
-			this.occupancy = this.sourcesSet.uniqueSize();
-		return this.occupancy;
-	}
-	
-	public void setOccupation(int occupation) {
-		this.occupancy = occupation;
+	public int getOccupancy() {
+		return this.numUniqueSources();
 	}
 	
 	public Routable getPrev() {
@@ -131,7 +120,7 @@ public class RoutableData {
 		return level;
 	}
 	
-	public float getPres_cost() {
+	public float getPres_cost() {//TODO would be better to add entry node pres cost here?
 		return pres_cost;
 	}
 
@@ -169,7 +158,7 @@ public class RoutableData {
 		StringBuilder s = new StringBuilder();
 		s.append("RNode " + this.index + " ");
 		s.append(", ");
-		s.append(String.format("occupation = %d", this.getOccupation()));
+		s.append(String.format("occupation = %d", this.getOccupancy()));
 		s.append(", ");
 		s.append(String.format("num_unique_sources = %d", this.numUniqueSources()));
 		s.append(", ");
