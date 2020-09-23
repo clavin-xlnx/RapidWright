@@ -1099,7 +1099,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
        
         
         for (EDIFHierPortInst hport : hports) {
-        	if(n.getName().equals("nca0") && hport.isOutput()){
+        	if(n.getName().equals("ncda") && hport.isOutput()){
         		System.out.println("hport output of net ncda found");
         	}
             String portName = hport.getPortInst().getName();
@@ -1215,7 +1215,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 e = new TimingEdge(this, vS, vD, edifNet, net);
             
           //TODO Yun needed
-            if(!this.spiAndtimingVertex.containsKey(local_spi_source)){
+            if(!this.spiAndtimingVertex.containsKey(local_spi_source)){//local_spi_source = G_O // G_MUX
             	this.spiAndtimingVertex.put(local_spi_source, vS);
             }
             if(!this.spiAndtimingVertex.containsKey(spi_sink)){
