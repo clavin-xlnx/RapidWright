@@ -7,6 +7,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.util.MessageGenerator;
 
 public class Main {
 	public Design design;
@@ -89,6 +90,7 @@ public class Main {
 	
 	public static void main(String[] args) {
 		Main main = new Main(args);
+		MessageGenerator.waitOnAnyKey();//halt the program
 		main.processing();
 	}
 	

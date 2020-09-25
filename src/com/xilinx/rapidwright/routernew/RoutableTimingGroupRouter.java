@@ -479,6 +479,9 @@ public class RoutableTimingGroupRouter{
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
 				
+				System.out.println("all entry nodes in cost map: " + RoutableTimingGroup.entryNodePresHistCosts.size());
+				System.out.println("entry nodes used: " + RoutableTimingGroup.entryNodeSources.size());
+				
 				for(Connection con:this.sortedListOfConnection){
 					con.newNodes();
 					int irn = 0;
@@ -1355,24 +1358,31 @@ public class RoutableTimingGroupRouter{
 	public void exploringAndExpansion(RoutableTimingGroup rnode, Connection con){
 		this.nodesExpanded++;
 		
-		if(this.debugExpansion && this.targetCon(con)){
-			this.printInfo("\t" + " exploring rnode " + rnode.toString());
-		}
-		if(this.debugExpansion && this.targetCon(con)) 
-			this.printInfo("\t starting  queue size: " + this.queue.size());
+//		if(this.debugExpansion && this.targetCon(con)){
+//			this.printInfo("\t" + " exploring rnode " + rnode.toString());
+//		}
+//		if(this.debugExpansion && this.targetCon(con)) 
+//			this.printInfo("\t starting  queue size: " + this.queue.size());
 		
 		for(Pair<RoutableTimingGroup, ImmutableTimingGroup> childRNode : rnode.childrenImmuTG){
-			if(this.debugExpansion && this.targetCon(con)) this.printInfo("run here and check RNode " + childRNode.toString());
+//			if(this.debugExpansion && this.targetCon(con)) this.printInfo("run here and check RNode " + childRNode.toString());
 			RoutableTimingGroup child = childRNode.getFirst();
+			ImmutableTimingGroup thruImmu = childRNode.getSecond();
+			
 			if(child.isTarget()){		
-				if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t childRNode is the target");
-				this.addNodeToQueue(rnode, child, childRNode.getSecond(), con);
+//				if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t childRNode is the target");
+				Node entry = thruImmu.entryNode();
+				RoutableTimingGroup.putNewEntryNode(entry);
+				this.addNodeToQueue(rnode, child, thruImmu, con);
 				
 			}else if(child.type.equals(RoutableType.INTERRR)){//TODO BOUNCE/GLOBAL filtering?
 				if(child.isInBoundingBoxLimit(con)){
-					if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t" + " add node to the queue");
-					this.addNodeToQueue(rnode, child, childRNode.getSecond(), con);
-					if(this.debugExpansion && this.targetCon(con)) this.printInfo("");
+//					if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t" + " add node to the queue");
+					Node entry = thruImmu.entryNode();
+					RoutableTimingGroup.putNewEntryNode(entry);
+					this.addNodeToQueue(rnode, child, thruImmu, con);
+					
+//					if(this.debugExpansion && this.targetCon(con)) this.printInfo("");
 				}	
 			}
 		}
@@ -1503,9 +1513,11 @@ public class RoutableTimingGroupRouter{
 		
 		//add entry node cost to the Siblings
 		if(entry != null){
-			Pair<Float, Float> costs = RoutableTimingGroup.entryNodePresHistCosts.get(entry);
-			pres_cost += costs.getFirst();
-			acc_cost += costs.getSecond();
+			Pair<Float, Float> costs = RoutableTimingGroup.entryNodePresHistCosts.get(entry);//TODO cleaner version of initialization and lookup
+//			Pair<Float, Float> costsdumy = RoutableTimingGroup.entryNodePresHistCosts.get(entry);
+			pres_cost += costs.getFirst();///2 + costsdumy.getFirst()/2;
+			acc_cost += costs.getSecond();///2 + costsdumy.getSecond()/2;
+			
 		}
 		
 		//Bias cost

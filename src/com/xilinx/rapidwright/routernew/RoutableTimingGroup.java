@@ -32,6 +32,7 @@ public class RoutableTimingGroup implements Routable{
 	public final RoutableData rnodeData;//data for the siblings, that is for the exit nodes
 	
 	//belong to the class, visible to all RoutableTimingGroup
+	
 	static Map<Node, CountingSet<SitePinInst>> entryNodeSources;
 	static Map<Node, CountingSet<Routable>> entryNodeParents;
 	static Map<Node, Pair<Float, Float>> entryNodePresHistCosts;//lazy adding approach: creating a pair of costs when meet an entry node
@@ -44,7 +45,7 @@ public class RoutableTimingGroup implements Routable{
 	
 	static {
 		//Node - CountingSet maps are needed for per-connection routing
-		//retaining per connection routing is needed for future connection-aware parallelization
+		//retaining per-connection routing is needed for future connection-aware parallelization
 		entryNodeSources = new HashMap<>();
 		entryNodeParents  = new HashMap<>();
 		entryNodePresHistCosts = new HashMap<>();
@@ -136,15 +137,15 @@ public class RoutableTimingGroup implements Routable{
 			
 			//store entry nodes and initialize the costs of entry nodes
 			//in consistent with the initialization of each routable
-			Node entry = thruImmuTg.entryNode();
-			this.putNewEntryNode(entry);
+			/*Node entry = thruImmuTg.entryNode();
+			putNewEntryNode(entry);*/
 		}
 		
 		this.childrenSet = true;
 		return globalIndex;
 	}
 	
-	public void putNewEntryNode(Node entry){
+	public static void putNewEntryNode(Node entry){
 		if(entry != null && !entryNodePresHistCosts.containsKey(entry)){
 			entryNodePresHistCosts.put(entry, new Pair<>(1f, 1f));
 		}
