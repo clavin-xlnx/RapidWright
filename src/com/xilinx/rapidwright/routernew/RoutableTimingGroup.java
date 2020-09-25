@@ -22,7 +22,7 @@ public class RoutableTimingGroup implements Routable{
 	private SiblingsTimingGroup sibTimingGroups;
 	public GroupDelayType groupType;
 	public RoutableType type;
-	private ImmutableTimingGroup thruImmuTg;//could be removed? TODO
+	private ImmutableTimingGroup thruImmuTg;//could be removed? TODO use index of the childrenImmuTG objects, ArrayList.indexOf()?
 	
 	public short xlow, xhigh;
 	public short ylow, yhigh;
@@ -37,7 +37,6 @@ public class RoutableTimingGroup implements Routable{
 	static Map<Node, Pair<Float, Float>> entryNodePresHistCosts;//lazy adding approach: creating a pair of costs when meet an entry node
 	
 	public boolean target;
-//	public List<RoutableTimingGroup> children;
 	public List<Pair<RoutableTimingGroup, ImmutableTimingGroup>> childrenImmuTG;//TODO use this one
 	public boolean childrenSet;
 	
@@ -81,10 +80,7 @@ public class RoutableTimingGroup implements Routable{
 			Set<Node> reservedNodes,
 			RouteThruHelper helper){
 		
-//		if(debug) this.downHillNodesodTheLastNode();
-//		this.children = new ArrayList<>();
 		this.childrenImmuTG = new ArrayList<>();
-//		if(debug) System.out.println("set children");
 		
 		List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper);
 		
@@ -94,19 +90,8 @@ public class RoutableTimingGroup implements Routable{
 			ImmutableTimingGroup thruImmuTg;
 			Pair<RoutableTimingGroup,ImmutableTimingGroup> childThruImmuTg;
 			
-			//the last node of timing group siblings is unique, used as the key
-			if(debug){
-				if(stGroups.getSecond() != null){
-					ImmutableTimingGroup immu = stGroups.getSecond();
-					System.out.println("immu exists: " + immu.toString());
-				}else{
-					System.out.println("immu not exist, siblings = " + stGroups.getFirst().getSiblings().length);
-				}
-			}
-			
 			Node key = stGroups.getFirst().getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
 			
-//			if(debug) System.out.println(stGroups.getFirst().getExitNode().toString());
 			if(!createdRoutable.containsKey(key)){
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups.getFirst());
 				childRNode.setBaseCost(base_cost_fac);
@@ -127,23 +112,42 @@ public class RoutableTimingGroup implements Routable{
 				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
 			}
 			
-			//TODO store entry nodes and initialize the costs of entry nodes
+			/*if(this.index == 58597 && childRNode.index == 70491){
+			 * //TODO this is where the conflicts come from
+			 * the entry node connecting two exit nodes INT_X9Y101/WW1_E_7_FT0 -> * -> INT_X9Y102/BOUNCE_W_0_FT1 is not identical
+			 * INT_X9Y102/INODE_W_1_FT1 from RouterHelper, while it is INT_X9Y101/INODE_W_62_FT0 from the API getNextSiblings
+				System.out.println(thruImmuTg.toString()); //ImmuTg = ( INT_X9Y101/INODE_W_62_FT0, INT_X9Y102/BOUNCE_W_0_FT1 )
+				System.out.println();//this thruImmuTg returned from the API is different from when calling RouterHelper.findImmuTgBetweenTwoSiblings()
+			}*/
+			
+			//for checking up on the above finding
+			/*if(this.sibTimingGroups.getExitNode().toString().equals("INT_X9Y101/WW1_E_7_FT0")){
+				System.out.println("all downhill nodes of exit node INT_X9Y101/WW1_E_7_FT0 in Siblings " + this.index + ":");
+				for(Node nextNode:this.sibTimingGroups.getExitNode().getAllDownhillNodes()){
+					System.out.println(nextNode.toString());
+				}
+			}
+			if(this.sibTimingGroups.getExitNode().toString().equals("INT_X9Y102/BOUNCE_W_0_FT1")){
+				System.out.println("all uphill nodes of exit node INT_X9Y102/BOUNCE_W_0_FT1 in Siblings " + this.index + ":");
+				for(Node nextNode:this.sibTimingGroups.getExitNode().getAllUphillNodes()){
+					System.out.println(nextNode.toString());
+				}
+			}*/
+			
+			//store entry nodes and initialize the costs of entry nodes
 			//in consistent with the initialization of each routable
 			Node entry = thruImmuTg.entryNode();
-			if(entry != null && !entryNodePresHistCosts.containsKey(entry)){
-				entryNodePresHistCosts.put(entry, new Pair<>(1f, 1f));
-			}
+			this.putNewEntryNode(entry);
 		}
 		
-		if(debug){
-			System.out.println("children size = " + this.childrenImmuTG.size());
-			for(Pair<RoutableTimingGroup, ImmutableTimingGroup> rtg:this.childrenImmuTG){
-				System.out.println(rtg.getFirst().toString());
-			}
-			System.out.println();
-		}
 		this.childrenSet = true;
 		return globalIndex;
+	}
+	
+	public void putNewEntryNode(Node entry){
+		if(entry != null && !entryNodePresHistCosts.containsKey(entry)){
+			entryNodePresHistCosts.put(entry, new Pair<>(1f, 1f));
+		}
 	}
 	
 	public List<Node> downHillNodesodTheLastNode(){
@@ -193,10 +197,10 @@ public class RoutableTimingGroup implements Routable{
 		return Routable.capacity < this.rnodeData.numUniqueParents();
 	}
 	
-	//TODO separate occupancy methods of rnode and the entry node?
+	//TODO separating occupancy methods of rnode and the entry node makes sense and makes the router 3x faster
 	public int getOccupancy(){
-		return Math.max(this.findMaximumOccEntryNodes(), this.rnodeData.getOccupancy());
-//		return this.rnodeData.getOccupancy();
+//		return Math.max(this.findMaximumOccEntryNodes(), this.rnodeData.getOccupancy());//not valid any more if the entry node costs are added to the siblings cost
+		return this.rnodeData.getOccupancy();
 	}
 	
 	public int findMaximumOccEntryNodes(){
@@ -204,8 +208,8 @@ public class RoutableTimingGroup implements Routable{
 		ImmutableTimingGroup[] itgs = this.sibTimingGroups.getSiblings();
 		for(int i = 0; i < itgs.length; i++){
 			Node entry = itgs[i].entryNode();
-			if(entry != null && RoutableTimingGroup.entryNodeSources.containsKey(entry)){
-				int usage = RoutableTimingGroup.entryNodeSources.get(entry).uniqueSize();
+			if(entry != null && entryNodeSources.containsKey(entry)){
+				int usage = entryNodeSources.get(entry).uniqueSize();
 				if(usage > occ){
 					occ = usage;
 				}
@@ -292,7 +296,7 @@ public class RoutableTimingGroup implements Routable{
 		entryNodePresHistCosts.put(entry, presHistCosts);
 	}
 	
-	public static void updateEntryNodeCosts(float pres_fac, float acc_fac){
+	public static void updateEntryNodesCosts(float pres_fac, float acc_fac){
 		for(Node entry : entryNodePresHistCosts.keySet()){
 			int overuse;
 			if(entryNodeSources.get(entry) == null){
@@ -310,26 +314,12 @@ public class RoutableTimingGroup implements Routable{
 			entryNodePresHistCosts.put(entry, presHistCosts);
 		}
 	}
-	
-	public void updatePresentCongestionPenalty(float pres_fac, Node entryNode) {
-		
-		RoutableData data = this.rnodeData;
-		
-		int occ = Math.max(data.numUniqueSources(), entryNodeSources.get(entryNode).uniqueSize());//TODO max? a specific entry node occ and rnode data occ 
-		int cap = Routable.capacity;
-		
-		if (occ < cap) {
-			data.setPres_cost(1);
-		} else {
-			data.setPres_cost(1 + (occ - cap + 1) * pres_fac);
-		}
-	}
 
 	@Override
 	public float getCenterX() {
 		return (this.xhigh + this.xlow) / 2;
 	}
-
+	
 	@Override
 	public float getCenterY() {
 		return (this.yhigh + this.ylow) / 2;
@@ -376,7 +366,7 @@ public class RoutableTimingGroup implements Routable{
 	}
 	
 	public String toStringEntriesAndExit(){
-		String s = "{ ";
+		String s = this.type + ", Siblings " + this.index + " = { ";
 		ImmutableTimingGroup[] immuTgs = sibTimingGroups.getSiblings();
 		if(immuTgs.length == 1){
 			s += immuTgs[0].exitNode().toString() + " }";
@@ -477,5 +467,10 @@ public class RoutableTimingGroup implements Routable{
 	@Override
 	public void setAcc_cost(float acc_cost) {
 		this.rnodeData.setAcc_cost(acc_cost);	
+	}
+
+	@Override
+	public Node getNode() {
+		return this.sibTimingGroups.getExitNode();
 	}	
 }

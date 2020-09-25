@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 
@@ -231,5 +232,11 @@ public class RoutableWire implements Routable{
 	@Override
 	public void setAcc_cost(float acc_cost) {
 		this.rnodeData.setAcc_cost(acc_cost);	
+	}
+
+	@Override
+	public Node getNode() {
+		// TODO Auto-generated method stub
+		return this.wire.getNode();
 	}
 }
