@@ -79,7 +79,7 @@ public class ImmutableTimingGroup {
     }
     
     public String toString(){
-    	String s = "( ";
+    	String s = "ImmuTg = ( ";
     	if(entryNode != null)
     		s += entryNode.toString();
     	else 
