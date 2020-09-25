@@ -65,7 +65,6 @@ public class RoutableTimingGroupRouter{
 	
 	public List<Connection> sortedListOfConnection;
 	public List<Netplus> sortedListOfNetplus;
-
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -318,7 +317,7 @@ public class RoutableTimingGroupRouter{
 				}
 				
 				if(c.getSourceTimingVertex() != null && c.getSinkTimingVertex() != null){
-					c.setTimingEdge(this.timingGraph, edifNet, n);//TODO bug fixing
+					c.setTimingEdge(this.timingGraph, edifNet, n);//TODO timing graph bug fixing
 				}else{
 					System.err.println();
 				}
@@ -363,8 +362,8 @@ public class RoutableTimingGroupRouter{
 		this.itry = 1;
 		this.pres_fac = this.initial_pres_fac;
 		
-		System.out.printf("-----------------------------------------------------------------------------------------------------------------------------------------\n");
-        System.out.printf("%9s  %11s  %12s  %12s  %15s  %11s  %7s  %8s  %17s  %17s \n", 
+		System.out.printf("----------------------------------------------------------------------------------------------------------------------------------------- --------------------\n");
+        System.out.printf("%9s  %11s  %12s  %12s  %15s  %11s  %7s  %8s  %17s  %17s  %19s \n", 
         		"Iteration", 
         		"Conn routed", 
         		"Run Time (s)", 
@@ -374,8 +373,9 @@ public class RoutableTimingGroupRouter{
         		"Illegal",
         		"Overused", 
         		"OverUsePercentage",
-        		"OverUsedEntryNode");
-        System.out.printf("---------  -----------  ------------  ------------  ---------------  -----------  -------  --------  -----------------  -----------------\n");
+        		"OverUsedEntryNode",
+        		"MultiFaninEntryNode");
+        System.out.printf("---------  -----------  ------------  ------------  ---------------  -----------  -------  --------  -----------------  -----------------  -------------------\n");
 	}
 	
 	public int overUsedEntryNodes(){
@@ -386,6 +386,16 @@ public class RoutableTimingGroupRouter{
 			}
 		}
 		return overUsedEntryNodes;
+	}
+	
+	public int multiFaninEntryNodes(){
+		int illegalEntryNodes = 0;
+		for(Node n:RoutableTimingGroup.entryNodeParents.keySet()){
+			if(n != null && RoutableTimingGroup.entryNodeParents.get(n).uniqueSize() > 1){
+				illegalEntryNodes++;
+			}
+		}
+		return illegalEntryNodes;
 	}
 	
 	public void printConEntryNodes(Connection con){
@@ -468,6 +478,19 @@ public class RoutableTimingGroupRouter{
 			//fix illegal routing trees if any
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
+				
+				for(Connection con:this.sortedListOfConnection){
+					con.newNodes();
+					int irn = 0;
+					for(Routable rn:con.rnodes){
+						con.addNode(rn.getNode());
+						Node entry = this.connectionEntryNodes.get(con).get(irn);
+						if(entry != null)
+							con.addNode(entry);
+						irn++;
+					}
+				}
+				
 				this.fixIllegalTree(sortedListOfConnection);
 				this.routerTimer.rerouteIllegal.finish();
 			}
@@ -488,10 +511,30 @@ public class RoutableTimingGroupRouter{
 				}
 			}*/
 			
-			/*if(this.itry == 14){
+			/*if(this.itry == 7 || this.itry == 8){
+				
+				System.out.println("rnodes valid? " + this.isValidRouting());
+				System.out.println("entry nodes valid? " + this.validEntryNodesRouting());
+				
 				for(Connection con:this.sortedListOfConnection){
-					this.printConEntryNodes(con);
+					if(con.getNet().getNet().getName().equals("opr[1]")){//con.getNet().getNet().getName().equals("n113") || con.getNet().getNet().getName().equals("n170") || 
+						System.out.println(con.toString());
+						System.out.println(this.connectionEntryNodes.get(con));
+						this.printConRNodes(con);
+						System.out.println();
+					}
+					
 				}
+				
+				for(Node entry:RoutableTimingGroup.entryNodeSources.keySet()){
+					if(RoutableTimingGroup.entryNodeSources.get(entry).uniqueSize() > 1){
+						System.out.println("overused entry node: " + entry.toString());
+					}
+					if(entry.toString().equals("INT_X9Y102/INODE_W_1_FT1") && RoutableTimingGroup.entryNodeSources.containsKey(entry)){
+						System.out.println("node INT_X9Y102/INODE_W_1_FT1 sources = " + RoutableTimingGroup.entryNodeSources.get(entry).uniqueSize());
+					}
+				}
+				System.out.println();
 			}*/
 			//TODO update timing and criticalities of connections
 			
@@ -499,13 +542,12 @@ public class RoutableTimingGroupRouter{
 			//statistics
 			this.routerTimer.calculateStatistics.start();
 			this.staticticsInfo(this.sortedListOfConnection, 
-					this.iterationStart, this.iterationEnd, 
-					this.rrgNodeId, this.routerTimer.rnodesCreation.getTime());
-			this.routerTimer.calculateStatistics.finish();;
+								this.iterationStart, 
+								this.iterationEnd, 
+								this.rrgNodeId, 
+								this.routerTimer.rnodesCreation.getTime());
+			this.routerTimer.calculateStatistics.finish();
 			//if the routing is valid /realizable return, the routing completed successfully
-	
-			if(this.itry == 1) this.firstIterRNodes = this.rnodesCreated.size();
-			
 			if (validRouting) {
 				//generate and assign a list of PIPs for each Net net
 				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
@@ -513,6 +555,8 @@ public class RoutableTimingGroupRouter{
 				this.routerTimer.pipsAssignment.start();
 				this.pipsAssignment();
 				this.routerTimer.pipsAssignment.finish();
+				
+//				System.out.println(RoutableTimingGroup.entryNodePresHistCosts.size());
 				
 				return;
 			}
@@ -585,14 +629,14 @@ public class RoutableTimingGroupRouter{
 	public void staticticsInfo(List<Connection> connections, 
 			long iterStart, long iterEnd,
 			int globalRNodeId, long rnodesT){
-		
+		if(this.itry == 1) this.firstIterRNodes = this.rnodesCreated.size();
 		this.getOverusedAndIllegalRNodesInfo(connections);
 		
 		int numRNodesCreated = this.rnodesCreated.size();
 		int overUsed = this.overUsedRNodes.size();
 		int illegal = this.illegalRNodes.size();
 		double overUsePercentage = 100.0 * (double)this.overUsedRNodes.size() / numRNodesCreated;
-		System.out.printf("%9d  %11d  %12.2f  %12d  %15.2f  %11d  %7d  %8d  %16.2f%%  %8d\n", 
+		System.out.printf("%9d  %11d  %12.2f  %12d  %15.2f  %11d  %7d  %8d  %16.2f%%  %17d  %19d\n", 
 				this.itry,
 				this.connectionsRoutedIteration,
 				(iterEnd - iterStart)*1e-9,
@@ -602,7 +646,8 @@ public class RoutableTimingGroupRouter{
 				illegal,
 				overUsed,
 				overUsePercentage,
-				this.overUsedEntryNodes());
+				this.overUsedEntryNodes(),
+				this.multiFaninEntryNodes());
 	}
 	
 	public void updateCostFactors(){
@@ -614,8 +659,8 @@ public class RoutableTimingGroupRouter{
 		this.updateCost(this.pres_fac, this.acc_fac);
 	}
 	
-	//TODO entryNode over usage should also be considered here
-	//same update for every entry node?
+	//entryNode over usage should also be considered here
+	//similar update for every entry node
 	private void updateCost(float pres_fac, float acc_fac) {
 		for(RoutableTimingGroup rnode:this.rnodesCreated.values()){
 			int overuse = rnode.getOccupancy() - Routable.capacity;
@@ -629,7 +674,7 @@ public class RoutableTimingGroupRouter{
 		}
 		
 		//update costs of entry nodes
-		RoutableTimingGroup.updateEntryNodeCosts(pres_fac, acc_fac);
+		RoutableTimingGroup.updateEntryNodesCosts(pres_fac, acc_fac);
 	}
 	
 	public int findMaximumEntryNodeOcc(RoutableTimingGroup rtg){
@@ -714,7 +759,7 @@ public class RoutableTimingGroupRouter{
 		return illegal.size();	
 	}
 	
-	public void fixIllegalTree(List<Connection> cons) {
+	public void fixIllegalTree(List<Connection> cons){
 //		this.printInfo("checking if there is any illegal node");	
 		int numIllegal = this.getIllegalNumRNodes(cons);
 		GraphHelper graphHelper = new GraphHelper();
@@ -725,7 +770,7 @@ public class RoutableTimingGroupRouter{
 			for(Netplus net : this.nets) {
 				boolean illegal = false;
 				for(Connection con : net.getConnection()) {
-					if(con.illegal()) {
+					if(con.illegal() || illegalConOnEntryNode(con)) {
 						illegal = true;
 					}
 				}
@@ -740,18 +785,114 @@ public class RoutableTimingGroupRouter{
 				boolean isCyclic = graphHelper.isCyclic(illegalTree);
 				if(isCyclic){
 					//remove cycles
-					graphHelper.cutOffCycles(illegalTree);
+					System.out.println("cycle exists");
+					graphHelper.cutOffCycles(illegalTree);//TODO clean version (update to router fields)
 				}else{
 					this.handleNoCyclicIllegalRoutingTree(illegalTree);
+					this.handleNoCyclicEntryNodeIllegalTree(illegalTree);
 				}
 			}
 		}
 	}
 	
+	public boolean illegalConOnEntryNode(Connection con){
+		boolean illegal = false;
+		for(Node entry:this.connectionEntryNodes.get(con)){
+			if(entry != null && RoutableTimingGroup.entryNodeParents.get(entry).uniqueSize() > 1){
+				return true;
+			}
+		}
+		return illegal;
+	}
+	
+	public Node getIllegalEntryNode(Netplus illegalTree){
+		
+		for(Connection con:illegalTree.getConnection()){
+			for(Node entry:this.connectionEntryNodes.get(con)){
+				if(entry != null && RoutableTimingGroup.entryNodeParents.get(entry).uniqueSize() > 1){
+					return entry;
+				}
+			}
+		}
+		return null;
+	}
+	
+	public Set<Connection> getIllegalCons(Netplus illegalTree, Node illegalNode){
+		Set<Connection> illegalCons = new HashSet<>();
+		for(Connection con : illegalTree.getConnection()) {
+			for(Node node : this.connectionEntryNodes.get(con)) {
+				if(node!= null && node.equals(illegalNode)) {
+					illegalCons.add(con);					
+				}
+			}
+		}
+		return illegalCons;
+	}
+	
+	public Connection getCriticalCon(Set<Connection> illegalCons){
+		Connection maxCriticalConnection = (Connection) illegalCons.toArray()[0];
+		for(Connection illegalConnection : illegalCons) {
+			if(illegalConnection.nodes.size() > maxCriticalConnection.nodes.size()) {
+				maxCriticalConnection = illegalConnection;
+			}
+		}
+		return maxCriticalConnection;
+	}
+	
+	public List<Node> getNodesFromIllegalNodeToSink(Connection maxCriticalConnection, Node illegalNode){
+		List<Node> newNodes = new ArrayList<>();
+		boolean add = false;
+		for(Node newRouteNode : maxCriticalConnection.nodes) {
+			if(newRouteNode.equals(illegalNode)) add = true;
+			if(add){
+				newNodes.add(newRouteNode);
+			}
+		}
+		return newNodes;
+	}
+	
+	public void fixIllegalCons(Set<Connection> illegalCons, Node illegalNode, List<Node> nodesFromIllegalToSink){
+		for(Connection illegalConnection : illegalCons) {
+			this.ripup(illegalConnection);
+			
+			//Remove illegal path from routing tree
+			while(!illegalConnection.nodes.remove(illegalConnection.nodes.size() - 1).equals(illegalNode));
+			
+			//Add new path to routing tree
+			
+			for(Node newRouteNode : nodesFromIllegalToSink) {
+				illegalConnection.addNode(newRouteNode);				
+			}
+			
+//			this.add(illegalConnection);
+		}
+	}
+	
+	public void handleNoCyclicEntryNodeIllegalTree(Netplus illegalTree){
+		Node illegalNode;
+		while((illegalNode = this.getIllegalEntryNode(illegalTree)) != null){				
+			
+			Set<Connection> illegalCons = this.getIllegalCons(illegalTree, illegalNode);
+			
+			//fixing the illegal trees, since there is no criticality info, use the hops info
+			//Find the illegal connection with maximum number of RNodes (hops)
+			Connection maxCriticalConnection = this.getCriticalCon(illegalCons);
+			
+			//Get the path from the connection with maximum hops
+			//get the entry nodes from the critical connection
+			List<Node> nodesFromIllegalToSink = this.getNodesFromIllegalNodeToSink(maxCriticalConnection, illegalNode);
+			
+			//Replace the path of each illegal connection with the path from the connection with maximum hops
+			this.fixIllegalCons(illegalCons, illegalNode, nodesFromIllegalToSink);		
+		}
+	}
+	
 	public void handleNoCyclicIllegalRoutingTree(Netplus illegalTree){
 		Routable illegalRNode;
+		Node illegalNode;
 		while((illegalRNode = illegalTree.getIllegalRNode()) != null){
-			List<Connection> illegalCons = new ArrayList<>();
+			illegalNode = illegalRNode.getNode();
+			Set<Connection> illegalCons = new HashSet<>();
 			for(Connection con : illegalTree.getConnection()) {
 				for(Routable rnode : con.rnodes) {
 					if(rnode.equals(illegalRNode)) {
@@ -762,7 +903,7 @@ public class RoutableTimingGroupRouter{
 			
 			//fixing the illegal trees, since there is no criticality info, use the hops info
 			//Find the illegal connection with maximum number of RNodes (hops)
-			Connection maxCriticalConnection = illegalCons.get(0);
+			Connection maxCriticalConnection = (Connection) illegalCons.toArray()[0];
 			for(Connection illegalConnection : illegalCons) {
 				if(illegalConnection.rnodes.size() > maxCriticalConnection.rnodes.size()) {
 					maxCriticalConnection = illegalConnection;
@@ -771,54 +912,67 @@ public class RoutableTimingGroupRouter{
 			
 			//Get the path from the connection with maximum hops
 			List<Routable> newRouteNodes = new ArrayList<>();
+			//get the entry nodes from the critical connection
+			List<Node> entryNodes = new ArrayList<>();
+			
 			boolean add = false;
+			int ir = 0;
 			for(Routable newRouteNode : maxCriticalConnection.rnodes) {
 				if(newRouteNode.equals(illegalRNode)) add = true;
-				if(add) newRouteNodes.add(newRouteNode);
+				if(add){
+					newRouteNodes.add(newRouteNode);
+					entryNodes.add(this.connectionEntryNodes.get(maxCriticalConnection).get(ir));//this is for the statistic info update
+					
+				}
+				ir++;
 			}
 			
 			//Replace the path of each illegal connection with the path from the connection with maximum hops
 			for(Connection illegalConnection : illegalCons) {
-				this.ripupEasy(illegalConnection);
+				this.ripup(illegalConnection);
 				
 				//Remove illegal path from routing tree
-				while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode));
+				while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode)){
+					this.connectionEntryNodes.get(illegalConnection).remove(this.connectionEntryNodes.get(illegalConnection).size() - 1);
+				}
+				this.connectionEntryNodes.get(illegalConnection).remove(this.connectionEntryNodes.get(illegalConnection).size() - 1);
+				
+				while(!illegalConnection.nodes.remove(illegalConnection.nodes.size() - 1).equals(illegalNode));
 				
 				//Add new path to routing tree
+				int ien = 0;
 				for(Routable newRouteNode : newRouteNodes) {
 					illegalConnection.addRNode(newRouteNode);
+					
+					illegalConnection.addNode(newRouteNode.getNode());
+					Node entry = entryNodes.get(ien);
+					if(entry != null) illegalConnection.addNode(entry);
+					this.connectionEntryNodes.get(illegalConnection).add(entryNodes.get(ien));
+					ien++;
 				}
 				
-				this.addEasy(illegalConnection);
+				this.add(illegalConnection);//to update rnodes and entry nodes status, i.e. sources and parents
 			}
 			
 		}
 	}
 	
 	public void ripup(Connection con){
-		RoutableTimingGroup parent = null;
-		
-//		if(this.itry > 1) 
-//			this.debugRoutingCon = false;
-		if(this.debugRoutingCon && this.targetCon(con)) this.printInfo("rip up: " + con.toString());
-		this.printConRNodes(con);
-		
+		RoutableTimingGroup parent = null;	
 		for(int i = con.rnodes.size() - 1; i >= 0; i--){
 			RoutableTimingGroup rnode = (RoutableTimingGroup) con.rnodes.get(i);
-			RoutableData rNodeData = rnode.rnodeData;
-			
+			RoutableData rNodeData = rnode.rnodeData;	
 			rNodeData.removeSource(con.source);
 			
-			//TODO remove sources of entry nodes
+			//remove sources of entry nodes
 			//moving out from ripup will require one more traversal of the con.rnodes
-			Node thruEntryNode = this.removeEntryNodeSource(rnode, con, i);
-			
+			Node thruEntryNode = this.removeEntryNodeSource(rnode, con, i);			
 			if(parent == null){
 				parent = rnode;
 			}else{
 				rNodeData.removeParent(parent);
 				
-				//TODO remove parents of entry nodes
+				//remove parents of entry nodes
 				if(thruEntryNode != null){
 					this.removeEntryNodeParent(thruEntryNode, parent);
 				}
@@ -827,30 +981,10 @@ public class RoutableTimingGroupRouter{
 			}
 			// Calculation of present congestion penalty
 			rnode.updatePresentCongestionPenalty(this.pres_fac);
-			//TODO update present congestion penalty of entry nodes
+			//update present congestion penalty of entry nodes
 			if(thruEntryNode != null){
 				RoutableTimingGroup.updatePeresetCongestionPenaltyOfEntryNode(thruEntryNode, this.pres_fac);
 			}
-		}
-	}
-	
-	public void ripupEasy(Connection con){
-		RoutableTimingGroup parent = null;
-		
-		for(int i = con.rnodes.size() - 1; i >= 0; i--){
-			RoutableTimingGroup rnode = (RoutableTimingGroup) con.rnodes.get(i);
-			RoutableData rNodeData = rnode.rnodeData;
-			
-			rNodeData.removeSource(con.source);
-			
-			if(parent == null){
-				parent = rnode;
-			}else{
-				rNodeData.removeParent(parent);		
-				parent = rnode;
-			}
-			// Calculation of present congestion penalty
-			rnode.updatePresentCongestionPenalty(this.pres_fac);
 		}
 	}
 	
@@ -864,15 +998,14 @@ public class RoutableTimingGroupRouter{
 			
 			rNodeData.addSource(con.source);
 			
-			//TODO add sources of entry nodes
-			Node thruEntryNode = this.addEntryNodeSource(rnode, con);		
-			
+			//add sources of entry nodes
+			Node thruEntryNode = this.addEntryNodeSource(rnode, con, i);			
 			if(parent == null){
 				parent = rnode;
 			}else{
 				rNodeData.addParent(parent);
 				
-				//TODO add parents of entry nodes
+				//add parents of entry nodes
 				if(thruEntryNode != null){
 					this.addEntryNodeParent(thruEntryNode, parent);
 				}
@@ -881,21 +1014,20 @@ public class RoutableTimingGroupRouter{
 			}
 			// Calculation of present congestion penalty
 			//for an entire SiblingsTimingGroup, not bothering intersection entry nodes
-			rnode.updatePresentCongestionPenalty(this.pres_fac);
-			
-			//TODO update present cogestion of entry node
+			rnode.updatePresentCongestionPenalty(this.pres_fac);		
+			//update present cogestion of entry node
 			if(thruEntryNode != null){
 				RoutableTimingGroup.updatePeresetCongestionPenaltyOfEntryNode(thruEntryNode, this.pres_fac);
-			}
-			
+			}		
 		}
 	}
 	
-	public Node addEntryNodeSource(RoutableTimingGroup rnode, Connection con){
+	public Node addEntryNodeSource(RoutableTimingGroup rnode, Connection con, int i){
 		//thruImmuTg will never be null for non-source resources
 		if(rnode.type != RoutableType.SOURCERR){
 			CountingSet<SitePinInst> sourceSet;
-			Node thruEntryNode = rnode.getThruImmuTg().entryNode();
+//			Node thruEntryNode = rnode.getThruImmuTg().entryNode();
+			Node thruEntryNode = this.connectionEntryNodes.get(con).get(i);
 			if(thruEntryNode != null){
 				if(!RoutableTimingGroup.entryNodeSources.containsKey(thruEntryNode)){//TODO thruEntryNode will be more efficient
 					sourceSet = new CountingSet<>();
@@ -910,24 +1042,21 @@ public class RoutableTimingGroupRouter{
 		return null;
 	}
 	
-	//adding parent needed?
+	//adding parent needed for checking if there is any entry node that has multiple fanin
 	public void addEntryNodeParent(Node thruEntryNode, RoutableTimingGroup parent){
-		
 			CountingSet<Routable> parentSet;
-			if(!RoutableTimingGroup.entryNodeParents.containsKey(thruEntryNode)){//TODO thruEntryNode will be more efficient
+			if(!RoutableTimingGroup.entryNodeParents.containsKey(thruEntryNode)){
 				parentSet = new CountingSet<>();
 			}else{
 				parentSet = RoutableTimingGroup.entryNodeParents.get(thruEntryNode);
 			}
 			parentSet.add(parent);
-			RoutableTimingGroup.entryNodeParents.put(thruEntryNode, parentSet);
-		
+			RoutableTimingGroup.entryNodeParents.put(thruEntryNode, parentSet);	
 	}
 	
 	public Node removeEntryNodeSource(RoutableTimingGroup rnode, Connection con, int i){
 		if(rnode.type != RoutableType.SOURCERR){//SOURCERR does not have a thruImmuTg (null)
-			Node thruEntryNode = this.connectionEntryNodes.get(con).get(i);
-			//TODO it is not thruImmuTg that should be used here, 
+			Node thruEntryNode = this.connectionEntryNodes.get(con).get(i);//thruImmuTg that should not be used here,
 			//because it might be changed during the routing process of other connections that use the same rnode
 			if(thruEntryNode != null){
 				CountingSet<SitePinInst> sourceSet = RoutableTimingGroup.entryNodeSources.get(thruEntryNode);
@@ -939,34 +1068,10 @@ public class RoutableTimingGroupRouter{
 		return null;
 	}
 	
-	public void removeEntryNodeParent(Node thruEntryNode, RoutableTimingGroup parent){
-		
+	public void removeEntryNodeParent(Node thruEntryNode, RoutableTimingGroup parent){	
 		CountingSet<Routable> parentSet = RoutableTimingGroup.entryNodeParents.get(thruEntryNode);
 		parentSet.remove(parent);
-		RoutableTimingGroup.entryNodeParents.put(thruEntryNode, parentSet);
-		
-	}
-	
-	public void addEasy(Connection con){
-		RoutableTimingGroup parent = null;
-		
-		for(int i = con.rnodes.size()-1; i >= 0; i--){
-			//sourcerr to sinkrr
-			RoutableTimingGroup rnode = (RoutableTimingGroup) con.rnodes.get(i);
-			RoutableData rNodeData = rnode.rnodeData;
-			
-			rNodeData.addSource(con.source);
-			
-			if(parent == null){
-				parent = rnode;
-			}else{
-				rNodeData.addParent(parent);
-				parent = rnode;
-			}
-			// Calculation of present congestion penalty
-			//for an entire SiblingsTimingGroup, not bothering intersection entry nodes
-			rnode.updatePresentCongestionPenalty(this.pres_fac);
-		}
+		RoutableTimingGroup.entryNodeParents.put(thruEntryNode, parentSet);	
 	}
 	
 	public void pipsAssignment(){
@@ -974,25 +1079,25 @@ public class RoutableTimingGroupRouter{
 			Set<PIP> netPIPs = new HashSet<>();
 			
 			for(Connection c:np.getConnection()){
-				netPIPs.addAll(this.conPIPs(c));
+				netPIPs.addAll(RouterHelper.conPIPs(c.nodes));
 			}
 			np.getNet().setPIPs(netPIPs);
 		}
 		
 		this.checkPIPsUsage();
-//		this.checkNetRoutedPins();
+//		this.debugRoutingCon = true;
 //		this.printWrittenPIPs();
-		System.out.println("net n113: ");
-		this.checkPIPsOfInvalidlyRoutedNet("n113");
-			
-		System.out.println("\nn983: ");
-		this.checkPIPsOfInvalidlyRoutedNet("n983");
+//		System.out.println("net n5f7: ");
+//		this.checkPIPsOfInvalidlyRoutedNet("n5f7");
+//			
+//		System.out.println("\nn62b: ");
+//		this.checkPIPsOfInvalidlyRoutedNet("n62b");
 		
-		System.out.println("\nnet opr[1]: ");
-		this.checkPIPsOfInvalidlyRoutedNet("opr[1]");
-		
-		System.out.println("\nnet opr[46]: ");
-		this.checkPIPsOfInvalidlyRoutedNet("opr[46]");
+//		System.out.println("\nnet opr[1]: ");
+//		this.checkPIPsOfInvalidlyRoutedNet("opr[1]");
+//		
+//		System.out.println("\nnet opr[46]: ");
+//		this.checkPIPsOfInvalidlyRoutedNet("opr[46]");
 	}
 	
 	public void printWrittenPIPs(){
@@ -1045,8 +1150,10 @@ public class RoutableTimingGroupRouter{
 				foundInRWrouter = true;
 				
 				for(Connection c: net.getConnection()){
-//					System.out.println(((RoutableTimingGroup)c.getSinkRNode()).getSiblingsTimingGroup().toString() + " - " + c.sink.getName());
-					for(PIP p:this.conPIPs(c)){
+					System.out.println(c.toString());
+					this.printConRNodes(c);
+					System.out.println(this.connectionEntryNodes.get(c));
+					for(PIP p:RouterHelper.conPIPs(c.nodes)){
 						System.out.println("\t" + p.toString());
 					}
 					System.out.println();
@@ -1067,19 +1174,12 @@ public class RoutableTimingGroupRouter{
 		List<Node> conNodes = new ArrayList<>();
 		
 		for(int i = 0; i < con.rnodes.size() - 1; i++){		
-			RoutableTimingGroup rtgFormer = ((RoutableTimingGroup) (con.rnodes.get(i + 1)));
-			RoutableTimingGroup rtgLatter = ((RoutableTimingGroup) (con.rnodes.get(i)));		
-			
-			ImmutableTimingGroup immu = RouterHelper.findImmutableTimingGroup(rtgFormer, rtgLatter);
-			
-//			this.checkImmuTGofNet(con, "n887", "LUT6_2_16/O5", immu);
-//			this.checkImmuTgOfNet(con, "n2fd", "LUT6_2_14/O5", immu);
-			
-			conNodes.add(immu.exitNode());
-			if(immu.entryNode() != null){
-				conNodes.add(immu.entryNode());
-			}
-			
+			RoutableTimingGroup rtg = ((RoutableTimingGroup) (con.rnodes.get(i)));
+			conNodes.add(rtg.getSiblingsTimingGroup().getExitNode());
+			Node entry = this.connectionEntryNodes.get(con).get(i);
+			if(entry != null){
+				conNodes.add(entry);
+			}		
 		}
 		Node sourcePinNode = con.source.getConnectedNode();
 		conNodes.add(sourcePinNode);
@@ -1099,7 +1199,7 @@ public class RoutableTimingGroupRouter{
 	
 	public void checkImmuTgOfNet(Connection con, String net1, String net2, ImmutableTimingGroup immu){
 		if(con.getNet().getNet().getName().equals(net1) || con.getNet().getNet().getName().equals(net2)){
-			System.out.println(con.getNet().getNet().getName() + " Immu exit node " + immu.exitNode().toString() + ", entry node " + immu.entryNode().toString());
+			System.out.println(con.getNet().getNet().getName() + immu.toString());
 		}
 	}
 	
@@ -1200,17 +1300,18 @@ public class RoutableTimingGroupRouter{
 		
 		this.finishRoutingACon(con);
 		
-		this.printConRNodes(con);
+//		this.printConRNodes(con);
 	}
 	
 	public void printConRNodes(Connection con){
-		if(this.debugRoutingCon && this.targetCon(con)){
+//		if(this.debugRoutingCon && this.targetCon(con)){
 			for(Routable rn:con.rnodes){
+				this.printInfo(((RoutableTimingGroup)(rn)).toStringEntriesAndExit());
 				boolean immuTg = ((RoutableTimingGroup)(rn)).getThruImmuTg() != null;
-				if(immuTg) this.printInfo(((RoutableTimingGroup)(rn)).toStringEntriesAndExit() + ", " + ((RoutableTimingGroup)(rn)).getThruImmuTg().toString());
+				if(immuTg) this.printInfo("\t" + ((RoutableTimingGroup)(rn)).getThruImmuTg().toString());//this thruImmuTg 
 			}
 			this.printInfo("");	
-		}	
+//		}
 	}
 	
 	public void finishRoutingACon(Connection con){
@@ -1225,7 +1326,13 @@ public class RoutableTimingGroupRouter{
 	
 	public void saveRouting(Connection con){
 		RoutableTimingGroup rn = (RoutableTimingGroup) con.getSinkRNode();
-		List<Node> entryNodes = new ArrayList<>();
+		List<Node> entryNodes;
+		if(!this.connectionEntryNodes.containsKey(con)){
+			entryNodes = new ArrayList<>();
+		}else{
+			entryNodes = this.connectionEntryNodes.get(con);
+			entryNodes.clear();
+		}
 		while (rn != null) {
 			con.addRNode(rn);
 			if(rn.type == RoutableType.SOURCERR)
@@ -1280,12 +1387,12 @@ public class RoutableTimingGroupRouter{
 		RoutableData data = childRNode.rnodeData;
 		int countSourceUses = data.countSourceUses(con.source);
 		
-		if(this.debugExpansion && this.targetCon(con)){
-			this.printInfo("\t\t childRNode " + childRNode.toString());
-		}
+//		if(this.debugExpansion && this.targetCon(con)){
+//			this.printInfo("\t\t childRNode " + childRNode.toString());
+//		}
 		
 		float partial_path_cost = rnode.rnodeData.getPartialPathCost();//upstream path cost
-		//TODO pass info of rnode to childRNode (entry node)
+		//getRouteNodeCost() includes the exit node cost and the entry node cost
 		float rnodeCost = this.getRouteNodeCost(rnode, childRNode, thruImmuTg, con, countSourceUses);
 		float new_partial_path_cost = partial_path_cost + rnodeCost;//upstream path cost + cost of node under consideration
 		float new_lower_bound_total_path_cost;
@@ -1300,7 +1407,7 @@ public class RoutableTimingGroupRouter{
 			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
 			new_lower_bound_total_path_cost = new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * (rnode.rnodeData.getLevel() + 1);
 			
-			if(this.timingDriven){
+			/*if(this.timingDriven){
 				ImmutableTimingGroup immuTG = thruImmuTg;
 				
 				if(debugTiming) {
@@ -1330,19 +1437,19 @@ public class RoutableTimingGroupRouter{
 				if(debugTiming) System.out.println(" delay = " + delay);
 				
 				new_lower_bound_total_path_cost += delay;
-			}
+			}*/
 			
 		}else{//lut input pin (sink)
 			new_lower_bound_total_path_cost = new_partial_path_cost;
 		}
 		
-		if(this.debugExpansion && this.targetCon(con)){
-			System.out.println("\t\t partial_path_cost = " + partial_path_cost 
-								+ ", \n \t\t rnodeCost = " + rnodeCost
-								+ ", \n \t\t countSourceUses = " + countSourceUses
-								+ ", \n \t\t expected_distance_cost = " + expected_distance_cost
-								+ ", \n \t\t new_lower_bound_total_path_cost = " + new_lower_bound_total_path_cost);
-		}
+//		if(this.debugExpansion && this.targetCon(con)){
+//			System.out.println("\t\t partial_path_cost = " + partial_path_cost 
+//								+ ", \n \t\t rnodeCost = " + rnodeCost
+//								+ ", \n \t\t countSourceUses = " + countSourceUses
+//								+ ", \n \t\t expected_distance_cost = " + expected_distance_cost
+//								+ ", \n \t\t new_lower_bound_total_path_cost = " + new_lower_bound_total_path_cost);
+//		}
 		
 		this.addRNodeToQueue(con, childRNode, rnode, thruImmuTg, new_partial_path_cost, new_lower_bound_total_path_cost);
 		
@@ -1352,20 +1459,20 @@ public class RoutableTimingGroupRouter{
 		RoutableData data = childRNode.rnodeData;
 		
 		if(!data.isTouched()) {
-			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t not touched");
+//			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t not touched");
 			this.rnodesTouched.add(data);
-			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t touched node size = "+this.rnodesTouched.size());
+//			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t touched node size = "+this.rnodesTouched.size());
 			data.setLowerBoundTotalPathCost(new_lower_bound_total_path_cost);
 			data.setPartialPathCost(new_partial_path_cost);
 			data.setPrev(rnode);
 			childRNode.setThruImmuTg(thruImmuTg);
 			if(rnode != null) data.setLevel(rnode.rnodeData.getLevel()+1);
 			this.queue.add(new QueueElement(childRNode, new_lower_bound_total_path_cost));
-			if(this.debugExpansion&& this.targetCon(con) ) this.printInfo("\t\t node added, queue size = " + this.queue.size());
+//			if(this.debugExpansion&& this.targetCon(con) ) this.printInfo("\t\t node added, queue size = " + this.queue.size());
 			
 		} else if (data.updateLowerBoundTotalPathCost(new_lower_bound_total_path_cost)) {
 			//queue is sorted by lower bound total cost
-			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t touched previously");
+//			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t touched previously");
 			data.setPartialPathCost(new_partial_path_cost);
 			data.setPrev(rnode);
 			childRNode.setThruImmuTg(thruImmuTg);
@@ -1375,49 +1482,31 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	private float getRouteNodeCost(RoutableTimingGroup parentRNode, RoutableTimingGroup rnode, ImmutableTimingGroup thruImmuTg, Connection con, int countSourceUses) {		
-		boolean containsSource = countSourceUses!= 0;
-		
-		/*//entry node sources
-		Node thruEntryNode = null;
-		if(thruImmuTg != null)
-			thruEntryNode = thruImmuTg.entryNode();
-		int containSourceFromEntryNode = 0;
-		if(RoutableTimingGroup.entryNodeSources.containsKey(thruEntryNode)){
-			containSourceFromEntryNode = RoutableTimingGroup.entryNodeSources.get(thruEntryNode).count(con.source);
-		}
-		int overOccupancyFromNode = 0;
-		if(containSourceFromEntryNode != 0)
-			overOccupancyFromNode = RoutableTimingGroup.entryNodeSources.get(thruEntryNode).uniqueSize() - Routable.capacity;
-		*/
-		
+		boolean containsSource = countSourceUses!= 0;	
 		//Present congestion cost
+		Node entry = thruImmuTg.entryNode();
 		float pres_cost;
-		int overoccupancy = 0;
+		
 		if(containsSource) {
-			overoccupancy = rnode.getOccupancy() - Routable.capacity;//TODO use entry node
-//			int overoccupancy = data.numUniqueSources() - Routable.capacity);
+			int overoccupancy = 0;
+			overoccupancy = rnode.getOccupancy() - Routable.capacity;//this is for Siblings, i.e. the exit node
 			if(overoccupancy < 0) {
 				pres_cost = 1;
 			}else{
 				pres_cost = 1 + overoccupancy * this.pres_fac;
 			}
 		}else{
-			pres_cost = rnode.getPres_cost();// + overOccupancyFromNode * this.pres_fac;//TODO entry node cost map?====
+			pres_cost = rnode.getPres_cost();
 		}
 		
-		float acc_cost_entry = 0; 
-		Node entry = thruImmuTg.entryNode();
+		float acc_cost = rnode.getAcc_cost();
+		
+		//add entry node cost to the Siblings
 		if(entry != null){
-			pres_cost += RoutableTimingGroup.entryNodePresHistCosts.get(entry).getFirst();
-			acc_cost_entry = RoutableTimingGroup.entryNodePresHistCosts.get(entry).getSecond();
+			Pair<Float, Float> costs = RoutableTimingGroup.entryNodePresHistCosts.get(entry);
+			pres_cost += costs.getFirst();
+			acc_cost += costs.getSecond();
 		}
-		
-//		if(this.debugExpansion && this.targetCon(con)){
-//			System.out.println("\t\t " + containsSource);
-//			System.out.println("\t\t overoccupancy = " + overoccupancy + ": ");
-//			System.out.println("\t\t maximum ennode occ = " + rnode.findMaximumOccEntryNodes() + ", rnodedata.occ = " + rnode.rnodeData.numUniqueSources());
-//			System.out.println("\t\t this.pres_fac = " + this.pres_fac + ", pres_cost = " + pres_cost);
-//		}
 		
 		//Bias cost
 		float bias_cost = 0;
@@ -1430,7 +1519,7 @@ public class RoutableTimingGroupRouter{
 //		if(this.debugExpansion && this.targetCon(con))
 //			this.printInfo("\t\t rnode cost = b(n)*h(n)*p(n)/(1+sourceUsage) = " + rnode.base_cost + " * " + rnode.getAcc_cost()+ " * " + pres_cost + " / (1 + " + countSourceUses + ") + " + bias_cost);
 		
-		return rnode.base_cost * (rnode.getAcc_cost() + acc_cost_entry)* pres_cost / (1 + countSourceUses) + bias_cost;
+		return rnode.base_cost * acc_cost * pres_cost / (1 + countSourceUses) + bias_cost;
 	}
 	
 	private float expectMahatD(RoutableTimingGroup childRNode, Connection con){
@@ -1455,7 +1544,8 @@ public class RoutableTimingGroupRouter{
 		
 		//set the sink rrg node of con as the target
 		con.getSinkRNode().setTarget(true);
-		this.sinkPinTG = ((RoutableTimingGroup)con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[1];//TODO Choose one for the estimator
+		//TODO currently, the one with index 1 is selected for delay estimation
+		this.sinkPinTG = ((RoutableTimingGroup)con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[1];
 		
 		// Add source to queue
 		RoutableTimingGroup source = (RoutableTimingGroup) con.getSourceRNode();
@@ -1471,7 +1561,7 @@ public class RoutableTimingGroupRouter{
 		float numTG = 0;
 		
 		for(RoutableTimingGroup rn:this.rnodesCreated.values()){
-			ImmutableTimingGroup[] timingGroups = rn.getSiblingsTimingGroup().getSiblings();//TODO needed
+			ImmutableTimingGroup[] timingGroups = rn.getSiblingsTimingGroup().getSiblings();
 			numTG += timingGroups.length;
 			for(ImmutableTimingGroup tg:timingGroups){
 				
