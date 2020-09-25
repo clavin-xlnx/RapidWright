@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
@@ -29,6 +30,16 @@ public class Connection{
 	private Routable sinkRNode;
 	public List<Routable> rnodes;
 	public List<Routable> pathFromSinkToSwitchBox;
+	
+	public List<Node> nodes;
+	
+	public void newNodes(){
+		this.nodes = new ArrayList<>();
+	}
+	
+	public void addNode(Node node){
+		this.nodes.add(node);
+	}
 	
 	public Connection(int id, SitePinInst source, SitePinInst sink){
 		this.id = id;
