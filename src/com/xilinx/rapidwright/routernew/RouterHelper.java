@@ -59,6 +59,24 @@ public class RouterHelper {
 		return conPIPs;
 	}
 	
+	public static List<PIP> conPIPs(List<Node> conNodes){
+		List<PIP> conPIPs = new ArrayList<>();
+		
+		//nodes of a connection are added starting from the sink until the source
+		for(int i = conNodes.size() -1; i > 0; i--){
+			Node nodeFormer = conNodes.get(i);
+			Node nodeLatter = conNodes.get(i-1);
+			
+			PIP pip = findThePIPbetweenTwoNodes(nodeFormer.getAllWiresInNode(), nodeLatter);
+			if(pip != null){
+				conPIPs.add(pip);
+			}else{
+				System.err.println("Null PIP connecting node " + nodeFormer.toString() + " and node " + nodeLatter.toString());
+			}
+		}
+		return conPIPs;
+	}
+	
 	public static PIP findThePIPbetweenTwoNodes(Wire[] nodeFormerWires, Node nodeLatter){
 		PIP pip = null;
 		Tile pipTile = nodeLatter.getTile();
