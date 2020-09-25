@@ -461,7 +461,7 @@ public class RoutableWireRouter{
 		return illegal.size();	
 	}
 	
-	public void fixIllegalTree(List<Connection> cons) {
+	public void fixIllegalTree(List<Connection> cons) {//TODO unchecked 2020/09/24
 //		this.printInfo("checking if there is any illegal node");	
 		int numIllegal = this.getIllegalNumRNodes(cons);	
 		if(numIllegal > 0){
@@ -484,11 +484,13 @@ public class RoutableWireRouter{
 			//find the illegal connections and fix illegal trees
 			for(Netplus illegalTree : illegalTrees){
 				Routable illegalRNode;
+				Node illegalNode;
 				while((illegalRNode = illegalTree.getIllegalRNode()) != null){
+					illegalNode = illegalRNode.getNode();
 					List<Connection> illegalCons = new ArrayList<>();
 					for(Connection con : illegalTree.getConnection()) {
 						for(Routable rnode : con.rnodes) {
-							if(rnode.equals(illegalRNode)) {
+							if(rnode.getNode().equals(illegalNode)) {
 								illegalCons.add(con);
 							}
 						}
@@ -505,10 +507,15 @@ public class RoutableWireRouter{
 					
 					//Get the path from the connection with maximum hops
 					List<Routable> newRouteNodes = new ArrayList<>();
+					List<Node> newNodes = new ArrayList<>();
 					boolean add = false;
 					for(Routable newRouteNode : maxCriticalConnection.rnodes) {
-						if(newRouteNode.equals(illegalRNode)) add = true;
-						if(add) newRouteNodes.add(newRouteNode);
+						if(newRouteNode.getNode().equals(illegalNode)) add = true;
+						if(add){
+							newRouteNodes.add(newRouteNode);
+							newNodes.add(newRouteNode.getNode());
+							
+						}
 					}
 					
 					//Replace the path of each illegal connection with the path from the connection with maximum hops
@@ -517,10 +524,12 @@ public class RoutableWireRouter{
 						
 						//Remove illegal path from routing tree
 						while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode));
+						while(!illegalConnection.nodes.remove(illegalConnection.nodes.size() - 1).equals(illegalNode));
 						
 						//Add new path to routing tree
 						for(Routable newRouteNode : newRouteNodes) {
 							illegalConnection.addRNode(newRouteNode);
+							illegalConnection.addNode(newRouteNode.getNode());
 						}
 						
 						this.add(illegalConnection);
