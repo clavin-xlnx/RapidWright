@@ -23,10 +23,8 @@ package com.xilinx.rapidwright.timing;
 // Consider moving this to device
 
 import com.xilinx.rapidwright.device.IntentCode;
-import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.Pair;
-
 
 /**
  * There are two types of TGs.
@@ -41,7 +39,7 @@ public class ImmutableTimingGroup {
 
     // NODE_PINBOUNCE can be driven by NODE_LOCAL or INTENT_DEFAULT (which is vcc in this case).
     // We don't need a TG with vcc, but there is no way to back off once this ctor is called.
-    public ImmutableTimingGroup(Node exitNode, Node entryNode, IntentCode exitNodeIntentCode, IntentCode entryNodeIntentCode) {
+    public ImmutableTimingGroup(NodeWithFaninInfo exitNode, NodeWithFaninInfo entryNode, IntentCode exitNodeIntentCode, IntentCode entryNodeIntentCode) {
         this.exitNode  = exitNode;
         this.entryNode = entryNode;
         Pair<GroupDelayType,GroupWireDirection> data = computeTypes(exitNode, exitNodeIntentCode);
@@ -49,7 +47,7 @@ public class ImmutableTimingGroup {
         this.groupWireDir   = data.getSecond();
     }
 
-    public ImmutableTimingGroup(Node exitNode, IntentCode exitNodeIntentCode) {
+    public ImmutableTimingGroup(NodeWithFaninInfo exitNode, IntentCode exitNodeIntentCode) {
         this.exitNode  = exitNode;
         this.entryNode = null;
         Pair<GroupDelayType,GroupWireDirection> data = computeTypes(exitNode, exitNodeIntentCode);
@@ -70,20 +68,20 @@ public class ImmutableTimingGroup {
         return groupWireDir;
     }
 
-    public Node exitNode() {
+    public NodeWithFaninInfo exitNode() {
         return exitNode;
     }
 
-    public Node entryNode() {
+    public NodeWithFaninInfo entryNode() {
         return entryNode;
     }
     // ------------------------------------   private ----------------------------------------
 
 
     // TODO: Do I need to keep nodes around? If not, store hashCode
-    final private Node exitNode;  // drive entryNode of other TGs.
+    final private NodeWithFaninInfo exitNode;  // drive entryNode of other TGs.
     // TODO: Do we need to keep track of entryNode?  We can save memory by not keeping it, but will spend more time for backward traveral.
-    final private Node entryNode; // can drive exitNode of other TGs, but never drive entry nodes.
+    final private NodeWithFaninInfo entryNode; // can drive exitNode of other TGs, but never drive entry nodes.
 
     // if groupDelayType = INTERNAL, PINFEED, PIN_BOUNCE, GLOBAL, or OTHER ignore GroupWireDir
     final private GroupDelayType groupDelayType;
@@ -91,7 +89,7 @@ public class ImmutableTimingGroup {
     final private GroupWireDirection groupWireDir; // ver, hor
 
 
-    private GroupWireDirection getDirection (Node node) {
+    private GroupWireDirection getDirection (NodeWithFaninInfo node) {
         // TODO: is there a better than name checking ?
         String wName = node.getAllWiresInNode()[0].getWireName();
         if (wName.startsWith("SS") || wName.startsWith("NN"))
@@ -104,7 +102,7 @@ public class ImmutableTimingGroup {
      * Computes the TimingGroup GroupDelayType for this group.
      */
     // TODO: if TG is from device model, this method is not needed because the type is already known.
-    private Pair<GroupDelayType, GroupWireDirection> computeTypes(Node node, IntentCode intentCode) {
+    private Pair<GroupDelayType, GroupWireDirection> computeTypes(NodeWithFaninInfo node, IntentCode intentCode) {
         GroupDelayType     groupDelayType = null;
         GroupWireDirection groupWireDir   = null;
 
