@@ -29,15 +29,12 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.Pair;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 /**
@@ -156,7 +153,7 @@ public class SiblingsTimingGroup {
                                 IntentCode nextPrvIc       = nextPrvNode.getAllWiresInNode()[0].getIntentCode();
                                 ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNextNode, nextPrvNode, nextNextIc, nextPrvIc);
                                 tgs.add(newTS);
-                                if (nextPrvNode == nextNode)
+                                if (nextPrvNode.equals(nextNode))
                                     throughTg = newTS;
                             }
                             // TODO: find out the type if the type is needed. Don't do it to reduce runtime
@@ -197,8 +194,8 @@ public class SiblingsTimingGroup {
 ////                builder.append(entryNode.getAllWiresInNode()[0].getWireName());
 //            }
 //        }
-        RoutingNode n = getTermInfo(siblings[0]);
-        builder.append(n.toString());
+//        RoutingNode n = getTermInfo(siblings[0]);
+//        builder.append(n.toString());
         return builder.toString();
     }
 
@@ -222,106 +219,6 @@ public class SiblingsTimingGroup {
         this.type     = type;
     }
 
-
-    class RoutingNode {
-        // INT_TILE coordinate
-        short x;
-        short y;
-        // E or W side of INT_TILE
-        InterconnectInfo.TileSide side;
-        // U or D
-        InterconnectInfo.Orientation orientation;
-        InterconnectInfo.TimingGroup tg;
-
-        RoutingNode(int x, int y, String side, String direction, String tg) {
-            this.x         = (short) x;
-            this.y         = (short) y;
-            this.side      = InterconnectInfo.TileSide.valueOf(side);
-            this.orientation = InterconnectInfo.Orientation.valueOf(direction);
-            this.tg        = InterconnectInfo.TimingGroup.valueOf(tg);
-        }
-        RoutingNode() {
-        }
-        public String toString() {
-            return String.format("x:%d y:%d %s %s %s", x,y,side.name(),tg.name(),orientation.name());
-        }
-    }
-
-    // input node is exitNode of a tg
-    // TODO: This method is loop heavy. If TG is prebuilt, this problem will be solved because all info is pre-recorded.
-    private InterconnectInfo.TileSide findTileSideForInternalSingle(Node node) {
-        Pattern EPattern = Pattern.compile("([\\w]+)_(E)_");
-        Pattern WPattern = Pattern.compile("([\\w]+)_(W)_");
-
-        for (Node prvNode : node.getAllUphillNodes()) { // need to get all downhill PIPs
-            String prvNodeName = prvNode.getAllWiresInNode()[0].getWireName();
-
-            Matcher EMatcher = EPattern.matcher(prvNodeName);
-            if (EMatcher.find()) {
-                return InterconnectInfo.TileSide.E;
-            } else {
-                Matcher WMatcher = WPattern.matcher(prvNodeName);
-                if (WMatcher.find())
-                    return InterconnectInfo.TileSide.W;
-            }
-
-        }
-        return InterconnectInfo.TileSide.M;
-    }
-
-    // node.toString()     -  node.getAllWiresInNode()[0].getIntentCode()
-    // INT_X0Y0/BYPASS_E9  - NODE_PINBOUNCE  :
-    // INT_X0Y0/IMUX_E9  - NODE_PINFEED  :
-    // INT_X0Y0/EE2_E_BEG3  - NODE_DOUBLE  :
-    // INT_X0Y0/NN1_E_BEG3  - NODE_SINGLE  :
-    // INT_X0Y0/NN4_E_BEG2  - NODE_VQUAD  :
-    // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
-    private RoutingNode getTermInfo(ImmutableTimingGroup tg) {
-        Node node = tg.exitNode();
-        Pattern tilePattern     = Pattern.compile("X([\\d]+)Y([\\d]+)");
-
-        RoutingNode res = new RoutingNode();
-
-        // INT_X45Y109/EE2_E_BEG6
-        // TODO: should I use getTile and wire instead of spliting the name?
-        String[] int_node = node.toString().split("/");
-
-        Matcher tileMatcher = tilePattern.matcher(int_node[0]);
-        if (tileMatcher.find()) {
-            res.x = Short.valueOf(tileMatcher.group(1));
-            res.y = Short.valueOf(tileMatcher.group(2));
-        } else {
-            System.out.println("getTermInfo coordinate matching error for node " + node.toString());
-        }
-
-        String[] tg_side = int_node[1].split("_");
-
-        // THIS IF MUST BE ABOVE THE IF BELOW (for res.side).
-        if (tg_side[0].startsWith("SS") || tg_side[0].startsWith("WW"))
-            res.orientation = InterconnectInfo.Orientation.D;
-        else if (tg_side[0].startsWith("NN") || tg_side[0].startsWith("EE"))
-            res.orientation = InterconnectInfo.Orientation.U;
-        else
-            res.orientation = InterconnectInfo.Orientation.S;
-
-        // THIS IF MUST BE BELOW THE IF ABOVE (for res.orientation).
-        if (tg_side[1].startsWith("E"))
-            res.side = InterconnectInfo.TileSide.E;
-        else if (tg_side[1].startsWith("W"))
-            res.side = InterconnectInfo.TileSide.W;
-        else
-        if (int_node[1].startsWith("INT")) {
-            // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
-            // Check intendcode is an alternative to above if condition.
-            res.side = findTileSideForInternalSingle(tg.entryNode());
-            // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
-            res.orientation = (res.side == InterconnectInfo.TileSide.E) ? InterconnectInfo.Orientation.D : InterconnectInfo.Orientation.U;
-        } else {
-            res.side = InterconnectInfo.TileSide.M;
-        }
-
-        return res;
-    }
 
     // ------------------------------------   test ----------------------------------------
 
