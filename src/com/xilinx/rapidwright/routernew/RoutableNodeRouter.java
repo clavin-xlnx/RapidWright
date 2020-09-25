@@ -526,6 +526,15 @@ public class RoutableNodeRouter{
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
 //				this.debugRoutingCon = true;//TODO fix cycles in the tree
+				
+				//for fixing illegalTree using nodes
+				for(Connection con:this.sortedListOfConnection){
+					con.newNodes();
+					for(Routable rn:con.rnodes){
+						con.nodes.add(rn.getNode());//wire router should check if node has been added or not, different wires belong to same node
+					}
+				}
+				
 				this.fixIllegalTree(sortedListOfConnection);
 				this.routerTimer.rerouteIllegal.finish();
 			}
@@ -792,6 +801,7 @@ public class RoutableNodeRouter{
 				boolean isCyclic = graphHelper.isCyclic(illegalTree);
 				if(isCyclic){
 					//remove cycles
+					System.out.println("cycle exists");
 					graphHelper.cutOffCycles(illegalTree);
 				}else{
 					if(this.debugRoutingCon) this.printInfo("fixing net: " + illegalTree.hashCode());
@@ -804,7 +814,9 @@ public class RoutableNodeRouter{
 	
 	public void handleNoCyclicIllegalRoutingTree(Netplus illegalTree){
 		Routable illegalRNode;
+		Node illegalNode;
 		while((illegalRNode = illegalTree.getIllegalRNode()) != null){
+			illegalNode = illegalRNode.getNode();
 //			if(this.debugRoutingCon) System.out.println("dealing rnode: " + illegalRNode.hashCode());
 			Set<Connection> illegalCons = new HashSet<>();
 			for(Connection con : illegalTree.getConnection()) {
@@ -824,12 +836,18 @@ public class RoutableNodeRouter{
 				}
 			}
 			if(this.debugRoutingCon) this.printInfo("  max con" + maxCriticalConnection.id);
+			
 			//Get the path from the connection with maximum hops
 			List<Routable> newRouteNodes = new ArrayList<>();
+//			List<Node> newNodes = new ArrayList<>();
+			
 			boolean add = false;
 			for(Routable newRouteNode : maxCriticalConnection.rnodes) {
 				if(newRouteNode.equals(illegalRNode)) add = true;
-				if(add) newRouteNodes.add(newRouteNode);
+				if(add) {
+					newRouteNodes.add(newRouteNode);
+//					newNodes.add(newRouteNode.getNode());
+				}
 			}
 			
 			//Replace the path of each illegal connection with the path from the connection with maximum hops
@@ -838,13 +856,15 @@ public class RoutableNodeRouter{
 				
 				//Remove illegal path from routing tree
 				while(!illegalConnection.rnodes.remove(illegalConnection.rnodes.size() - 1).equals(illegalRNode));
+				while(!illegalConnection.nodes.remove(illegalConnection.nodes.size() - 1).equals(illegalNode));
 				
 				//Add new path to routing tree
 				for(Routable newRouteNode : newRouteNodes) {
 					illegalConnection.addRNode(newRouteNode);
+					illegalConnection.addNode(newRouteNode.getNode());
 				}
 				
-				this.add(illegalConnection);
+				this.add(illegalConnection);//TODO update entry node info 0925 and pip assignment based on con.nodes
 			}
 			
 		}
@@ -892,7 +912,7 @@ public class RoutableNodeRouter{
 			Set<PIP> netPIPs = new HashSet<>();
 			
 			for(Connection c:np.getConnection()){
-				netPIPs.addAll(RouterHelper.conPIPs(c));
+				netPIPs.addAll(RouterHelper.conPIPs(c.nodes));
 			}
 			np.getNet().setPIPs(netPIPs);
 		}
