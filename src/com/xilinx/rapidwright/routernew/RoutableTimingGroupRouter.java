@@ -1371,15 +1371,13 @@ public class RoutableTimingGroupRouter{
 			
 			if(child.isTarget()){		
 //				if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t childRNode is the target");
-				Node entry = thruImmu.entryNode();
-				RoutableTimingGroup.putNewEntryNode(entry);
+				
 				this.addNodeToQueue(rnode, child, thruImmu, con);
 				
 			}else if(child.type.equals(RoutableType.INTERRR)){//TODO BOUNCE/GLOBAL filtering?
 				if(child.isInBoundingBoxLimit(con)){
 //					if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t" + " add node to the queue");
-					Node entry = thruImmu.entryNode();
-					RoutableTimingGroup.putNewEntryNode(entry);
+					
 					this.addNodeToQueue(rnode, child, thruImmu, con);
 					
 //					if(this.debugExpansion && this.targetCon(con)) this.printInfo("");

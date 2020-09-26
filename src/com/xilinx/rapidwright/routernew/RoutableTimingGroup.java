@@ -31,8 +31,6 @@ public class RoutableTimingGroup implements Routable{
 	
 	public final RoutableData rnodeData;//data for the siblings, that is for the exit nodes
 	
-	//belong to the class, visible to all RoutableTimingGroup
-	
 	static Map<Node, CountingSet<SitePinInst>> entryNodeSources;
 	static Map<Node, CountingSet<Routable>> entryNodeParents;
 	static Map<Node, Pair<Float, Float>> entryNodePresHistCosts;//lazy adding approach: creating a pair of costs when meet an entry node
@@ -100,6 +98,7 @@ public class RoutableTimingGroup implements Routable{
 				thruImmuTg = stGroups.getSecond();
 				
 				childThruImmuTg = new Pair<>(childRNode, thruImmuTg);
+//				childThruImmuTg = new Pair<>(new RoutableTimingGroup(globalIndex, stGroups.getFirst()), stGroups.getSecond());
 				
 				globalIndex++;
 
@@ -137,8 +136,8 @@ public class RoutableTimingGroup implements Routable{
 			
 			//store entry nodes and initialize the costs of entry nodes
 			//in consistent with the initialization of each routable
-			/*Node entry = thruImmuTg.entryNode();
-			putNewEntryNode(entry);*/
+			Node entry = thruImmuTg.entryNode();
+			putNewEntryNode(entry);//better to be here than to be in the expansion
 		}
 		
 		this.childrenSet = true;
@@ -146,8 +145,8 @@ public class RoutableTimingGroup implements Routable{
 	}
 	
 	public static void putNewEntryNode(Node entry){
-		if(entry != null && !entryNodePresHistCosts.containsKey(entry)){
-			entryNodePresHistCosts.put(entry, new Pair<>(1f, 1f));
+		if(entry != null){
+			entryNodePresHistCosts.putIfAbsent(entry, new Pair<>(1f, 1f));
 		}
 	}
 	
