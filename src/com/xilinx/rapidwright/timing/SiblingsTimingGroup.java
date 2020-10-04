@@ -34,11 +34,11 @@ import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.Pair;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 /**
@@ -50,7 +50,7 @@ import java.util.regex.Pattern;
  */
 public class SiblingsTimingGroup {
 
-    public Node getExitNode() {
+    public NodeWithFaninInfo getExitNode() {
         return siblings[0].exitNode();
     }
 
@@ -62,8 +62,13 @@ public class SiblingsTimingGroup {
     public GroupDelayType type() {
         return this.type;
     }
-
-
+    
+    public ImmutableTimingGroup getThruImmuTg(NodeWithFaninInfo lastExitNode){
+    	if(this.fanins.size() > 0)
+    		return this.fanins.get(lastExitNode);
+    	return this.siblings[0];
+    }
+    
     /**
      * Construct SiblingsTimingGroup from a sitePin which can be input or output.
      * This is the only public constructor of this class. Other SiblingsTimingGroups can be created indirectly from an object of this class.
@@ -77,13 +82,8 @@ public class SiblingsTimingGroup {
 
         Node node = sitePin.getConnectedNode();
 
-        // TODO: Can sitePin.getConnectedNode return null ?
-//        if (node == null) {
-//            String errMsg = String.format("SiblingsTimingGroup ctor found sitePin %s whose node is null.", sitePin.getName());
-//            throw new IllegalArgumentException(errMsg);
-//        }
-
         List<ImmutableTimingGroup> siblings    = new ArrayList<>();
+        this.fanins = new HashMap<>();
 
         if (sitePin.getPinType() == PinType.IN) {
             // input sitepin has two nodes
@@ -92,18 +92,23 @@ public class SiblingsTimingGroup {
 
             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) {
                 IntentCode nextPrvIc = nextPrvNode.getAllWiresInNode()[0].getIntentCode();
-                ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNextNode, nextPrvNode, nextNextIc, nextPrvIc);
+                ImmutableTimingGroup newTS = new ImmutableTimingGroup(
+                        NodeWithFaninInfo.create(nextNextNode),
+                        NodeWithFaninInfo.create(nextPrvNode),
+                        nextNextIc, nextPrvIc);
                 siblings.add(newTS);
             }
         } else {
             // output sitepin has only one node
-            ImmutableTimingGroup tg = new ImmutableTimingGroup(node, node.getAllWiresInNode()[0].getIntentCode());
+            ImmutableTimingGroup tg = new ImmutableTimingGroup(
+                    NodeWithFaninInfo.create(node), node.getAllWiresInNode()[0].getIntentCode());
             siblings.add(tg);
         }
 
         this.siblings = siblings.toArray(new ImmutableTimingGroup[siblings.size()]);
         this.hashCode = this.siblings[0].exitNode().hashCode();
         this.type     = GroupDelayType.PINFEED;
+        this.populateFanin();
     }
 
     /**
@@ -111,14 +116,20 @@ public class SiblingsTimingGroup {
      * @return a list of list of timing groups representing a list of siblings -- timing groups sharing the same last nodes,
      * instead of an array of timing groups, returned by getNextTimingGroups().
      */
-    public List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> getNextSiblingTimingGroups(Set<Node> reservedNodes, RouteThruHelper rthHelper) {
-        List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> result = new ArrayList<Pair<SiblingsTimingGroup,ImmutableTimingGroup>>();
+
+    public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes, RouteThruHelper rthHelper) {
+        List<SiblingsTimingGroup> result = new ArrayList<SiblingsTimingGroup>();
+
         Node prevNode = siblings[0].exitNode();
         // I don't see pip is used in computeTypes or delay calculation. Thus, I don't populate it.
         for (Node nextNode : prevNode.getAllDownhillNodes()) {
-            if (!reservedNodes.contains(nextNode) && (rthHelper!= null && !rthHelper.isRouteThru(prevNode, nextNode))) {
+            if (!reservedNodes.contains(nextNode)){// && (rthHelper!= null && !rthHelper.isRouteThru(prevNode, nextNode))) {
                 IntentCode ic = nextNode.getAllWiresInNode()[0].getIntentCode();
-
+                //TODO check
+                if(ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_CLE_OUTPUT){
+                	continue;
+                }
+                
                 // TODO: is there a better way then relying on name?
                 // TODO: I don't to do this loop if ic == NDDE_CLE_OUTPUT. That's way I do 2 level of ifs.
                 boolean nextNodeHasGlobalWire = false;
@@ -130,23 +141,28 @@ public class SiblingsTimingGroup {
                 // CLE_OUT, GLOBAL, LONG TGs have only one node, others have 2 nodes.
                 // TG with one node has no siblings.
                 if (nextNodeHasGlobalWire) {
-                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNode, ic);
-                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}},
-                                                                  GroupDelayType.GLOBAL), newTS));
+                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}},
+                                                                  GroupDelayType.GLOBAL));
                 } else if (ic == IntentCode.NODE_CLE_OUTPUT) {
-                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNode, ic);
-                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
-                                                                  GroupDelayType.OTHER),newTS));
+                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
+                                                                  GroupDelayType.OTHER));
                 } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
-                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNode, ic);
-                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
-                                                                  GroupDelayType.LONG),newTS));
+                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
+                                                                  GroupDelayType.LONG));
                 } else {
                     // for other TGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
+                    	//TODO check
+                    	IntentCode code = nextNextNode.getAllWiresInNode()[0].getIntentCode();
+                        if(code == IntentCode.NODE_PINFEED || code == IntentCode.NODE_CLE_OUTPUT){
+                        	continue;
+                        }
+                        
                         if (!reservedNodes.contains(nextNextNode)) {
                             IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
-
                             List<ImmutableTimingGroup> tgs = new ArrayList<>();
                             ImmutableTimingGroup throughTg = null;
                             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) { // need to get all downhill PIPs
@@ -154,13 +170,20 @@ public class SiblingsTimingGroup {
                                 // TODO: (need to revisit this if the assumption changes.)
                                 // TODO: Thus only check nodes that can be key nodes. nextPrvNode is not a key node.
                                 IntentCode nextPrvIc       = nextPrvNode.getAllWiresInNode()[0].getIntentCode();
-                                ImmutableTimingGroup newTS = new ImmutableTimingGroup(nextNextNode, nextPrvNode, nextNextIc, nextPrvIc);
+                                ImmutableTimingGroup newTS = new ImmutableTimingGroup(
+                                        NodeWithFaninInfo.create(nextNextNode),
+                                        NodeWithFaninInfo.create(nextPrvNode),
+                                        nextNextIc, nextPrvIc);
                                 tgs.add(newTS);
-                                if (nextPrvNode.equals(nextNode))
+                                if (nextPrvNode.equals(nextNode)){
                                     throughTg = newTS;
+                                    /*if(prevNode.toString().equals("INT_X12Y97/EE12_BEG7") && 
+                                    		nextNextNode.toString().equals("INT_X18Y97/INT_INT_SDQ_7_INT_OUT0"))
+                                    		System.out.println(throughTg.toString());*/
+                                }
                             }
                             // TODO: find out the type if the type is needed. Don't do it to reduce runtime
-                            result.add(new Pair<>(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER),throughTg));
+                            result.add(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER));
                         }
                     }
                 }
@@ -197,8 +220,8 @@ public class SiblingsTimingGroup {
 ////                builder.append(entryNode.getAllWiresInNode()[0].getWireName());
 //            }
 //        }
-        RoutingNode n = getTermInfo(siblings[0]);
-        builder.append(n.toString());
+//        RoutingNode n = getTermInfo(siblings[0]);
+//        builder.append(n.toString());
         return builder.toString();
     }
 
@@ -214,119 +237,37 @@ public class SiblingsTimingGroup {
     final private ImmutableTimingGroup[] siblings;
     final private int                    hashCode;
     final private GroupDelayType         type;
+    private Map<NodeWithFaninInfo,ImmutableTimingGroup> fanins; //for nextSiblings <last exit node, timingGroup in this siblings>
 
 
     private SiblingsTimingGroup (List<ImmutableTimingGroup> tgs, GroupDelayType type) {
-        this.siblings = tgs.toArray(new ImmutableTimingGroup[tgs.size()]);
+        this.siblings = tgs.toArray(new ImmutableTimingGroup[tgs.size()]); // *******
         this.hashCode = this.siblings[0].hashCode();
         this.type     = type;
+        this.fanins = new HashMap<>();
+        this.populateFanin();//use the List<Pair<SiblingsTimingGroup, ImmutbleTimingGroup>> returned from getNextSiblingsTimingGroups()
     }
-
-
-    class RoutingNode {
-        // INT_TILE coordinate
-        short x;
-        short y;
-        // E or W side of INT_TILE
-        InterconnectInfo.TileSide side;
-        // U or D
-        InterconnectInfo.Orientation orientation;
-        InterconnectInfo.TimingGroup tg;
-
-        RoutingNode(int x, int y, String side, String direction, String tg) {
-            this.x         = (short) x;
-            this.y         = (short) y;
-            this.side      = InterconnectInfo.TileSide.valueOf(side);
-            this.orientation = InterconnectInfo.Orientation.valueOf(direction);
-            this.tg        = InterconnectInfo.TimingGroup.valueOf(tg);
-        }
-        RoutingNode() {
-        }
-        public String toString() {
-            return String.format("x:%d y:%d %s %s %s", x,y,side.name(),tg.name(),orientation.name());
-        }
-    }
-
-    // input node is exitNode of a tg
-    // TODO: This method is loop heavy. If TG is prebuilt, this problem will be solved because all info is pre-recorded.
-    private InterconnectInfo.TileSide findTileSideForInternalSingle(Node node) {
-        Pattern EPattern = Pattern.compile("([\\w]+)_(E)_");
-        Pattern WPattern = Pattern.compile("([\\w]+)_(W)_");
-
-        for (Node prvNode : node.getAllUphillNodes()) { // need to get all downhill PIPs
-            String prvNodeName = prvNode.getAllWiresInNode()[0].getWireName();
-
-            Matcher EMatcher = EPattern.matcher(prvNodeName);
-            if (EMatcher.find()) {
-                return InterconnectInfo.TileSide.E;
-            } else {
-                Matcher WMatcher = WPattern.matcher(prvNodeName);
-                if (WMatcher.find())
-                    return InterconnectInfo.TileSide.W;
-            }
-
-        }
-        return InterconnectInfo.TileSide.M;
-    }
-
-    // node.toString()     -  node.getAllWiresInNode()[0].getIntentCode()
-    // INT_X0Y0/BYPASS_E9  - NODE_PINBOUNCE  :
-    // INT_X0Y0/IMUX_E9  - NODE_PINFEED  :
-    // INT_X0Y0/EE2_E_BEG3  - NODE_DOUBLE  :
-    // INT_X0Y0/NN1_E_BEG3  - NODE_SINGLE  :
-    // INT_X0Y0/NN4_E_BEG2  - NODE_VQUAD  :
-    // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
-    private RoutingNode getTermInfo(ImmutableTimingGroup tg) {
-        Node node = tg.exitNode();
-        Pattern tilePattern     = Pattern.compile("X([\\d]+)Y([\\d]+)");
-
-        RoutingNode res = new RoutingNode();
-
-        // INT_X45Y109/EE2_E_BEG6
-        // TODO: should I use getTile and wire instead of spliting the name?
-        String[] int_node = node.toString().split("/");
-
-        Matcher tileMatcher = tilePattern.matcher(int_node[0]);
-        if (tileMatcher.find()) {
-            res.x = Short.valueOf(tileMatcher.group(1));
-            res.y = Short.valueOf(tileMatcher.group(2));
-        } else {
-            System.out.println("getTermInfo coordinate matching error for node " + node.toString());
-        }
-
-        String[] tg_side = int_node[1].split("_");
-
-        // THIS IF MUST BE ABOVE THE IF BELOW (for res.side).
-        if (tg_side[0].startsWith("SS") || tg_side[0].startsWith("WW"))
-            res.orientation = InterconnectInfo.Orientation.D;
-        else if (tg_side[0].startsWith("NN") || tg_side[0].startsWith("EE"))
-            res.orientation = InterconnectInfo.Orientation.U;
-        else
-            res.orientation = InterconnectInfo.Orientation.S;
-
-        // THIS IF MUST BE BELOW THE IF ABOVE (for res.orientation).
-        if (tg_side[1].startsWith("E"))
-            res.side = InterconnectInfo.TileSide.E;
-        else if (tg_side[1].startsWith("W"))
-            res.side = InterconnectInfo.TileSide.W;
-        else
-        if (int_node[1].startsWith("INT")) {
-            // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
-            // Check intendcode is an alternative to above if condition.
-            res.side = findTileSideForInternalSingle(tg.entryNode());
-            // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
-            res.orientation = (res.side == InterconnectInfo.TileSide.E) ? InterconnectInfo.Orientation.D : InterconnectInfo.Orientation.U;
-        } else {
-            res.side = InterconnectInfo.TileSide.M;
-        }
-
-        return res;
+    
+    private void populateFanin(){
+		for(ImmutableTimingGroup immuTg : this.siblings){
+    		if(immuTg.entryNode() != null){
+    			for(Node n:immuTg.entryNode().getAllUphillNodes()){
+//    				System.out.println(immuTg.toString());
+        			this.fanins.put(NodeWithFaninInfo.create(n), immuTg);
+        		}
+    		}else{//output pin Sibling and global siblings
+    			for(Node n:this.siblings[0].exitNode().getAllUphillNodes()){
+        			this.fanins.put(NodeWithFaninInfo.create(n), this.siblings[0]);
+        		}
+    		}
+		}
+    	
     }
 
     // ------------------------------------   test ----------------------------------------
 
 
-    public static void main(String args[]) {
+   /* public static void main(String args[]) {
         Device device = Device.getDevice("xcvu3p-ffvc1517");
         String siteName = "SLICE_X0Y0";
         SiteInst siteInst = new SiteInst(siteName, SiteTypeEnum.SLICEL);
@@ -347,7 +288,7 @@ public class SiblingsTimingGroup {
             // just pack one to expand
             s = next.get(0).getFirst();
         }
-    }
+    }*/
 }
 
 
