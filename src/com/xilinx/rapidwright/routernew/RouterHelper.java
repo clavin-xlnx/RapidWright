@@ -99,6 +99,7 @@ public class RouterHelper {
 			int length = immus.length;
 			for(int i = 0; i < length; i++){
 				Node entryOfSecond = immus[i].entryNode();
+//				System.out.println(exitofFirst.toString() + ", " + entryOfSecond.toString());
 				if(twoNodesAbutted(exitofFirst, entryOfSecond)){
 					return immus[i];
 				}
@@ -111,9 +112,10 @@ public class RouterHelper {
 		return null;
 	}
 	
-	public static boolean twoNodesAbutted(Node parent, Node nodeToCheck){
-		for(Node n:parent.getAllDownhillNodes()){
-			if(n.equals(nodeToCheck))
+	public static boolean twoNodesAbutted(Node exitOfFirst, Node entryOfSecond){//NodeWithFaninInfo
+		for(Node n:exitOfFirst.getAllDownhillNodes()){
+//			System.out.println(n.toString());
+			if(n.toString().equals(entryOfSecond.toString()))//
 				return true;
 		}
 		return false;
