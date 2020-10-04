@@ -155,11 +155,11 @@ public class SiblingsTimingGroup {
                 } else {
                     // for other TGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
-                    	//TODO check
-                    	IntentCode code = nextNextNode.getAllWiresInNode()[0].getIntentCode();
-                        if(code == IntentCode.NODE_PINFEED || code == IntentCode.NODE_CLE_OUTPUT){
+                    	//TODO check - wrong - will cause non-thruImmuTg issue for other siblings
+                    	/*IntentCode code = nextNextNode.getAllWiresInNode()[0].getIntentCode();
+                        if(code == IntentCode.NODE_CLE_OUTPUT){//code == IntentCode.NODE_PINFEED){
                         	continue;
-                        }
+                        }*/
                         
                         if (!reservedNodes.contains(nextNextNode)) {
                             IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
