@@ -3,6 +3,7 @@ package com.xilinx.rapidwright.routernew;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -13,6 +14,7 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
+import com.xilinx.rapidwright.timing.NodeWithFaninInfo;
 import com.xilinx.rapidwright.timing.SiblingsTimingGroup;
 import com.xilinx.rapidwright.timing.TimingModel;
 import com.xilinx.rapidwright.util.Pair;
@@ -31,12 +33,14 @@ public class RoutableTimingGroup implements Routable{
 	
 	public final RoutableData rnodeData;//data for the siblings, that is for the exit nodes
 	
-	static Map<Node, CountingSet<SitePinInst>> entryNodeSources;
-	static Map<Node, CountingSet<Routable>> entryNodeParents;
-	static Map<Node, Pair<Float, Float>> entryNodePresHistCosts;//lazy adding approach: creating a pair of costs when meet an entry node
+//	static Map<Node, CountingSet<SitePinInst>> entryNodeSources;
+//	static Map<Node, CountingSet<Routable>> entryNodeParents;
+//	static Map<Node, Pair<Float, Float>> entryNodePresHistCosts;//lazy adding approach: creating a pair of costs when meet an entry node
+	
+	static Set<NodeWithFaninInfo> entryNodesExpanded;
 	
 	public boolean target;
-	public List<Pair<RoutableTimingGroup, ImmutableTimingGroup>> childrenImmuTG;//TODO use this one
+	public List<Pair<RoutableTimingGroup, ImmutableTimingGroup>> childrenImmuTG;
 	public boolean childrenSet;
 	
 	public boolean debug = false;
@@ -44,9 +48,10 @@ public class RoutableTimingGroup implements Routable{
 	static {
 		//Node - CountingSet maps are needed for per-connection routing
 		//retaining per-connection routing is needed for future connection-aware parallelization
-		entryNodeSources = new HashMap<>();
-		entryNodeParents  = new HashMap<>();
-		entryNodePresHistCosts = new HashMap<>();
+//		entryNodeSources = new HashMap<>();
+//		entryNodeParents  = new HashMap<>();
+//		entryNodePresHistCosts = new HashMap<>();
+		entryNodesExpanded = new HashSet<>();
 	}
 	
 	public RoutableTimingGroup(int index, SitePinInst sitePinInst, RoutableType type, TimingModel tmodel){
@@ -75,27 +80,37 @@ public class RoutableTimingGroup implements Routable{
 	}
 	
 	public int setChildren(int globalIndex, float base_cost_fac, 
-			Map<Node, RoutableTimingGroup> createdRoutable, 
+			Map<NodeWithFaninInfo, RoutableTimingGroup> createdRoutable, 
 			Set<Node> reservedNodes,
 			RouteThruHelper helper){
 		
 		this.childrenImmuTG = new ArrayList<>();
 		
-		List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper);
 		
-		for(Pair<SiblingsTimingGroup,ImmutableTimingGroup> stGroups : next){
+		List<SiblingsTimingGroup> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper);
+		
+		for(SiblingsTimingGroup stGroups : next){
 			
 			RoutableTimingGroup childRNode;
 			ImmutableTimingGroup thruImmuTg;
 			Pair<RoutableTimingGroup,ImmutableTimingGroup> childThruImmuTg;
 			
-			Node key = stGroups.getFirst().getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
+			NodeWithFaninInfo key = stGroups.getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
+//			String key = stGroups.getFirst().getExitNode().toString();
 			
 			if(!createdRoutable.containsKey(key)){
-				childRNode = new RoutableTimingGroup(globalIndex, stGroups.getFirst());
+				childRNode = new RoutableTimingGroup(globalIndex, stGroups);
 				childRNode.setBaseCost(base_cost_fac);
 				
-				thruImmuTg = stGroups.getSecond();
+				thruImmuTg = stGroups.getThruImmuTg(this.sibTimingGroups.getExitNode());
+				
+				/*if(thruImmuTg == null){
+					NodeWithFaninInfo exit = this.sibTimingGroups.getExitNode();		
+					System.out.println("null thruImmuTg between: ");
+					System.out.println(this.type + ", " + childRNode.type);
+					System.out.println(this.sibTimingGroups.getExitNode().toString() + ", " + childRNode.getSiblingsTimingGroup().getExitNode().toString());
+					
+				}*/
 				
 				childThruImmuTg = new Pair<>(childRNode, thruImmuTg);
 //				childThruImmuTg = new Pair<>(new RoutableTimingGroup(globalIndex, stGroups.getFirst()), stGroups.getSecond());
@@ -106,29 +121,29 @@ public class RoutableTimingGroup implements Routable{
 				createdRoutable.put(key, childRNode);
 			}else{
 				childRNode = createdRoutable.get(key);
-
-				thruImmuTg = RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key));
+				
+				thruImmuTg = childRNode.getSiblingsTimingGroup().getThruImmuTg(this.sibTimingGroups.getExitNode());//RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key));
 
 				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
 			}
 			
-			/*if(this.index == 58597 && childRNode.index == 70491){
-			 * //TODO this is where the conflicts come from
-			 * the entry node connecting two exit nodes INT_X9Y101/WW1_E_7_FT0 -> * -> INT_X9Y102/BOUNCE_W_0_FT1 is not identical
-			 * INT_X9Y102/INODE_W_1_FT1 from RouterHelper, while it is INT_X9Y101/INODE_W_62_FT0 from the API getNextSiblings
-				System.out.println(thruImmuTg.toString()); //ImmuTg = ( INT_X9Y101/INODE_W_62_FT0, INT_X9Y102/BOUNCE_W_0_FT1 )
+			/*if(this.sibTimingGroups.getExitNode().toString().equals("INT_X12Y97/EE12_BEG7") && childRNode.sibTimingGroups.getExitNode().toString().equals("INT_X18Y97/INT_INT_SDQ_7_INT_OUT0")){
+			  //TODO this is where the conflicts come from
+			  //the entry node connecting two exit nodes INT_X9Y101/WW1_E_7_FT0 -> * -> INT_X9Y102/BOUNCE_W_0_FT1 is not identical
+			  //INT_X9Y102/INODE_W_1_FT1 from RouterHelper, while it is INT_X9Y101/INODE_W_62_FT0 from the API getNextSiblings
+				System.out.println("thruImmuTg = " + thruImmuTg.toString()); //ImmuTg = ( INT_X9Y101/INODE_W_62_FT0, INT_X9Y102/BOUNCE_W_0_FT1 )
 				System.out.println();//this thruImmuTg returned from the API is different from when calling RouterHelper.findImmuTgBetweenTwoSiblings()
 			}*/
 			
 			//for checking up on the above finding
-			/*if(this.sibTimingGroups.getExitNode().toString().equals("INT_X9Y101/WW1_E_7_FT0")){
-				System.out.println("all downhill nodes of exit node INT_X9Y101/WW1_E_7_FT0 in Siblings " + this.index + ":");
+			/*if(this.sibTimingGroups.getExitNode().toString().equals("INT_X12Y97/EE12_BEG7")){
+				System.out.println("all downhill nodes of exit node INT_X12Y97/EE12_BEG7 in Siblings " + this.index + ":");
 				for(Node nextNode:this.sibTimingGroups.getExitNode().getAllDownhillNodes()){
 					System.out.println(nextNode.toString());
 				}
 			}
-			if(this.sibTimingGroups.getExitNode().toString().equals("INT_X9Y102/BOUNCE_W_0_FT1")){
-				System.out.println("all uphill nodes of exit node INT_X9Y102/BOUNCE_W_0_FT1 in Siblings " + this.index + ":");
+			if(this.sibTimingGroups.getExitNode().toString().equals("INT_X18Y97/INT_INT_SDQ_7_INT_OUT0")){
+				System.out.println("all uphill nodes of exit node INT_X18Y97/INT_INT_SDQ_7_INT_OUT0 in Siblings " + this.index + ":");
 				for(Node nextNode:this.sibTimingGroups.getExitNode().getAllUphillNodes()){
 					System.out.println(nextNode.toString());
 				}
@@ -136,7 +151,7 @@ public class RoutableTimingGroup implements Routable{
 			
 			//store entry nodes and initialize the costs of entry nodes
 			//in consistent with the initialization of each routable
-			Node entry = thruImmuTg.entryNode();
+			NodeWithFaninInfo entry = thruImmuTg.entryNode();
 			putNewEntryNode(entry);//better to be here than to be in the expansion
 		}
 		
@@ -144,9 +159,10 @@ public class RoutableTimingGroup implements Routable{
 		return globalIndex;
 	}
 	
-	public static void putNewEntryNode(Node entry){
-		if(entry != null){
-			entryNodePresHistCosts.putIfAbsent(entry, new Pair<>(1f, 1f));
+	public static void putNewEntryNode(NodeWithFaninInfo entry){
+		if(entry != null && !entryNodesExpanded.contains(entry)){
+			entry.initialize();//create sources and parents CountingSet, initialize pres_cost and acc_cost
+			entryNodesExpanded.add(entry);
 		}
 	}
 	
@@ -201,21 +217,6 @@ public class RoutableTimingGroup implements Routable{
 	public int getOccupancy(){
 //		return Math.max(this.findMaximumOccEntryNodes(), this.rnodeData.getOccupancy());//not valid any more if the entry node costs are added to the siblings cost
 		return this.rnodeData.getOccupancy();
-	}
-	
-	public int findMaximumOccEntryNodes(){
-		int occ = 0;
-		ImmutableTimingGroup[] itgs = this.sibTimingGroups.getSiblings();
-		for(int i = 0; i < itgs.length; i++){
-			Node entry = itgs[i].entryNode();
-			if(entry != null && entryNodeSources.containsKey(entry)){
-				int usage = entryNodeSources.get(entry).uniqueSize();
-				if(usage > occ){
-					occ = usage;
-				}
-			}
-		}
-		return occ;
 	}
 
 	public ImmutableTimingGroup getThruImmuTg() {
@@ -284,34 +285,33 @@ public class RoutableTimingGroup implements Routable{
 		}
 	}
 	
-	public static void updatePeresetCongestionPenaltyOfEntryNode(Node entry, float pres_fac){
-		int occ = entryNodeSources.get(entry).uniqueSize();
+	public static void updatePresentCongestionPenaltyOfEntryNode(NodeWithFaninInfo entry, float pres_fac){
+		int occ = entry.getOcc();
 		int cap = Routable.capacity;
-		Pair<Float, Float> presHistCosts = entryNodePresHistCosts.get(entry);
+		
 		if (occ < cap) {
-			presHistCosts.setFirst(1f);
+			entry.setPresCost(1f);
 		} else {
-			presHistCosts.setFirst(1 + (occ - cap + 1) * pres_fac);
+			entry.setPresCost(1 + (occ - cap + 1) * pres_fac);
+//			System.out.println("overused pres cost = " + entry.getPresCost());
 		}
-		entryNodePresHistCosts.put(entry, presHistCosts);
+		entryNodesExpanded.add(entry);//TODO redundant?
 	}
 	
 	public static void updateEntryNodesCosts(float pres_fac, float acc_fac){
-		for(Node entry : entryNodePresHistCosts.keySet()){
-			int overuse;
-			if(entryNodeSources.get(entry) == null){
-				overuse = -1;
-			}else{
-				overuse = entryNodeSources.get(entry).uniqueSize() - Routable.capacity;
-			}
-			Pair<Float, Float> presHistCosts = entryNodePresHistCosts.get(entry);
+		for(NodeWithFaninInfo entry : entryNodesExpanded){
+			int overuse = entry.getOcc() - Routable.capacity;
+			
 			if(overuse == 0){
-				presHistCosts.setFirst(1 + pres_fac);
+				entry.setPresCost(1 + pres_fac);
 			}else if(overuse > 0){
-				presHistCosts.setFirst(1 + (overuse + 1) * pres_fac);
-				presHistCosts.setSecond(presHistCosts.getSecond() + overuse * acc_fac);
+//				System.out.println("overuse > 0");
+				entry.setPresCost(1 + (overuse + 1) * pres_fac);
+				entry.setAccCost(entry.getAccCost() + overuse * acc_fac);
+				
 			}
-			entryNodePresHistCosts.put(entry, presHistCosts);
+//			System.out.println("entry costs = " + entry.getAccCost() + ", " + entry.getPresCost());
+			entryNodesExpanded.add(entry);
 		}
 	}
 
