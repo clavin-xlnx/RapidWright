@@ -90,7 +90,7 @@ public class Main {
 	
 	public static void main(String[] args) {
 		Main main = new Main(args);
-		MessageGenerator.waitOnAnyKey();//halt the program
+//		MessageGenerator.waitOnAnyKey();//halt the program
 		main.processing();
 	}
 	
@@ -142,9 +142,11 @@ public class Main {
 						router.rrgNodeId,
 						router.usedRNodes.size(),
 						router.checkAverageNumWires(),
-						1);
+						1, 0, 0);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
+						router.firstRouting,
+						router.firtRnodeT,
 						router.itry, 
 						router.connectionsRouted,
 						router.sortedListOfConnection.size(),
@@ -181,9 +183,11 @@ public class Main {
 						router.rrgNodeId,
 						router.usedRNodes.size(),
 						1,
-						0);
+						0, 0, 0);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
+						router.firstIterRouting,
+						router.firtRnodeT,
 						router.itry, 
 						router.connectionsRouted,
 						router.sortedListOfConnection.size(),
@@ -222,9 +226,13 @@ public class Main {
 						router.rrgNodeId,
 						router.usedRNodes.size(),
 						router.averWire,
-						router.averNode);
+						router.averNodePerImmuTg,
+						router.averImmuTgPerSiblings,
+						router.averNodePerSiblings);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
+						router.firstRouting,
+						router.firtRnodeT,
 						router.itry, 
 						router.connectionsRouted,
 						router.sortedListOfConnection.size(),
@@ -286,7 +294,8 @@ public class Main {
 		System.out.println(s);
 	}
 	
-	public void rnodesInfo(float sumMD, long hops, int firstIterRNodes, int totalRNodes, int totalUsage, float averWire, float averNode){
+	public void rnodesInfo(float sumMD, long hops, int firstIterRNodes, int totalRNodes, int totalUsage, float averWire, float averNode,
+			float averImmuTgSiblings, float averNodeSiblings){
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Total Manhattan distance: %10.2f\n", sumMD);
 		System.out.printf("Total hops: %d\n", hops);
@@ -298,10 +307,14 @@ public class Main {
 		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #node in rnodes: %5.2f\n", averNode);
+			System.out.printf("Average #TG per siblings: %5.2f\n", averImmuTgSiblings);
+			System.out.printf("Average #node per siblings: %5.2f\n", averNodeSiblings);
 		}
 	}
 	
 	public void runtimeInfoPrinting(int routingRuntime, 
+			float firstRouting,
+			float firstRnodeT,
 			int iterations,
 			int consRouted,
 			int toalCons,
@@ -309,6 +322,10 @@ public class Main {
 			RouterTimer timer){
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Routing took %.2f s\n", routingRuntime*1e-3);
+		System.out.printf("RnodesT in the 1st iter: %.2f s\n", firstRnodeT);
+		System.out.printf("Routing in the 1st iter: %.2f s\n", firstRouting);
+		float rerouting = (float) (timer.rerouteCongestion.getTime() * 1e-9 - (timer.rnodesCreation.getTime()*1e-9 - firstRnodeT));
+		System.out.printf("Rerouting needed: %.2f s\n", rerouting);
 		System.out.println("Num iterations: " + iterations);
 		System.out.println("Connections routed: " + consRouted);
 		System.out.println("Connections rerouted: " + (consRouted - toalCons));
