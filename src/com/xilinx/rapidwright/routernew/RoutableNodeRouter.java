@@ -71,6 +71,7 @@ public class RoutableNodeRouter{
 	
 	public int rrgNodeId;
 	public int firstIterRNodes;
+	public float firstRouting;
 	
 	public int connectionsRouted;
 	public long nodesExpanded;
@@ -86,6 +87,7 @@ public class RoutableNodeRouter{
 	public boolean trial = false;
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
+	public float firtRnodeT;
 	
 	public RoutableNodeRouter(Design design,
 			String dcpFileName,
@@ -465,7 +467,7 @@ public class RoutableNodeRouter{
 		 this.route();
 		 long end = System.nanoTime();
 		 int timeInMilliseconds = (int)Math.round((end-start) * Math.pow(10, -6));
-		 
+		 this.printTotalUsedNodes();
 		 return timeInMilliseconds;
 	}
 	
@@ -550,7 +552,7 @@ public class RoutableNodeRouter{
 			this.routerTimer.calculateStatistics.finish();;
 			//if the routing is valid /realizable return, the routing completed successfully
 	
-			if(this.itry == 1) this.firstIterRNodes = this.rnodesCreated.size();
+			
 	
 			if (validRouting) {
 				//generate and assign a list of PIPs for each Net net
@@ -577,6 +579,17 @@ public class RoutableNodeRouter{
 		}
 		
 		return;
+	}
+	
+	public void printTotalUsedNodes(){		
+		Set<Node> used = new HashSet<>();
+		for(Connection c:this.sortedListOfConnection){
+			for(Node n:c.nodes){
+				used.add(n);
+			}
+		}
+		
+		System.out.println("Total used Nodes: " + used.size());
 	}
 	
 	public void routingAndTimer(Connection con){
@@ -619,6 +632,11 @@ public class RoutableNodeRouter{
 			long iterStart, long iterEnd,
 			int globalRNodeId, long rnodesT){
 		
+		if(this.itry == 1){
+			this.firstIterRNodes = this.rnodesCreated.size();
+			this.firstRouting = (float) ((iterEnd - iterStart - rnodesT)*1e-9);
+			this.firtRnodeT = (float) (this.routerTimer.rnodesCreation.getTime() * 1e-9);
+		}
 		this.getOverusedAndIllegalRNodesInfo(connections);
 		
 		int numRNodesCreated = this.rnodesCreated.size();

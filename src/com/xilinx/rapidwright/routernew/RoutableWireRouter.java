@@ -54,6 +54,7 @@ public class RoutableWireRouter{
 	
 	public int rrgNodeId;
 	public int firstIterRNodes;
+	public float firstIterRouting;
 	
 	public int connectionsRouted;
 	public long nodesExpanded;
@@ -69,6 +70,7 @@ public class RoutableWireRouter{
 	public boolean trial = false;
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
+	public float firtRnodeT;
 	
 	public RoutableWireRouter(Design design,
 			String dcpFileName,
@@ -307,8 +309,6 @@ public class RoutableWireRouter{
 			this.routerTimer.calculateStatistics.finish();;
 			//if the routing is valid /realizable return, the routing completed successfully
 	
-			if(this.itry == 1) this.firstIterRNodes = this.rnodesCreated.size();
-	
 			if (validRouting) {
 				//generate and assign a list of PIPs for each Net net
 				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
@@ -353,6 +353,12 @@ public class RoutableWireRouter{
 	public void staticticsInfo(List<Connection> connections, 
 			long iterStart, long iterEnd,
 			int globalRNodeId, long rnodesT){
+		
+		if(this.itry == 1){
+			this.firstIterRNodes = this.rnodesCreated.size();
+			this.firstIterRouting = (float)((iterEnd - iterStart - rnodesT)*1e-9);
+			this.firtRnodeT = (float) (this.routerTimer.rnodesCreation.getTime() * 1e-9);
+		}
 		
 		this.getOverusedAndIllegalRNodesInfo(connections);
 		
