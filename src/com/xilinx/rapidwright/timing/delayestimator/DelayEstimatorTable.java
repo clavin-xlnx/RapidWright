@@ -30,6 +30,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
+import com.xilinx.rapidwright.timing.NodeWithFaninInfo;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.PairUtil;
@@ -1832,14 +1833,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         IntentCode exitIC  = exitNode.getAllWiresInNode()[0].getIntentCode();
         IntentCode entryIC = exitNode.getAllWiresInNode()[0].getIntentCode();
-        return new ImmutableTimingGroup(exitNode, entryNode, exitIC, entryIC);
+        return new ImmutableTimingGroup(NodeWithFaninInfo.create(exitNode), NodeWithFaninInfo.create(entryNode), exitIC, entryIC);
     }
 
     // for TG with only one node
     ImmutableTimingGroup createTG(String exitNodeName, Device device) {
         Node exitNode  = new Node(exitNodeName, device);
         IntentCode exitIC  = exitNode.getAllWiresInNode()[0].getIntentCode();
-        return new ImmutableTimingGroup(exitNode, exitIC);
+        return new ImmutableTimingGroup(NodeWithFaninInfo.create(exitNode), exitIC);
     }
 
 
