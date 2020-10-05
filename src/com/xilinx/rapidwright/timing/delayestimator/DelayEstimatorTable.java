@@ -219,6 +219,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             this.tg        = T.TimingGroup.valueOf(tg);
         }
         RoutingNode() {
+            this.tg  = null;
         }
         void setHorTG(short len) {
             if (len == 1)
@@ -298,6 +299,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     // INT_X0Y0/NN4_E_BEG2  - NODE_VQUAD  :
     // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
     private RoutingNode getTermInfo(ImmutableTimingGroup tg) {
+
         Node node = tg.exitNode();
         IntentCode ic = node.getAllWiresInNode()[0].getIntentCode();
         Pattern tilePattern = Pattern.compile("X([\\d]+)Y([\\d]+)");
@@ -306,7 +308,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         Pattern NN          = Pattern.compile("NN([\\d]+)");
         Pattern SS          = Pattern.compile("SS([\\d]+)");
 
+        Pattern skip         = Pattern.compile("WW1_E");
+
         RoutingNode res = new RoutingNode();
+
 
         // INT_X45Y109/EE2_E_BEG6
         // TODO: should I use getTile and wire instead of spliting the name?
@@ -319,6 +324,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         } else {
             System.out.println("getTermInfo coordinate matching error for node " + node.toString());
         }
+
+        if (skip.matcher(int_node[1]).find())
+            return res; // res.tg is null
 
         String[] tg_side = int_node[1].split("_");
 
@@ -1096,6 +1104,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     }
 
     private Pair<Short, String> getMinDelayToSinkPin(RoutingNode beg, RoutingNode end) {
+        if (beg.tg == null)
+            return new Pair<Short,String>(Short.MAX_VALUE,null);
         return getMinDelayToSinkPin( beg.tg, end.tg, beg.x, beg.y, end.x, end.y, beg.side, end.side, beg.orientation, end.orientation);
     }
 
@@ -1856,8 +1866,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //                "INT_X11Y107/VCC_WIRE", device);
 //        ImmutableTimingGroup src = createTG("INT_X11Y108/EE4_W_BEG1","INT_X11Y108/INT_NODE_SDQ_53_INT_OUT0",device);
 //        ImmutableTimingGroup dst = createTG("INT_X11Y107/IMUX_W2","INT_X11Y106/INODE_W_60_FT0", device);
-        ImmutableTimingGroup src = createTG("INT_X11Y112/EE12_BEG2",device);
-        ImmutableTimingGroup dst = createTG("INT_X11Y114/IMUX_W33","INT_X11Y114/INT_NODE_IMUX_40_INT_OUT0", device);                   short dly = getMinDelayToSinkPin(src, dst);
+//        ImmutableTimingGroup src = createTG("INT_X11Y112/EE12_BEG2",device);
+//        ImmutableTimingGroup dst = createTG("INT_X11Y114/IMUX_W33","INT_X11Y114/INT_NODE_IMUX_40_INT_OUT0", device);                   short dly = getMinDelayToSinkPin(src, dst);
+
+//        ImmutableTimingGroup src = createTG("INT_X11Y107/WW1_E_7_FT0","INT_X11Y108/SDQNODE_E_0_FT1", device);
+        // ok
+        ImmutableTimingGroup src = createTG("INT_X11Y107/WW1_W_BEG5","INT_X11Y107/INT_NODE_SDQ_77_INT_OUT1", device);
+        ImmutableTimingGroup dst = createTG("INT_X11Y107/IMUX_W2","INT_X11Y106/INODE_W_60_FT0", device);
+        short dly = getMinDelayToSinkPin(src, dst);
         System.out.println("delay " + dly);
         return;
     }

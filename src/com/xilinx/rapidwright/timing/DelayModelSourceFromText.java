@@ -23,6 +23,8 @@
 
 package com.xilinx.rapidwright.timing;
 
+import com.xilinx.rapidwright.util.FileTools;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -35,8 +37,6 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import com.xilinx.rapidwright.util.FileTools;
 
 /**
  * An implementation of DelayModelSource, used to provide data source to DelayModel class.
@@ -113,6 +113,15 @@ class DelayModelSourceFromText extends DelayModelSource {
         return belName;
     }
 
+    public static boolean isNumeric(String str) {
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch(NumberFormatException e){
+            return false;
+        }
+    }
+
     /**
      * Process the given line for logic delay.
      * @param belName The current bel under processing.
@@ -128,13 +137,45 @@ class DelayModelSourceFromText extends DelayModelSource {
 
         Short  config = -1; // all 1
 
+        String key = null;
+        List<String> vals = new ArrayList<>();
+
         if (items.size() > 3) {
             Short[] cfgArray  = new Short[configNames.size()]; // initialize to null
             String configName = null;
             config = 0;
+            int configStartAt = 3;
+
+            // check if the first item after delay is for substitution
+            if (!configName2Idx.containsKey(items.get(configStartAt))) {
+                // this is not a config, it must be a substitution
+                key = items.get(configStartAt).replaceAll(":", "");
+
+
+                configStartAt++;
+                for (; configStartAt < items.size(); configStartAt++) {
+                    String val = items.get(configStartAt);
+                    if (val.contains(":"))
+                        break;
+
+                    if (val.contains("-")) {
+                        List<String> ranges = Arrays.asList(val.split("-"));
+                        if (!isNumeric(ranges.get(0)) || !isNumeric(ranges.get(1))) {
+                            throw new IllegalArgumentException("Range " + val + " contain non-numeric value.!");
+                        }
+                        int beg = Integer.parseInt(ranges.get(0));
+                        int end = Integer.parseInt(ranges.get(1));
+                        for (int i = beg; i <= end; i++) {
+                            vals.add(Integer.toString(i));
+                        }
+                    } else {
+                        vals.add(val);
+                    }
+                }
+            }
 
             // fill out config listed for this arc
-            for (int i = 3; i < items.size(); i++) {
+            for (int i = configStartAt; i < items.size(); i++) {
                 String e = items.get(i);
                 if (e.matches("(.*):")) {
                     configName = e;
@@ -162,11 +203,21 @@ class DelayModelSourceFromText extends DelayModelSource {
             }
         }
 
+        if (key == null) {
+            // insert "no op" substitute. a valid source will not contain a space.
+            key = " ";
+            vals.add(" ");
+        }
+
         List<String> srcs = Arrays.asList(src.trim().split(","));
         List<String> dsts = Arrays.asList(dst.trim().split(","));
         for (String s : srcs) {
             for (String t : dsts) {
-                logicDelays.add(new DelayEntry(belName, s, t, dly, config));
+                for (String val : vals) {
+                    String ss  = s.replaceAll(key, val);
+                    String st  = t.replaceAll(key, val);
+                    logicDelays.add(new DelayEntry(belName, ss, st, dly, config));
+                }
             }
         }
     }

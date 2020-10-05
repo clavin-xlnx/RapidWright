@@ -116,7 +116,6 @@ public class SiblingsTimingGroup {
      * @return a list of list of timing groups representing a list of siblings -- timing groups sharing the same last nodes,
      * instead of an array of timing groups, returned by getNextTimingGroups().
      */
-
     public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes, RouteThruHelper rthHelper) {
         List<SiblingsTimingGroup> result = new ArrayList<SiblingsTimingGroup>();
 
@@ -142,16 +141,19 @@ public class SiblingsTimingGroup {
                 // TG with one node has no siblings.
                 if (nextNodeHasGlobalWire) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}},
-                                                                  GroupDelayType.GLOBAL));
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}}, 
+                    		GroupDelayType.GLOBAL));
+
                 } else if (ic == IntentCode.NODE_CLE_OUTPUT) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
                     result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
                                                                   GroupDelayType.OTHER));
+
                 } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
-                                                                  GroupDelayType.LONG));
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}, 
+                    									GroupDelayType.LONG));
+
                 } else {
                     // for other TGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
@@ -175,12 +177,12 @@ public class SiblingsTimingGroup {
                                         NodeWithFaninInfo.create(nextPrvNode),
                                         nextNextIc, nextPrvIc);
                                 tgs.add(newTS);
-                                if (nextPrvNode.equals(nextNode)){
+                                if (nextPrvNode.equals(nextNode))
                                     throughTg = newTS;
                                     /*if(prevNode.toString().equals("INT_X12Y97/EE12_BEG7") && 
                                     		nextNextNode.toString().equals("INT_X18Y97/INT_INT_SDQ_7_INT_OUT0"))
                                     		System.out.println(throughTg.toString());*/
-                                }
+                                
                             }
                             // TODO: find out the type if the type is needed. Don't do it to reduce runtime
                             result.add(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER));
@@ -263,7 +265,6 @@ public class SiblingsTimingGroup {
 		}
     	
     }
-
     // ------------------------------------   test ----------------------------------------
 
 
