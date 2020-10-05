@@ -95,7 +95,7 @@ public class RoutableTimingGroup implements Routable{
 			ImmutableTimingGroup thruImmuTg;
 			Pair<RoutableTimingGroup,ImmutableTimingGroup> childThruImmuTg;
 			
-			NodeWithFaninInfo key = stGroups.getExitNode();//TODO Yun - why this is necessary and using SiblingsTimingGroup hash code does not work
+			NodeWithFaninInfo key = stGroups.getExitNode();//TODO Yun - using node as the key is necessary, different nodes may have a same hasCode()
 //			String key = stGroups.getFirst().getExitNode().toString();
 			
 			if(!createdRoutable.containsKey(key)){
@@ -123,7 +123,7 @@ public class RoutableTimingGroup implements Routable{
 				childRNode = createdRoutable.get(key);
 				
 				thruImmuTg = childRNode.getSiblingsTimingGroup().getThruImmuTg(this.sibTimingGroups.getExitNode());//RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key));
-
+				
 				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
 			}
 			

@@ -442,17 +442,22 @@ public class RoutableTimingGroupRouter{
 		boolean validRouting;
 		List<Netplus> trialNets = new ArrayList<>();
         for(Netplus net : this.sortedListOfNetplus){
-        	if(net.getNet().getName().equals("n689")){
+        	if(net.getNet().getName().equals("n689") || net.getNet().getName().equals("nabc")){
         		trialNets.add(net);
 //        		System.out.println(net.getNet().getName());
         	}
         }
         List<Connection> trialCons = new ArrayList<>();
-        for(Connection con : this.sortedListOfConnection){
+        for(Netplus netp:trialNets){
+        	for(Connection c:netp.getConnection()){
+        		trialCons.add(c);
+        	}
+        }
+        /*for(Connection con : this.sortedListOfConnection){
         	if(con.id == 1216){
         		trialCons.add(con);
         	}
-        }
+        }*/
         
 		while(this.itry < this.nrOfTrials){
 			this.iterationStart = System.nanoTime();
@@ -555,11 +560,19 @@ public class RoutableTimingGroupRouter{
 			this.iterationEnd = System.nanoTime();
 			//statistics
 			this.routerTimer.calculateStatistics.start();
-			this.staticticsInfo(this.sortedListOfConnection, 
+			if(!this.trial){
+				this.staticticsInfo(this.sortedListOfConnection, 
 								this.iterationStart, 
 								this.iterationEnd, 
 								this.rrgNodeId, 
 								this.routerTimer.rnodesCreation.getTime());
+			}else{
+				this.staticticsInfo(trialCons, 
+				this.iterationStart, 
+				this.iterationEnd, 
+				this.rrgNodeId, 
+				this.routerTimer.rnodesCreation.getTime());
+			}
 			this.routerTimer.calculateStatistics.finish();
 			//if the routing is valid /realizable return, the routing completed successfully
 			if (validRouting) {
@@ -1322,6 +1335,8 @@ public class RoutableTimingGroupRouter{
 	
 	public void printConRNodes(Connection con){
 //		if(this.debugRoutingCon && this.targetCon(con)){
+			printConEntryNodes(con);
+			System.out.println(this.connectionEntryNodes.get(con));
 			for(Routable rn:con.rnodes){
 				this.printInfo(((RoutableTimingGroup)(rn)).toStringEntriesAndExit());
 //				boolean immuTg = ((RoutableTimingGroup)(rn)).getThruImmuTg() != null;
@@ -1388,7 +1403,7 @@ public class RoutableTimingGroupRouter{
 //				if(thruImmu.entryNode() == null) System.err.println("null thruImmu at target STG");
 				this.addNodeToQueue(rnode, child, thruImmu, con);
 				
-			}else if(child.type.equals(RoutableType.INTERRR)){//TODO BOUNCE/GLOBAL filtering?
+			}else if(child.type.equals(RoutableType.INTERRR) && !child.getSiblingsTimingGroup().getExitNode().toString().contains("IMUX")){//TODO BOUNCE/GLOBAL filtering?
 				if(child.isInBoundingBoxLimit(con)){
 //					if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t" + " add node to the queue");
 					
@@ -1450,7 +1465,7 @@ public class RoutableTimingGroupRouter{
 					if(immuTG.exitNode().toString().equals("INT_X11Y97/IMUX_W15")){
 						System.out.println(immuTG.exitNode().getAllWiresInNode()[0].getIntentCode() + ", node INT_X11Y97/IMUX_W15 downhill:");
 						for(Node node : immuTG.exitNode().getAllDownhillNodes()){
-							
+							System.out.println(node.getSitePin().toString());
 							System.out.printf(node.toString() + ", " + node.getAllWiresInNode()[0].getIntentCode() + ", is routethru? ");
 							System.out.println(this.rthHelper.isRouteThru(immuTG.exitNode(), node));
 						}

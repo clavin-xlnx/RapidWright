@@ -125,8 +125,8 @@ public class SiblingsTimingGroup {
         for (Node nextNode : prevNode.getAllDownhillNodes()) {
             if (!reservedNodes.contains(nextNode)){// && (rthHelper!= null && !rthHelper.isRouteThru(prevNode, nextNode))) {
                 IntentCode ic = nextNode.getAllWiresInNode()[0].getIntentCode();
-                //TODO check
-                if(ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_CLE_OUTPUT){
+                //TODO check: only excluding NODE_CLE_OUTUT will cause an issue of non-thruImmuTg between two ITERRR in setChildren()
+                if(ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_CLE_OUTPUT){ 
                 	continue;
                 }
                 
