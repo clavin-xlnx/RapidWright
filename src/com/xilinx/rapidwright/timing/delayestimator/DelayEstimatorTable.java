@@ -1388,14 +1388,23 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
         // TODO: remove returned boolean and unused callback.
-
         Double res = DijkstraWithCallbacks.findMinWeightBetween(ig, src, dst, srcX,srcY,
                 // ExamineEdge. Update edge weight which depend on the beginning loc, length and direction of the TG
                 (g, u, e, x, y, dly) -> {g.setEdgeWeight(e,calcTimingGroupDelayOnEdge(e, u, dst, x, y, dly, isBackward));},
                 // DiscoverVertex. Propagate location at the beginning loc of a timing group edge.
                 (g, u, e, x, y, dly) -> {return discoverVertex(e, x, y, dly, isBackward);},
-                (g, u, e, dly) -> {return updateVertex(e, dly, isBackward);}
+                (g, u, e, dly) -> {return updateVertex(e, dly, isBackward);},
+                (e) -> {e.setMarker();}
         );
+//        Double res = DijkstraWithCallbacks.findMinWeightBetween(ig, src, dst, srcX,srcY,
+//                // ExamineEdge. Update edge weight which depend on the beginning loc, length and direction of the TG
+//                (g, u, e, x, y, dly) -> {g.setEdgeWeight(e,calcTimingGroupDelayOnEdge(e, u, dst, x, y, dly, isBackward));},
+//                // DiscoverVertex. Propagate location at the beginning loc of a timing group edge.
+//                (g, u, e, x, y, dly) -> {return discoverVertex(e, x, y, dly, isBackward);},
+//                (g, u, e, dly) -> {return updateVertex(e, dly, isBackward);}
+//        );
+
+
 
         String route = "";
 

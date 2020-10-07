@@ -33,7 +33,7 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
         double apply(Graph<V,E> g, V v, E e, double dist);
     }
     public static interface OpOnEdge<E> {
-        double apply(E e);
+        void apply(E e);
     }
     protected ExamineEdge<V,E> examineEdge;
     protected DiscoverVertex<V,E> discoverVertex;
@@ -136,9 +136,8 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
                 .getPathWeightWithOpOnMinEdges(source, sink, opOnMinEdge);
     }
     public static <V,E> Double findMinWeightBetween(Graph<V, E> graph, V source, V sink, short srcX, short srcY,
-                               ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
-                               UpdateVertex<V,E> updateVertex) {
-            return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex)).getPathWeight(source, sink);
+                               ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex, UpdateVertex<V,E> updateVertex) {
+        return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex)).getPathWeight(source, sink);
     }
     public DijkstraWithCallbacks(Graph<V, E> graph, short srcX, short srcY,
                                  ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex, UpdateVertex<V,E> updateVertex) {
