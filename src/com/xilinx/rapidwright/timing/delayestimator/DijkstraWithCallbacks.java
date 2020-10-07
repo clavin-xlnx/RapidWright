@@ -32,6 +32,9 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
     public static interface UpdateVertex<V, E> {
         double apply(Graph<V,E> g, V v, E e, double dist);
     }
+    public static interface OpOnEdge<E> {
+        double apply(E e);
+    }
     protected ExamineEdge<V,E> examineEdge;
     protected DiscoverVertex<V,E> discoverVertex;
     protected UpdateVertex<V,E> updateVertex;
@@ -77,7 +80,15 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
         }
         return new Pair<>(w,predicateIsTrue);
     }
-
+    public Double getPathWeightWithOpOnMinEdges(V source, V sink, OpOnEdge<E> opOnEdge) {
+        GraphPath<V, E> p = this.getPath(source, sink);
+        double w = p == null ? 1.0D / 0.0 : p.getWeight();
+        boolean predicateIsTrue = false;
+        for (E e : p.getEdgeList()) {
+            opOnEdge.apply(e);
+        }
+        return w;
+    }
     // same as that in BaseShortestPathAlgorithm<V, E>
     @Override
     public double getPathWeight(V source, V sink) {
@@ -117,6 +128,12 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
                                                     UpdateVertex<V,E> updateVertex, Predicate<E> edgePredicate) {
         return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex))
                                           .getPathWeightWithPredicate(source, sink, edgePredicate);
+    }
+    public static <V,E> Double findMinWeightBetween(Graph<V, E> graph, V source, V sink, short srcX, short srcY,
+                                                                  ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
+                                                                  UpdateVertex<V,E> updateVertex, OpOnEdge<E> opOnMinEdge) {
+        return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex))
+                .getPathWeightWithOpOnMinEdges(source, sink, opOnMinEdge);
     }
     public static <V,E> Double findMinWeightBetween(Graph<V, E> graph, V source, V sink, short srcX, short srcY,
                                ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
