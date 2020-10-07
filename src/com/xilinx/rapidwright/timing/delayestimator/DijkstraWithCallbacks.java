@@ -8,7 +8,6 @@ import org.jgrapht.GraphPath;
 import org.jgrapht.alg.interfaces.ShortestPathAlgorithm;
 import org.jgrapht.graph.GraphWalk;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
 
@@ -36,7 +35,6 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
     protected ExamineEdge<V,E> examineEdge;
     protected DiscoverVertex<V,E> discoverVertex;
     protected UpdateVertex<V,E> updateVertex;
-    protected Predicate<E> edgePredicate;
     protected short srcX;
     protected short srcY;
 
@@ -67,7 +65,7 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
         }
     }
 
-    public Pair<Double,Boolean> getPathWeightWithPredicate(V source, V sink) {
+    public Pair<Double,Boolean> getPathWeightWithPredicate(V source, V sink, Predicate<E> edgePredicate) {
         GraphPath<V, E> p = this.getPath(source, sink);
         double w = p == null ? 1.0D / 0.0 : p.getWeight();
         boolean predicateIsTrue = false;
@@ -117,8 +115,8 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
     public static <V,E> Pair<Double,Boolean> findMinWeightBetween(Graph<V, E> graph, V source, V sink, short srcX, short srcY,
                                                     ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
                                                     UpdateVertex<V,E> updateVertex, Predicate<E> edgePredicate) {
-        return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex,
-                                          edgePredicate)).getPathWeightWithPredicate(source, sink);
+        return (new DijkstraWithCallbacks(graph, srcX, srcY, examineEdge, discoverVertex, updateVertex))
+                                          .getPathWeightWithPredicate(source, sink, edgePredicate);
     }
     public static <V,E> Double findMinWeightBetween(Graph<V, E> graph, V source, V sink, short srcX, short srcY,
                                ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
@@ -132,16 +130,5 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
         this.discoverVertex = discoverVertex;
         this.srcX           = srcX;
         this.srcY           = srcY;
-        this.edgePredicate  = null;
-    }
-    public DijkstraWithCallbacks(Graph<V, E> graph, short srcX, short srcY,
-                                 ExamineEdge<V,E> examineEdge, DiscoverVertex<V,E> discoverVertex,
-                                 UpdateVertex<V,E> updateVertex, Predicate<E> edgePredicate) {
-        this.graph = (Graph) Objects.requireNonNull(graph, "Graph is null");
-        this.examineEdge    = examineEdge;
-        this.discoverVertex = discoverVertex;
-        this.srcX           = srcX;
-        this.srcY           = srcY;
-        this.edgePredicate  = edgePredicate;
     }
 }

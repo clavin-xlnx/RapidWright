@@ -1389,13 +1389,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         // TODO: remove returned boolean and unused callback.
 
-        Pair<Double,Boolean> res = DijkstraWithCallbacks.findMinWeightBetween(ig, src, dst, srcX,srcY,
+        Double res = DijkstraWithCallbacks.findMinWeightBetween(ig, src, dst, srcX,srcY,
                 // ExamineEdge. Update edge weight which depend on the beginning loc, length and direction of the TG
                 (g, u, e, x, y, dly) -> {g.setEdgeWeight(e,calcTimingGroupDelayOnEdge(e, u, dst, x, y, dly, isBackward));},
                 // DiscoverVertex. Propagate location at the beginning loc of a timing group edge.
                 (g, u, e, x, y, dly) -> {return discoverVertex(e, x, y, dly, isBackward);},
-                (g, u, e, dly) -> {return updateVertex(e, dly, isBackward);},
-                (e) -> {return isSwitchingSide(e);}
+                (g, u, e, dly) -> {return updateVertex(e, dly, isBackward);}
         );
 
         String route = "";
@@ -1420,7 +1419,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 System.out.println(minPath.toString().replace(",", ",\n") + "\n");
             }
         }
-        return new Pair<Short,String>(res.getFirst().shortValue(),route);
+        return new Pair<Short,String>(res.shortValue(),route);
     }
 
 
