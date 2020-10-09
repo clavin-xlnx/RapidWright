@@ -18,7 +18,7 @@ import java.util.function.Predicate;
  * Connection from LONG to QUAD does not need to be captured because if QUAD is really needed it can be before LONG.
  * This omission allows simpler data structure because we don't need to capture both incompatible requirements of LONG.
  */
-public class InterconnectInfo {
+public class InterconnectInfo implements java.io.Serializable {
 
     public static enum TileSide {
         E,

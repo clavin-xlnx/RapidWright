@@ -84,9 +84,10 @@ public class DijkstraWithCallbacks<V, E> implements ShortestPathAlgorithm<V, E> 
         GraphPath<V, E> p = this.getPath(source, sink);
         double w = p == null ? 1.0D / 0.0 : p.getWeight();
         boolean predicateIsTrue = false;
-        for (E e : p.getEdgeList()) {
-            opOnEdge.apply(e);
-        }
+        if (p!=null)
+            for (E e : p.getEdgeList()) {
+                opOnEdge.apply(e);
+            }
         return w;
     }
     // same as that in BaseShortestPathAlgorithm<V, E>
