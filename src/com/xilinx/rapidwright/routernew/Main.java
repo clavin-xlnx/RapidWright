@@ -142,7 +142,8 @@ public class Main {
 						router.rrgNodeId,
 						router.usedRNodes.size(),
 						router.checkAverageNumWires(),
-						1, 0, 0);
+						1, 0, 0,
+						router.averFanoutRNodes);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.firstRouting,
@@ -151,6 +152,9 @@ public class Main {
 						router.connectionsRouted,
 						router.sortedListOfConnection.size(),
 						router.nodesExpanded,
+						router.nodesExpandedFirstIter,
+						router.nodesPopedFromQueue,
+						router.nodesPopedFromQueueFirstIter,
 						router.routerTimer);
 				
 			}else if(this.opt == RoutingGranularityOpt.WIRE){
@@ -183,7 +187,8 @@ public class Main {
 						router.rrgNodeId,
 						router.usedRNodes.size(),
 						1,
-						0, 0, 0);
+						0, 0, 0,
+						router.averFanoutRNodes);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.firstIterRouting,
@@ -192,6 +197,9 @@ public class Main {
 						router.connectionsRouted,
 						router.sortedListOfConnection.size(),
 						router.nodesExpanded,
+						router.nodesExpandedFirstIter,
+						router.nodesPopedFromQueue,
+						router.nodesPopedFromQueueFirstIter,
 						router.routerTimer);
 				
 			}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
@@ -228,7 +236,8 @@ public class Main {
 						router.averWire,
 						router.averNodePerImmuTg,
 						router.averImmuTgPerSiblings,
-						router.averNodePerSiblings);
+						router.averNodePerSiblings,
+						router.averFanoutRNodes);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.firstRouting,
@@ -237,6 +246,9 @@ public class Main {
 						router.connectionsRouted,
 						router.sortedListOfConnection.size(),
 						router.nodesExpanded,
+						router.nodesExpandedFirstIter,
+						router.nodesPopedFromQueue,
+						router.nodesPopedFromQueueFirstIter,
 						router.routerTimer);
 				
 			}		
@@ -295,7 +307,7 @@ public class Main {
 	}
 	
 	public void rnodesInfo(float sumMD, long hops, int firstIterRNodes, int totalRNodes, int totalUsage, float averWire, float averNode,
-			float averImmuTgSiblings, float averNodeSiblings){
+			float averImmuTgSiblings, float averNodeSiblings, float averChildren){
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Total Manhattan distance: %10.2f\n", sumMD);
 		System.out.printf("Total hops: %d\n", hops);
@@ -304,11 +316,13 @@ public class Main {
 		System.out.printf("Total rnodes used: %d\n", totalUsage);
 		if(this.opt == RoutingGranularityOpt.NODE){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
+			System.out.printf("Average #children per siblings: %5.2f\n", averChildren);
 		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #node in rnodes: %5.2f\n", averNode);
 			System.out.printf("Average #TG per siblings: %5.2f\n", averImmuTgSiblings);
 			System.out.printf("Average #node per siblings: %5.2f\n", averNodeSiblings);
+			System.out.printf("Average #children per siblings: %5.2f\n", averChildren);
 		}
 	}
 	
@@ -319,6 +333,9 @@ public class Main {
 			int consRouted,
 			int toalCons,
 			long nodesExpanded,
+			long nodesExpandedFirstIter,
+			long nodesPoped,
+			long nodesPopedFirstIter,
 			RouterTimer timer){
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Routing took %.2f s\n", routingRuntime*1e-3);
@@ -330,6 +347,9 @@ public class Main {
 		System.out.println("Connections routed: " + consRouted);
 		System.out.println("Connections rerouted: " + (consRouted - toalCons));
 		System.out.println("Nodes expanded: " + nodesExpanded);
+		System.out.println("Nodes expanded first iter: " + nodesExpandedFirstIter);
+		System.out.println("Nodes poped: " + nodesPoped);
+		System.out.println("Nodes poped first iter: " + nodesPopedFirstIter);
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.print(timer);
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
