@@ -10,6 +10,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
@@ -153,45 +154,23 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public void setXY() {
-		int length = this.node.getAllWiresInNode().length;
-		short[] xCoordinates = new short[length];
-		short[] yCoordinates = new short[length];
-		short id = 0;
+		List<Short> xCoordinates = new ArrayList<>();
+		List<Short> yCoordinates = new ArrayList<>();
 		for(Wire w : this.node.getAllWiresInNode()){
-			xCoordinates[id] = (short) w.getTile().getColumn();
-			yCoordinates[id] = (short) w.getTile().getRow();
-			id++;
+			Tile tile = w.getTile();
+			if(tile.getTileTypeEnum() == TileTypeEnum.INT){
+				xCoordinates.add((short) w.getTile().getColumn());
+				yCoordinates.add((short) w.getTile().getRow());
+				
+			}	
 		}
-		
-		if(length == 1){
-			this.xlow = xCoordinates[0];
-			this.xhigh = this.xlow;
-			this.ylow = yCoordinates[0];
-			this.yhigh = this.ylow;
-		}else if(length == 2){
-			if(xCoordinates[0] < xCoordinates[1]){
-				this.xlow = xCoordinates[0];
-				this.xhigh = xCoordinates[1];
-			}else{
-				this.xlow = xCoordinates[1];
-				this.xhigh = xCoordinates[0];
-			}
-			if(yCoordinates[0] < yCoordinates[1]){
-				this.ylow = yCoordinates[0];
-				this.yhigh = yCoordinates[1];
-			}else{
-				this.ylow = yCoordinates[1];
-				this.yhigh = yCoordinates[0];
-			}
-		}else{
-			this.xlow = this.min(xCoordinates);
-			this.xhigh = this.max(xCoordinates);
-			this.ylow = this.min(yCoordinates);
-			this.yhigh = this.max(yCoordinates);
-		}
+		this.xlow = this.min(xCoordinates);
+		this.xhigh = this.max(xCoordinates);
+		this.ylow = this.min(yCoordinates);
+		this.yhigh = this.max(yCoordinates);
 	}
 	
-	public short max(short[] coordinates){
+	public short max(List<Short> coordinates){
 		short max = 0;
 		for(short c:coordinates){
 			if(c > max)
@@ -199,7 +178,7 @@ public class RoutableNode implements Routable{
 		}
 		return max;
 	}
-	public short min(short[] coordinates){
+	public short min(List<Short> coordinates){
 		short min = 10000;
 		for(short c:coordinates){
 			if(c < min)
@@ -281,7 +260,8 @@ public class RoutableNode implements Routable{
 
 	
 	public boolean isInBoundingBoxLimit(Connection con) {		
-		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
+//		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
+		return this.xlow > con.net.x_min_b && this.xhigh < con.net.x_max_b && this.ylow > con.net.y_min_b && this.yhigh < con.net.y_max_b;
 	}
 	
 	@Override
