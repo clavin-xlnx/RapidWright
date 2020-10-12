@@ -149,8 +149,10 @@ public class Connection{
 		
 		StringBuilder s = new StringBuilder();
 			
-		String coordinate = "(" + this.source.getTile().getColumn() + "," + this.source.getTile().getRow() + ") to (" 
-							+ this.sink.getTile().getColumn() + "," + this.sink.getTile().getRow() + ")";
+//		String coordinate = "(" + this.source.getTile().getColumn() + "," + this.source.getTile().getRow() + ") to (" 
+//							+ this.sink.getTile().getColumn() + "," + this.sink.getTile().getRow() + ")";
+		String coordinate = "(" + this.net.x_min_b + ", " + this.net.y_min_b + ") to (" 
+				+ this.net.x_max_b + ", " + this.net.y_max_b + ")";
 		
 		s.append("Con");
 		s.append(String.format("%6s", this.id));
