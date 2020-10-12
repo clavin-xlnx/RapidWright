@@ -13,6 +13,9 @@ public class RouterTimer {
 	public Timer calculateStatistics;
 	public Timer updateCost;
 	public Timer pipsAssignment;
+	public Timer rtgFilter;
+	public Timer checkOnEntryNodeCongestion;
+	public Timer checkIfEntryNodesRoutingValid;
 	
 	public RouterTimer() {
 		this.firstIteration = new Timer("first iteration");
@@ -27,6 +30,9 @@ public class RouterTimer {
 		this.calculateStatistics = new Timer("calc stat");
 		this.updateCost = new Timer("update cost");
 		this.pipsAssignment = new Timer("pips assignment");
+		this.rtgFilter = new Timer("rtg filter");
+		this.checkOnEntryNodeCongestion = new Timer("check on entry node congestion");
+		this.checkIfEntryNodesRoutingValid = new Timer("check if entry nodes routing valid");
 	}
 	
 	@Override
@@ -44,6 +50,9 @@ public class RouterTimer {
 		result += this.updateCost;
 		result += this.rerouteIllegal;
 		result += this.pipsAssignment;
+		result += this.rtgFilter;
+		result += this.checkOnEntryNodeCongestion;
+		result += this.checkIfEntryNodesRoutingValid;
 		
 		return result;
 	}
