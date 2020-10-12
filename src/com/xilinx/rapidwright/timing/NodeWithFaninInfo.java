@@ -2,7 +2,9 @@ package com.xilinx.rapidwright.timing;
 
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -18,6 +20,7 @@ public class NodeWithFaninInfo extends Node{
     CountingSet<Routable> parents;
     float pres_cost;
     float acc_cost;
+    public Set<Integer> entryHolders;
     
     static Map<Node, NodeWithFaninInfo> nodePairs;
     
@@ -53,6 +56,7 @@ public class NodeWithFaninInfo extends Node{
     
     public NodeWithFaninInfo(Wire wire){
         super(wire);
+        this.entryHolders = new HashSet<>();
     }
     
     public void setAccCost(float accCost){
