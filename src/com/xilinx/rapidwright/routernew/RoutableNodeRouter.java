@@ -51,6 +51,7 @@ public class RoutableNodeRouter{
 	
 	public List<Connection> sortedListOfConnection;
 	public List<Netplus> sortedListOfNetplus;
+	public List<Netplus> staticNets;
 
 	public RouteThruHelper routethruHelper;
 //	public RouterHelper routerHelper;
@@ -68,6 +69,7 @@ public class RoutableNodeRouter{
 	
 	public float mdWeight;
 	public float hopWeight;
+	public float averFanoutRNodes;
 	
 	public int rrgNodeId;
 	public int firstIterRNodes;
@@ -75,7 +77,10 @@ public class RoutableNodeRouter{
 	
 	public int connectionsRouted;
 	public long nodesExpanded;
+	public long nodesExpandedFirstIter;
 	public int connectionsRoutedIteration;
+	public long nodesPopedFromQueue;
+	public long nodesPopedFromQueueFirstIter;
 	
 	public Set<Integer> overUsedRNodes;
 	public Set<Integer> usedRNodes;
@@ -87,7 +92,9 @@ public class RoutableNodeRouter{
 	public boolean trial = false;
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
+	boolean printNodeInfo = false;
 	public float firtRnodeT;
+	
 	
 	public RoutableNodeRouter(Design design,
 			String dcpFileName,
@@ -130,6 +137,9 @@ public class RoutableNodeRouter{
 		this.connectionsRouted = 0;
 		this.connectionsRoutedIteration = 0;
 		this.nodesExpanded = 0;
+		this.nodesExpandedFirstIter = 0;
+		this.nodesPopedFromQueue = 0;
+		this.nodesPopedFromQueueFirstIter = 0;
 		
 		this.usedRNodes = new HashSet<>();
 		this.overUsedRNodes = new HashSet<>();
@@ -146,12 +156,13 @@ public class RoutableNodeRouter{
 		
 		this.nets = new ArrayList<>();
 		this.connections = new ArrayList<>();
+		this.staticNets = new ArrayList<>();
 		
 		DesignTools.createMissingSitePinInsts(this.design);
 		
 		for(Net n:this.design.getNets()){
 			
-			if(n.isClockNet() || n.isStaticNet()){
+			if(n.isClockNet()){
 				
 				if(n.hasPIPs()){
 					this.reservePipsOfNet(n);
@@ -160,6 +171,12 @@ public class RoutableNodeRouter{
 				}
 				this.iclockAndStaticNet++;
 				
+			}else if(n.isStaticNet()){
+				if(n.hasPIPs()){
+					this.reservePipsOfNet(n);
+				}else{
+					this.reserveConnectedNodesOfNetPins(n);
+				}
 			}else if (n.getType().equals(NetType.WIRE)){
 				
 				if(RouterHelper.isRegularNetToBeRouted(n)){
@@ -481,14 +498,14 @@ public class RoutableNodeRouter{
 		boolean validRouting;
         List<Netplus> trialNets = new ArrayList<>();
         for(Netplus net : this.sortedListOfNetplus){
-        	if(net.getId() == 49945 || net.getNet().getName().equals("n7b5")){
+        	if(net.getNet().getName().equals("opr[54]")){
         		trialNets.add(net);
         	}
         }
         
         List<Connection> trialCons = new ArrayList<>();
         for(Connection con : this.sortedListOfConnection){
-        	if(con.id == 113819 ||con.id == 1216){
+        	if(con.id == 3037){
         		trialCons.add(con);
         		/*con.pathFromSinkToSwitchBox = this.findInputPinFeed(con);
         		for(Routable rn:con.pathFromSinkToSwitchBox){
@@ -513,12 +530,17 @@ public class RoutableNodeRouter{
 					this.routingAndTimer(con);
 				}
 			}else{
-//				for(Netplus np : trialNets){
-//					for(Connection c : np.getConnection()){
-					for(Connection c : trialCons){
+				for(Netplus np : trialNets){
+					for(Connection c : np.getConnection()){
+//					for(Connection c : trialCons){
 						this.routingAndTimer(c);
 					}	
-//				}
+				}
+			}
+			
+			if(this.itry == 1){
+				this.nodesExpandedFirstIter = this.nodesExpanded;
+				this.nodesPopedFromQueueFirstIter = this.nodesPopedFromQueue;
 			}
 		
 			//check if routing is valid
@@ -528,12 +550,24 @@ public class RoutableNodeRouter{
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
 //				this.debugRoutingCon = true;//TODO fix cycles in the tree
+//				boolean printNodeInfo = true;
 				
 				//for fixing illegalTree using nodes
 				for(Connection con:this.sortedListOfConnection){
 					con.newNodes();
 					for(Routable rn:con.rnodes){
 						con.nodes.add(rn.getNode());//wire router should check if node has been added or not, different wires belong to same node
+						/*if(printNodeInfo == true){
+							if(rn.getNode().toString().equals("INT_X14Y111/WW2_W_BEG0")){
+								printNodeInfo = false;
+								System.out.println("Node INT_X14Y111/WW2_W_BEG0 wires:");
+								for(Wire wire:rn.getNode().getAllWiresInNode()){
+									Tile tile = wire.getTile();
+									System.out.println("wire " + wire.toString() + ": tile = " + tile.toString() 
+														+ ", tile column = " + tile.getColumn() + ", tile row = " + tile.getRow());
+								}
+							}
+						}*/
 					}
 				}
 				
@@ -682,12 +716,23 @@ public class RoutableNodeRouter{
 	public void getAllHopsAndManhattanD(){
 		//first check if routing is valid
 		int err = 0;
+		this.averFanoutRNodes = 0;
+		float sumChildren = 0;
+		float sumRNodes = 0;
 		for(RoutableNode rn:this.rnodesCreated.values()){
+			
+			if(rn.childrenSet){
+				sumChildren += rn.children.size();
+				sumRNodes++;
+			}
+			
 			if(rn.overUsed() || rn.illegal()){
 				System.err.println(rn.toString());//TODO because the fixingIllegalTree method in GraphHelper does not change records of RNodes
 				err++;
 			}
 		}
+		this.averFanoutRNodes = sumChildren / sumRNodes;
+		
 		if (err == 0){
 			System.out.println("\nNo errors found\n");
 		}else if(err > 0){
@@ -696,6 +741,7 @@ public class RoutableNodeRouter{
 		
 		this.hops = 0;
 		this.manhattanD = 0;
+		
 		Set<RoutableNode> netRNodes = new HashSet<>();
 		for(Netplus net:this.nets){	
 			for(Connection c:net.getConnection()){
@@ -1118,7 +1164,7 @@ public class RoutableNodeRouter{
 	}
 	
 	public void exploringAndExpansion(RoutableNode rnode, Connection con){
-		this.nodesExpanded++;
+		this.nodesPopedFromQueue++;
 		
 		if(this.debugExpansion){
 			this.printInfo("\t" + " exploring rnode " + rnode.toString());
@@ -1126,15 +1172,30 @@ public class RoutableNodeRouter{
 		if(this.debugExpansion) this.printInfo("\t starting  queue size: " + this.queue.size());
 		for(RoutableNode childRNode:rnode.children){
 			
+			/*if(printNodeInfo){
+				if(childRNode.getNode().toString().equals("INT_X14Y111/WW2_W_BEG0")){
+					printNodeInfo = false;
+					System.out.println("Node INT_X14Y111/WW2_W_BEG0 " + childRNode.toString());
+					System.out.println("Node INT_X14Y111/WW2_W_BEG0 wires:");
+					for(Wire wire:childRNode.getNode().getAllWiresInNode()){
+						Tile tile = wire.getTile();
+						System.out.println("wire " + wire.toString() + ": tile = " + tile.toString() 
+											+ ", tile column = " + tile.getColumn() + ", tile row = " + tile.getRow());
+					}
+				}
+			}*/
+			
 			if(childRNode.isTarget()){		
 				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
 				this.addNodeToQueue(rnode, childRNode, con);
+				this.nodesExpanded++;
 				
 			}else if(childRNode.type.equals(RoutableType.INTERRR)){
 				//this can be done by downsizing the created rnodes
 				if(childRNode.isInBoundingBoxLimit(con)){
 					if(this.debugExpansion) this.printInfo("\t\t" + " add node to the queue");
 					this.addNodeToQueue(rnode, childRNode, con);
+					this.nodesExpanded++;
 					if(this.debugExpansion) this.printInfo("");
 				}	
 			}
