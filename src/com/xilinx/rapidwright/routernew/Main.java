@@ -28,6 +28,7 @@ public class Main {
 	private float acc_fac = 1;
 	private float base_cost_fac = 1;
 	private boolean timingDriven = false;
+	private boolean partialRouting = false;
 	
 	public Main(String[] arguments) {
 		if(arguments.length < 2){
@@ -84,6 +85,9 @@ public class Main {
 				
 			}else if(arguments[i].contains("timingDriven")){
 				this.timingDriven = true;
+				
+			}else if(arguments[i].contains("partialRouting")){
+				this.partialRouting = true;
 			}
 		}
 	}
@@ -123,7 +127,8 @@ public class Main {
 						this.initial_pres_fac,
 						this.pres_fac_mult,
 						this.acc_fac,
-						this.base_cost_fac);
+						this.base_cost_fac,
+						this.partialRouting);
 				
 				router.designInfo();
 				this.routerConfigurationInfo();

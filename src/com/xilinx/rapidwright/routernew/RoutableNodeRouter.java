@@ -89,6 +89,8 @@ public class RoutableNodeRouter{
 	public long hops;
 	public float manhattanD;
 	
+	public boolean partialRouting;
+	
 	public boolean trial = false;
 	public boolean debugRoutingCon = false;
 	public boolean debugExpansion = false;
@@ -106,7 +108,8 @@ public class RoutableNodeRouter{
 			float initial_pres_fac, 
 			float pres_fac_mult, 
 			float acc_fac,
-			float base_cost_fac){
+			float base_cost_fac,
+			boolean partialRouting){
 		this.design = design;
 		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
@@ -122,6 +125,8 @@ public class RoutableNodeRouter{
 		this.base_cost_fac = base_cost_fac;
 		this.mdWeight = mdWeight;
 		this.hopWeight = hopWeight;
+		
+		this.partialRouting = partialRouting;
 		
 		this.routerTimer = new RouterTimer();
 		this.fanout1Net = 0;
@@ -180,7 +185,22 @@ public class RoutableNodeRouter{
 			}else if (n.getType().equals(NetType.WIRE)){
 				
 				if(RouterHelper.isRegularNetToBeRouted(n)){
-					this.initializeNetAndCons(n, bbRange);
+					if(!this.partialRouting){
+						n.unroute();
+						this.initializeNetAndCons(n, bbRange);
+					}else{
+//						if(n.toString().equals("opr[54]") || n.toString().equals("n1a4") || n.toString().equals("n1a2")){
+//							n.unroute();//for partially routed dcps
+//							continue;
+//						}else{
+							if(n.hasPIPs()){
+								this.reservePipsOfNet(n);
+							}else{
+								this.initializeNetAndCons(n, bbRange);
+							}
+//						}
+						
+					}
 					
 				}else if(RouterHelper.isOneTypePinNet(n)){
 					this.reserveConnectedNodesOfNetPins(n);
@@ -201,7 +221,7 @@ public class RoutableNodeRouter{
 	}
 
 	public void initializeNetAndCons(Net n, short bbRange){
-		n.unroute();
+		
 		Netplus np = new Netplus(inetToBeRouted, bbRange, n);
 		this.nets.add(np);
 		this.inetToBeRouted++;
