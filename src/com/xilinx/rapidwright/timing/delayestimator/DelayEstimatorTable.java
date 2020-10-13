@@ -136,7 +136,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      *
      * The beginning timing group can be of type Global or Bounce. However, Bounce is used to jump around within the INT tile of the sink.
      * Thus, it must not be considered until the router expansion is at the sink column.
-     * If you call from bounce node to a sink node in different coloumns, the model don’t store x coordinate.
+     * If you call from bounce node to a sink node in different coloumns, the model don't store x coordinate.
      *
      * @param timingGroup Timing group at the beginning of the route
      * @param sinkPin     Timing group at the end. It must be a sinkPin
@@ -2289,15 +2289,18 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                         est.rgBuilder.merge(name);
                     }
                 }
+                String outFileName = args[1] + "_merge" + ".ser";
+                est.rgBuilder.serializeTo(outFileName);
                 return;
             }
         }
 
+        est.rgBuilder.deserializeFrom("test_merge.ser");
 //        est.rgBuilder.serializeTo(args[1] + ".ser");
 //        est.rgBuilder.deserializeFrom(args[1] + ".ser");
 
 //        est.testBounceToSink();
-        est.testSpecialCase(device);
+//        est.testSpecialCase(device);
 
 
 //        long endBuildTime = System.nanoTime();
@@ -2305,11 +2308,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
 //
 //
-//        int count = 0;
+        int count = 0;
 //
-//        long startLookupTime = System.nanoTime();
+        long startLookupTime = System.nanoTime();
 //        // diagonal in table
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
 //        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
 //        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
 //        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
@@ -2321,8 +2324,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
 //
 //
-//        long endLookupTime = System.nanoTime();
-//        long elapsedLookupTime = endLookupTime - startLookupTime;
+        long endLookupTime = System.nanoTime();
+        long elapsedLookupTime = endLookupTime - startLookupTime;
 //
 //
 //        System.out.println();
