@@ -91,10 +91,10 @@ public class RoutableNodeRouter{
 	
 	public boolean partialRouting;
 	
-	public boolean trial = false;
-	public boolean debugRoutingCon = false;
-	public boolean debugExpansion = false;
-	boolean printNodeInfo = false;
+	public boolean trial = true;
+	public boolean debugRoutingCon = true;
+	public boolean debugExpansion = true;
+	boolean printNodeInfo = true;
 	public float firtRnodeT;
 	
 	
@@ -168,42 +168,36 @@ public class RoutableNodeRouter{
 		for(Net n:this.design.getNets()){
 			
 			if(n.isClockNet()){
-				
-				if(n.hasPIPs()){
-					this.reservePipsOfNet(n);
-				}else{
-					this.reserveConnectedNodesOfNetPins(n);
-				}
+				this.reserveNet(n);
 				this.iclockAndStaticNet++;
 				
 			}else if(n.isStaticNet()){
-				if(n.hasPIPs()){
-					this.reservePipsOfNet(n);
-				}else{
-					this.reserveConnectedNodesOfNetPins(n);
-				}
+				this.reserveNet(n);
+				this.iclockAndStaticNet++;
+				
 			}else if (n.getType().equals(NetType.WIRE)){
 				
 				if(RouterHelper.isRegularNetToBeRouted(n)){
 					if(!this.partialRouting){
+						if(n.getName().equals("tile2_2/rxByteCount_reg[4]")) System.out.println(n.toStringFull());
 						n.unroute();
 						this.initializeNetAndCons(n, bbRange);
 					}else{
 //						if(n.toString().equals("opr[54]") || n.toString().equals("n1a4") || n.toString().equals("n1a2")){
-//							n.unroute();//for partially routed dcps
+//							n.unroute();//for creating partially routed dcps
 //							continue;
 //						}else{
-							if(n.hasPIPs()){
-								this.reservePipsOfNet(n);
-							}else{
-								this.initializeNetAndCons(n, bbRange);
-							}
+							this.reserveNet(n);
 //						}
 						
 					}
 					
 				}else if(RouterHelper.isOneTypePinNet(n)){
-					this.reserveConnectedNodesOfNetPins(n);
+//					System.out.println(n.toStringFull());//S_CONTROL_USS/tile2_3_control_S_AXI_ARADDR[1],
+					//S_CONTROL_USS/tile1_4_control_S_AXI_ARADDR[3]
+					//S_CONTROL_USS/tile1_1_control_S_AXI_ARADDR[1]
+					//S_CONTROL_USS/tile1_3_control_S_AXI_WDATA[26]
+					this.reserveNet(n);
 					this.iWireOneTypePin++;
 					
 				}else if(RouterHelper.isNoPinNets(n)){
@@ -219,7 +213,15 @@ public class RoutableNodeRouter{
 		
 		return rrgNodeId;
 	}
-
+	
+	public void reserveNet(Net n){
+		if(n.hasPIPs()){
+			this.reservePipsOfNet(n);
+		}else{
+			this.reserveConnectedNodesOfNetPins(n);
+		}
+	}
+	
 	public void initializeNetAndCons(Net n, short bbRange){
 		
 		Netplus np = new Netplus(inetToBeRouted, bbRange, n);
@@ -518,14 +520,14 @@ public class RoutableNodeRouter{
 		boolean validRouting;
         List<Netplus> trialNets = new ArrayList<>();
         for(Netplus net : this.sortedListOfNetplus){
-        	if(net.getNet().getName().equals("opr[54]")){
+        	if(net.getNet().getName().equals("tile2_2/rxByteCount_reg[4]")){
         		trialNets.add(net);
         	}
         }
         
         List<Connection> trialCons = new ArrayList<>();
         for(Connection con : this.sortedListOfConnection){
-        	if(con.id == 3037){
+        	if(con.id == 39702){
         		trialCons.add(con);
         		/*con.pathFromSinkToSwitchBox = this.findInputPinFeed(con);
         		for(Routable rn:con.pathFromSinkToSwitchBox){
@@ -550,12 +552,12 @@ public class RoutableNodeRouter{
 					this.routingAndTimer(con);
 				}
 			}else{
-				for(Netplus np : trialNets){
-					for(Connection c : np.getConnection()){
-//					for(Connection c : trialCons){
+//				for(Netplus np : trialNets){
+//					for(Connection c : np.getConnection()){
+					for(Connection c : trialCons){
 						this.routingAndTimer(c);
 					}	
-				}
+//				}
 			}
 			
 			if(this.itry == 1){
@@ -1190,20 +1192,34 @@ public class RoutableNodeRouter{
 			this.printInfo("\t" + " exploring rnode " + rnode.toString());
 		}
 		if(this.debugExpansion) this.printInfo("\t starting  queue size: " + this.queue.size());
+		
+		if(rnode.getNode().toString().equals("INT_X17Y542/INT_NODE_IMUX_59_INT_OUT1") ||
+				rnode.getNode().toString().equals("INT_X17Y542/INT_NODE_IMUX_49_INT_OUT1")){
+			
+			System.out.println(rnode.toString() + " children rnodes: ");
+			for(RoutableNode child:rnode.children){
+				System.out.println(child.toString());
+				System.out.println(child.isTarget());
+				if(child.getNode().toString().equals("INT_X17Y542/BYPASS_W14") || child.getNode().toString().equals("INT_X17Y542/BYPASS_W8")){
+					System.out.println(child.getNode().toString() + "connected sitepin " + child.getNode().getSitePin().toString());
+				}
+			}
+		}
+		
 		for(RoutableNode childRNode:rnode.children){
 			
-			/*if(printNodeInfo){
-				if(childRNode.getNode().toString().equals("INT_X14Y111/WW2_W_BEG0")){
+			if(printNodeInfo){
+				if(childRNode.getNode().toString().equals("INT_X17Y542/BYPASS_W8")){
 					printNodeInfo = false;
-					System.out.println("Node INT_X14Y111/WW2_W_BEG0 " + childRNode.toString());
-					System.out.println("Node INT_X14Y111/WW2_W_BEG0 wires:");
+					System.out.println("INT_X17Y542/BYPASS_W8 " + childRNode.toString());
+					System.out.println("INT_X17Y542/BYPASS_W8 wires:");
 					for(Wire wire:childRNode.getNode().getAllWiresInNode()){
 						Tile tile = wire.getTile();
 						System.out.println("wire " + wire.toString() + ": tile = " + tile.toString() 
 											+ ", tile column = " + tile.getColumn() + ", tile row = " + tile.getRow());
 					}
 				}
-			}*/
+			}
 			
 			if(childRNode.isTarget()){		
 				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
@@ -1330,6 +1346,12 @@ public class RoutableNodeRouter{
 		//set the sink rrg node of con as the target
 		RoutableNode sink = (RoutableNode) con.getSinkRNode();
 		sink.target = true;
+		
+		if(con.id == 39702){
+			System.out.println(sink.toString());
+			System.out.println(sink.isTarget());
+			System.out.println();
+		}
 		
 		// Add source to queue
 		RoutableNode source = (RoutableNode) con.getSourceRNode();
