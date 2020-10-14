@@ -11,11 +11,18 @@ public class TimingGroupEdge extends DefaultWeightedEdge {
 
     private TimingGroup tg;
     private boolean     reverseDirection;
+    private boolean     marker;
 
     public TimingGroup getTimingGroup() {
         return tg;
     }
     public boolean isReverseDirection() { return reverseDirection; }
+    public void setMarker() {
+        this.marker = true;
+    }
+    public boolean isMarked() {
+        return this.marker;
+    }
 
     TimingGroupEdge(TimingGroup tg, boolean reverseDirection) {
         this.tg = tg;

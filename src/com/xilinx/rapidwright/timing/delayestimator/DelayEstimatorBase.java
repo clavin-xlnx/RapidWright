@@ -69,7 +69,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 
     protected int   verbose;
     // this is only need DelayEstimatorTable.loadBounceDelay
-    protected Device device;
+    protected transient Device device;
 
 
 

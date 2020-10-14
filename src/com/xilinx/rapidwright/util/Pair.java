@@ -29,7 +29,7 @@ package com.xilinx.rapidwright.util;
  *
  * @param <T>
  */
-public class Pair<T,U> {
+public class Pair<T,U> implements java.io.Serializable {
 
 	private T first;
 	
