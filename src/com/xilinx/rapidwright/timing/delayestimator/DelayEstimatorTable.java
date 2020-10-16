@@ -1150,7 +1150,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         // for testing , will come from member fields later.
         short maxX = 107;
         short minX = 0;
-        short yCoor = 20;
+        short yCoor = 60;
 
         // sweep across the chip
         int itr = 0;
@@ -2404,7 +2404,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 
 
-        short yCoor = 20;
+        short yCoor = 60;
 
 
         if ((args.length > 0) && (!args[0].startsWith("#")))  {
@@ -2507,12 +2507,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
 //        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
 //        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
-//
-//          //  out of table
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
+
+          //  out of table
+        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
 
         long endLookupTime = System.nanoTime();
         long elapsedLookupTime = endLookupTime - startLookupTime;
@@ -2527,7 +2527,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 ////        est.testOne(37, 53, 60, 90, "E", "E");
 ////        est.testOne(37, 37, 90, 60, "E", "E");
 ////        est.testOne(37, 37, 60, 90, "E", "E");
-       est.testOne(44, 49, 123, 123, "W", "E");
+//       est.testOne(44, 49, 123, 123, "W", "E");
 ////        est.testOne(44, 49, 123, 138, "E", "E");
 ////        est.testOne(44, 45, 121, 137, "E", "E");
 ////        est.testOne(44, 45, 124, 124, "E", "W");
@@ -2538,8 +2538,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     }
 }
 
-
-
+// sweepx          num nodes 8300, num edges 39581   2.4ms for in table
+// (crash for out of table during test)
+// previous (onex) num nodes 8525, num edges 24874   0.490ms for in table
+//                                                   0.57ms  for out table
+//                                                   0.47ms  combine
 
 
 
