@@ -991,8 +991,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             // connect from outside the table
             short minX = botLeft.getFirst();
             short minY = botLeft.getSecond();
-            short maxX = (short) (topRight.getFirst()); // get exclusive high end
-            short maxY = (short) (topRight.getSecond());
+            short maxX = (short) (topRight.getFirst() +1); // get exclusive high end
+            short maxY = (short) (topRight.getSecond() +1);
             Rectangle box = new Rectangle(minX, minY, maxX, maxY);
 
             for (short j = 0; j < T.maxTgLength(T.Direction.VERTICAL); j++) {
@@ -1248,6 +1248,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             }
 
             // for global
+            // TODO: should be combined with the loop above
             System.out.println("trim global");
             for (short x = minX; x < maxX; x++) {
                 for (short y = minY; y < maxY; y++) {
@@ -2538,17 +2539,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     }
 }
 
-// sweepx          num nodes 8300, num edges 39581   2.4ms for in table
-// (crash for out of table during test)
 // previous (onex) num nodes 8525, num edges 24874   0.490ms for in table
 //                                                   0.57ms  for out table
 //                                                   0.47ms  combine
-
-
-
-
-
-
-
-
+// atx50   nodes 7435 edges 22829                    0.6ms in table
+//                                                   crash out table
+// sweepx  nodes 8399 edges 40615                    2.2ms in table
+//                                                   crash out table
+// need to try trim only for in table, both sweep and x50
 
