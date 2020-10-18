@@ -76,6 +76,13 @@ import java.util.regex.Pattern;
  */
 public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstimatorBase<T> implements java.io.Serializable {
 
+
+    DelayEstimatorTable(Device device, T ictInfo) {
+        this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), 0);
+        String inFileName = "onex_merge.ser";
+        this.rgBuilder.deserializeFrom(inFileName);
+    }
+
     /**
      * Constructor from a device.
      *
@@ -885,12 +892,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 for (TimingGroupEdge e : edgesToRemove)
                     g.removeEdge(e);
 
-                    List<Object> verticesToRemove = new ArrayList<>();
-                    for (Object v : g.vertexSet()) {
-                        if (g.degreeOf(v) == 0) {
-                            verticesToRemove.add(v);
-                        }
+                List<Object> verticesToRemove = new ArrayList<>();
+                for (Object v : g.vertexSet()) {
+                    if (g.degreeOf(v) == 0) {
+                        verticesToRemove.add(v);
                     }
+                }
 //                for (int i = 0; i < 1000; i++)  {
 //                    List<Object> verticesToRemove = new ArrayList<>();
 //                    for (Object v : g.vertexSet()) {
@@ -1169,8 +1176,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     short m = (short) (srcCoor.getFirst() + ((frOrientation == T.Orientation.U) ? +deltaX : -deltaX));
                     short n = (short) (srcCoor.getSecond() + ((frOrientation == T.Orientation.U) ? +deltaY : -deltaY));
 
+                    System.out.println("frtg " + frTg + " " + srcCoor + " " + m + " " + n);
                     if (!box.contains(m, n))
                         continue;
+                    System.out.println("frtg " + frTg + " " + srcCoor + " " + m + " " + n + " in");
 
                     // sweep over possible sink tg
                     for (T.TileSide toSide : toTg.getExsistence()) {
@@ -1300,7 +1309,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
             System.out.println("trim external vertical");
             for (short j = 0; j < T.maxTgLength(T.Direction.VERTICAL); j++) {
-                for (short x = minX; x < maxX; x++) {
+                for (short x = 15; x <= 15; x++) {
+//                    short x = minX; x < maxX; x++
                     { // from bottom
                         // start (j=0) one row below the target box
                         short y = (short) (minY - j - 1);
@@ -1310,15 +1320,15 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                                     box, toTg, new Pair<>(x, y), endPoint, xCoor, yCoor);
                         }
                     }
-                    { // from top
-                        // start (j=0) at maxY. Note maxY is exclusive
-                        short y = (short) (maxY + j);
-                        for (Pair<Short, Short> endPoint : endPoints) {
-//                            System.out.println("top " + j + " " + y + " " + x + " " + endPoint);
-                            trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL)),
-                                    box, toTg, new Pair<>(x, y), endPoint, xCoor, yCoor);
-                        }
-                    }
+//                    { // from top
+//                        // start (j=0) at maxY. Note maxY is exclusive
+//                        short y = (short) (maxY + j);
+//                        for (Pair<Short, Short> endPoint : endPoints) {
+////                            System.out.println("top " + j + " " + y + " " + x + " " + endPoint);
+//                            trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL)),
+//                                    box, toTg, new Pair<>(x, y), endPoint, xCoor, yCoor);
+//                        }
+//                    }
                 }
             }
 
@@ -2402,7 +2412,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 2, (short) 2, 6);
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
+//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo);
 
 
         short yCoor = 60;
@@ -2504,13 +2515,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         long startLookupTime = System.nanoTime();
         // diagonal in table
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
 
-          //  out of table
-        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
+        //  out of table
+        count += est.testCases("est_dly_ref_37_71_60_239_E_E_temp.txt");
         count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
         count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
         count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
@@ -2524,7 +2535,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
         System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
 
-//        est.testOne(61, 37, 90, 60, "E", "W");
+//        est.testOne(37, 37, 60, 90, "E", "W");
 ////        est.testOne(37, 53, 60, 90, "E", "E");
 ////        est.testOne(37, 37, 90, 60, "E", "E");
 ////        est.testOne(37, 37, 60, 90, "E", "E");
