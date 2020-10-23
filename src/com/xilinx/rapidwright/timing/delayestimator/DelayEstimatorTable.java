@@ -1309,7 +1309,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
             System.out.println("trim external vertical");
             for (short j = 0; j < T.maxTgLength(T.Direction.VERTICAL); j++) {
-                for (short x = 15; x <= 15; x++) {
+                for (short x = minX; x < maxX; x++) {
 //                    short x = minX; x < maxX; x++
                     { // from bottom
                         // start (j=0) one row below the target box
@@ -2495,6 +2495,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 est.rgBuilder.deserializeFrom(inFileName);
             }
             else if (args[0].equalsIgnoreCase("TestOct23")) {
+                est.trimTableAt((short)50,(short)60,true);
                 est.trimTableAt((short)50,(short)60,false);
                 est.rgBuilder.removeUnmarked();
                 est.rgBuilder.serializeTo("testoct23_merge.ser");
