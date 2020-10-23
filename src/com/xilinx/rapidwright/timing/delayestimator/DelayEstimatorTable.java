@@ -2510,36 +2510,36 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        est.testSpecialCase(device);
 
 
-//        long endBuildTime = System.nanoTime();
-//        long elapsedBuildTime = endBuildTime - startTime;
-//        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-//
-//
-//        int count = 0;
-//
-//        long startLookupTime = System.nanoTime();
-//        // diagonal in table
+        long endBuildTime = System.nanoTime();
+        long elapsedBuildTime = endBuildTime - startTime;
+        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+
+
+        int count = 0;
+
+        long startLookupTime = System.nanoTime();
+        // diagonal in table
 //        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
 //        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
 //        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
 //        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
-//
-//        //  out of table
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_E_temp.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
-//
-//        long endLookupTime = System.nanoTime();
-//        long elapsedLookupTime = endLookupTime - startLookupTime;
-//
-//
-//        System.out.println();
-//        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-//        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
-//        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
 
-        est.testOne(37, 37, 60, 120, "E", "E");
+        //  out of table
+        count += est.testCases("est_dly_ref_37_71_60_239_E_E_temp.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
+
+        long endLookupTime = System.nanoTime();
+        long elapsedLookupTime = endLookupTime - startLookupTime;
+
+
+        System.out.println();
+        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
+        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
+
+//        est.testOne(37, 37, 60, 120, "E", "E");
 ////        est.testOne(37, 53, 60, 90, "E", "E");
 ////        est.testOne(37, 37, 90, 60, "E", "E");
 ////        est.testOne(37, 37, 60, 90, "E", "E");
