@@ -1176,10 +1176,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     short m = (short) (srcCoor.getFirst() + ((frOrientation == T.Orientation.U) ? +deltaX : -deltaX));
                     short n = (short) (srcCoor.getSecond() + ((frOrientation == T.Orientation.U) ? +deltaY : -deltaY));
 
-                    System.out.println("frtg " + frTg + " " + srcCoor + " " + m + " " + n);
+//                    System.out.println("frtg " + frTg + " " + srcCoor + " " + m + " " + n);
                     if (!box.contains(m, n))
                         continue;
-                    System.out.println("frtg " + frTg + " " + srcCoor + " " + m + " " + n + " in");
+//                    System.out.println("frtg " + frTg + " " + srcCoor + " " + m + " " + n + " in");
 
                     // sweep over possible sink tg
                     for (T.TileSide toSide : toTg.getExsistence()) {
@@ -1290,10 +1290,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             short maxY = (short) (topRight.getSecond() + 1);
             Rectangle box = new Rectangle(minX, minY, maxX, maxY);
             List<Pair<Short, Short>> endPoints = new ArrayList<Pair<Short, Short>>() {{
-//                add(topLeft);
-//                add(topRight);
+                add(topLeft);
+                add(topRight);
                 add(botLeft);
-//                add(botRight);
+                add(botRight);
             }};
 //            short minX = (short) (T.maxTgLength(T.Direction.HORIZONTAL) + 1); // to not start below 0
 //            short minY = (short) (T.maxTgLength(T.Direction.VERTICAL) + 1);
@@ -1320,15 +1320,15 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                                     box, toTg, new Pair<>(x, y), endPoint, xCoor, yCoor);
                         }
                     }
-//                    { // from top
-//                        // start (j=0) at maxY. Note maxY is exclusive
-//                        short y = (short) (maxY + j);
-//                        for (Pair<Short, Short> endPoint : endPoints) {
-////                            System.out.println("top " + j + " " + y + " " + x + " " + endPoint);
-//                            trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL)),
-//                                    box, toTg, new Pair<>(x, y), endPoint, xCoor, yCoor);
-//                        }
-//                    }
+                    { // from top
+                        // start (j=0) at maxY. Note maxY is exclusive
+                        short y = (short) (maxY + j);
+                        for (Pair<Short, Short> endPoint : endPoints) {
+//                            System.out.println("top " + j + " " + y + " " + x + " " + endPoint);
+                            trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) -> (e.direction() == T.Direction.VERTICAL)),
+                                    box, toTg, new Pair<>(x, y), endPoint, xCoor, yCoor);
+                        }
+                    }
                 }
             }
 
@@ -2415,9 +2415,6 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo);
 
-        est.trimTableAt((short)50,(short)60,false);
-        est.rgBuilder.removeUnmarked();
-
         short yCoor = 60;
 
 
@@ -2496,6 +2493,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
                 String inFileName = args[1] + "_merge" + ".ser";
                 est.rgBuilder.deserializeFrom(inFileName);
+            }
+            else if (args[0].equalsIgnoreCase("TestOct23")) {
+                est.trimTableAt((short)50,(short)60,false);
+                est.rgBuilder.removeUnmarked();
+                est.rgBuilder.serializeTo("testoct23_merge.ser");
             }
         }
 
