@@ -1236,7 +1236,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             short minY = 0;
             short maxX = width;
             short maxY = height;
-            Rectangle box = new Rectangle(minX, minY, maxX, maxY);
+            Rectangle box = new Rectangle((short) 0, (short) 0, extendedWidth, extendedHeight);
             List<Pair<Short, Short>> endPoints = new ArrayList<Pair<Short, Short>>() {{
                 add(new Pair<>(minX,minY));
                 add(new Pair<>(minX,maxY));
@@ -1245,8 +1245,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             }};
 
             // sweep over possible route within a table
-            for (short srcX = minX; srcX < maxX; srcX++) {
-                for (short srcY = minY; srcY < maxY; srcY++) {
+            for (short srcX = botLeft.getFirst(); srcX <= botRight.getFirst(); srcX++) {
+                for (short srcY = botLeft.getSecond(); srcY <= topLeft.getSecond(); srcY++) {
                     for (Pair<Short, Short> endPoint : endPoints) {
                         // sweep over possible source tg
                         trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) ->
@@ -1259,8 +1259,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             // for global
             // TODO: should be combined with the loop above
             System.out.println("trim global");
-            for (short x = minX; x < maxX; x++) {
-                for (short y = minY; y < maxY; y++) {
+            for (short x = botLeft.getFirst(); x <= botRight.getFirst(); x++) {
+                for (short y = botLeft.getSecond(); y <= topLeft.getSecond(); y++) {
                     for (Pair<Short, Short> endPoint : endPoints) {
                         trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) -> (e.type() == GroupDelayType.GLOBAL)),
                                 box, toTg, new Pair<>(x, y), endPoint, xCoor, yCoor);
@@ -1596,9 +1596,6 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         short distY = (short) (endY - begY);
 
         Pair<Short, Short> sourceCoor = new Pair<>((short) (sinkCoor.getFirst() - distX), (short) (sinkCoor.getSecond() - distY));
-
-        Pair<Pair<Short, Short>, Pair<T.Orientation, T.TileSide>> sourceLoc = new Pair<>(sourceCoor, new Pair<>(srcOrientation, begSide));
-        Pair<Pair<Short, Short>, Pair<T.Orientation, T.TileSide>> sinkLoc   = new Pair<>(sinkCoor, new Pair<>(dstOrientation, endSide));
 
         Object sourceNode = rgBuilder.getNode(sourceCoor.getFirst(), sourceCoor.getSecond(), srcOrientation, begSide, begTg);
         Object sinkNode   = rgBuilder.getNode(sinkCoor.getFirst(), sinkCoor.getSecond(), dstOrientation, endSide, endTg);
@@ -2399,10 +2396,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 ///        ImmutableTimingGroup src = createTG("INT_X14Y117/EE4_E_BEG6", "INT_X14Y117/INT_NODE_SDQ_38_INT_OUT0", device);
 ///        ImmutableTimingGroup dst = createTG("INT_X15Y98/IMUX_W11", "INT_X15Y98/INT_NODE_IMUX_44_INT_OUT0", device );
-        ImmutableTimingGroup src = createTG("INT_X18Y115/WW12_BEG6" ,  device);
-        ImmutableTimingGroup dst = createTG("INT_X18Y96/IMUX_W34","INT_X18Y96/INT_NODE_IMUX_40_INT_OUT0",  device );
-//        ImmutableTimingGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
-//        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E32","INT_X10Y111/INT_NODE_IMUX_10_INT_OUT0",  device );
+///        ImmutableTimingGroup src = createTG("INT_X18Y115/WW12_BEG6" ,  device);
+///        ImmutableTimingGroup dst = createTG("INT_X18Y96/IMUX_W34","INT_X18Y96/INT_NODE_IMUX_40_INT_OUT0",  device );
+        ImmutableTimingGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
+        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E32","INT_X10Y111/INT_NODE_IMUX_10_INT_OUT0",  device );
 //        ImmutableTimingGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
 //        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E37" ,"INT_X10Y111/INT_NODE_IMUX_12_INT_OUT0",  device );
 
@@ -2516,7 +2513,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        est.rgBuilder.deserializeFrom(args[1] + ".ser");
 
 //        est.testBounceToSink();
-        est.testSpecialCase(device);
+//        est.testSpecialCase(device);
 
 
         long endBuildTime = System.nanoTime();
@@ -2528,10 +2525,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         long startLookupTime = System.nanoTime();
         // diagonal in table
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
 
         //  out of table
 //        count += est.testCases("est_dly_ref_37_71_60_239_E_E_temp.txt");
