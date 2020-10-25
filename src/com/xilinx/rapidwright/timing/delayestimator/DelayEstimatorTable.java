@@ -1238,13 +1238,18 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             short maxY = height;
             Rectangle box = new Rectangle((short) 0, (short) 0, extendedWidth, extendedHeight);
             List<Pair<Short, Short>> endPoints = new ArrayList<Pair<Short, Short>>() {{
-                add(new Pair<>(minX,minY));
-                add(new Pair<>(minX,maxY));
-                add(new Pair<>(maxX,minY));
-                add(new Pair<>(maxX,maxY));
+//                add(new Pair<>(minX,minY));
+//                add(new Pair<>(minX,maxY));
+//                add(new Pair<>(maxX,minY));
+//                add(new Pair<>(maxX,maxY));
+                add(botLeft);
+                add(botRight);
+                add(topLeft);
+                add(topRight);
             }};
 
             // sweep over possible route within a table
+            System.out.println("trim in table");
             for (short srcX = botLeft.getFirst(); srcX <= botRight.getFirst(); srcX++) {
                 for (short srcY = botLeft.getSecond(); srcY <= topLeft.getSecond(); srcY++) {
                     for (Pair<Short, Short> endPoint : endPoints) {
@@ -2525,10 +2530,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         long startLookupTime = System.nanoTime();
         // diagonal in table
-        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
 
         //  out of table
 //        count += est.testCases("est_dly_ref_37_71_60_239_E_E_temp.txt");
