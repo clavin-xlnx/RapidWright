@@ -79,7 +79,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     DelayEstimatorTable(Device device, T ictInfo) {
         this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), 0);
-        String inFileName = "onex_merge.ser";
+        String inFileName = "onexwithdetour.ser";
+//        String inFileName = "onex_merge.ser";
         this.rgBuilder.deserializeFrom(inFileName);
     }
 
@@ -2399,14 +2400,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     void testSpecialCase(Device device) {
         verbose = 6;
 
-///        ImmutableTimingGroup src = createTG("INT_X14Y117/EE4_E_BEG6", "INT_X14Y117/INT_NODE_SDQ_38_INT_OUT0", device);
-///        ImmutableTimingGroup dst = createTG("INT_X15Y98/IMUX_W11", "INT_X15Y98/INT_NODE_IMUX_44_INT_OUT0", device );
-///        ImmutableTimingGroup src = createTG("INT_X18Y115/WW12_BEG6" ,  device);
-///        ImmutableTimingGroup dst = createTG("INT_X18Y96/IMUX_W34","INT_X18Y96/INT_NODE_IMUX_40_INT_OUT0",  device );
-        ImmutableTimingGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
-        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E32","INT_X10Y111/INT_NODE_IMUX_10_INT_OUT0",  device );
+//        ImmutableTimingGroup src = createTG("INT_X14Y117/EE4_E_BEG6", "INT_X14Y117/INT_NODE_SDQ_38_INT_OUT0", device);
+//        ImmutableTimingGroup dst = createTG("INT_X15Y98/IMUX_W11", "INT_X15Y98/INT_NODE_IMUX_44_INT_OUT0", device );
+//        ImmutableTimingGroup src = createTG("INT_X18Y115/WW12_BEG6" ,  device);
+//        ImmutableTimingGroup dst = createTG("INT_X18Y96/IMUX_W34","INT_X18Y96/INT_NODE_IMUX_40_INT_OUT0",  device );
 //        ImmutableTimingGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
-//        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E37" ,"INT_X10Y111/INT_NODE_IMUX_12_INT_OUT0",  device );
+//        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E32","INT_X10Y111/INT_NODE_IMUX_10_INT_OUT0",  device );
+        ImmutableTimingGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
+        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E37" ,"INT_X10Y111/INT_NODE_IMUX_12_INT_OUT0",  device );
 
 
         short dly = getMinDelayToSinkPin(src, dst);
@@ -2422,8 +2423,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 2, (short) 2, 6);
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
-//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo);
+//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo);
 
         short yCoor = 60;
 
@@ -2530,16 +2531,16 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         long startLookupTime = System.nanoTime();
         // diagonal in table
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
 
         //  out of table
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_E_temp.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_E_E_temp.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
 
         long endLookupTime = System.nanoTime();
         long elapsedLookupTime = endLookupTime - startLookupTime;
