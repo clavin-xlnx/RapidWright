@@ -16,6 +16,9 @@ public class RouterTimer {
 	public Timer rtgFilter;
 	public Timer checkOnEntryNodeCongestion;
 	public Timer checkIfEntryNodesRoutingValid;
+	public Timer addRNodeToQueueEvaluation;
+	public Timer addRNodeToQueuePushing;
+	public Timer getRouteNodeCost;
 	
 	public RouterTimer() {
 		this.firstIteration = new Timer("first iteration");
@@ -33,6 +36,9 @@ public class RouterTimer {
 		this.rtgFilter = new Timer("rtg filter");
 		this.checkOnEntryNodeCongestion = new Timer("check on entry node congestion");
 		this.checkIfEntryNodesRoutingValid = new Timer("check if entry nodes routing valid");
+		this.addRNodeToQueueEvaluation = new Timer("add RNode To Queue Evaluation");
+		this.addRNodeToQueuePushing = new Timer("add RNode To Queue Pushing");
+		this.getRouteNodeCost = new Timer("get RNode cost");
 	}
 	
 	@Override
@@ -53,6 +59,9 @@ public class RouterTimer {
 		result += this.rtgFilter;
 		result += this.checkOnEntryNodeCongestion;
 		result += this.checkIfEntryNodesRoutingValid;
+		result += this.addRNodeToQueueEvaluation;
+		result += this.addRNodeToQueuePushing;
+		result += this.getRouteNodeCost;
 		
 		return result;
 	}
