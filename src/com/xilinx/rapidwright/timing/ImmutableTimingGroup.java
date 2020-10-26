@@ -22,7 +22,12 @@
 package com.xilinx.rapidwright.timing;
 // Consider moving this to device
 
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+
 import com.xilinx.rapidwright.device.IntentCode;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.util.Pair;
 
@@ -169,5 +174,51 @@ public class ImmutableTimingGroup {
         }
 
         return new Pair(groupDelayType,groupWireDir);
+    }
+    
+    private short d;
+    private TimingModel timingModel;
+    /**
+     * Computes the D (distance) term used by the TimingModel calculation.
+     * @param n Given Node to use when checking the wire names.
+     * @return The D term used by the TimingModel delay calculation.
+     */
+    short computeD(Node n) {
+        int result = 0;
+        int minRow = 1<<20;
+        int maxRow = 0;
+        int minCol = 1<<20;
+        int maxCol = 0;
+        List<Wire> wList = new ArrayList<>();
+        for (Wire w : n.getAllWiresInNode()) {
+            if (w.getWireName().contains("BEG")) {
+                wList.add(0,w);
+            }
+            if (w.getWireName().contains("END")) {
+                wList.add(w);
+            }
+        }
+        for (Wire w1 : wList) {
+            if (w1.getTile().getColumn() < minCol)
+                minCol = w1.getTile().getColumn();
+            if (w1.getTile().getColumn() > maxCol)
+                maxCol = w1.getTile().getColumn();
+            if (w1.getTile().getRow() < minRow)
+                minRow = w1.getTile().getRow();
+            if (w1.getTile().getRow() > maxRow)
+                maxRow = w1.getTile().getRow();
+        }
+        int col1 = minCol;
+        int row1 = minRow;
+        int col2 = maxCol;
+        int row2 = maxRow;
+        if (groupWireDir == GroupWireDirection.HORIZONTAL && col1 < col2) {
+            result += timingModel.computeHorizontalDistFromArray(col1, col2, groupDelayType);
+        }
+        if (groupWireDir == GroupWireDirection.VERTICAL && row1 < row2) {
+            result += timingModel.computeVerticalDistFromArray(row1, row2, groupDelayType);
+        }
+        this.d = (short) result;
+        return (short) result;
     }
 }
