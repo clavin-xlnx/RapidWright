@@ -76,8 +76,8 @@ import java.util.regex.Pattern;
  */
 public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstimatorBase<T> implements java.io.Serializable {
 
-
-    DelayEstimatorTable(Device device, T ictInfo) {
+	
+    public DelayEstimatorTable(Device device, T ictInfo) {
         this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), 0);
         String inFileName = "onexwithdetour.ser";
 //        String inFileName = "onex_merge.ser";
