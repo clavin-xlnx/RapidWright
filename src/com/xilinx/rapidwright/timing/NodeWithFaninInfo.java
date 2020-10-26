@@ -19,7 +19,7 @@ public class NodeWithFaninInfo extends Node{
     CountingSet<SitePinInst> sources;
     CountingSet<Routable> parents;
     float pres_cost;
-    float acc_cost;
+    float acc_cost; 
     public Set<Integer> entryHolders;
     
     static Map<Node, NodeWithFaninInfo> nodePairs;
@@ -66,14 +66,21 @@ public class NodeWithFaninInfo extends Node{
     public float getAccCost(){
     	return this.acc_cost;
     }
-    
-    public CountingSet<SitePinInst> getSourcesSet(){
+	
+	public CountingSet<SitePinInst> getSourcesSet(){
     	return this.sources;
     }
     
     public CountingSet<Routable> getParentsSet(){
     	return this.parents;
     }
+    
+    public int countSourceUses(SitePinInst source) {
+		if(this.sources == null) {
+			return 0;
+		}
+		return this.sources.count(source);
+	}
     
     public void removeSource(SitePinInst source){
     	this.sources.remove(source);
