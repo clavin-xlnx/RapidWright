@@ -321,7 +321,7 @@ public class Main {
 		System.out.printf("Total rnodes used: %d\n", totalUsage);
 		if(this.opt == RoutingGranularityOpt.NODE){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
-			System.out.printf("Average #children per siblings: %5.2f\n", averChildren);
+			System.out.printf("Average #children per node: %5.2f\n", averChildren);
 		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #node in rnodes: %5.2f\n", averNode);
