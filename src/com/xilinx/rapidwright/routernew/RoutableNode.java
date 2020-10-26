@@ -30,7 +30,11 @@ public class RoutableNode implements Routable{
 	public List<RoutableNode> children;
 	public boolean childrenSet;
 	
-	public RoutableNode(int index, SitePinInst sitePinInst, RoutableType type){
+	/*
+	 * This constructor does not check site pin conflicts
+	 * If nets have input SitePinInst conflicts,"target unreachable" problem will occur during routing
+	 */
+	/*public RoutableNode(int index, SitePinInst sitePinInst, RoutableType type){
 		this.index = index;
 		this.type = type;
 		this.node = sitePinInst.getConnectedNode();
@@ -38,7 +42,7 @@ public class RoutableNode implements Routable{
 		this.childrenSet = false;
 		this.target = false;
 		this.setXY();
-	}
+	}*/
 	
 	public RoutableNode(int index, Node node, RoutableType type){
 		this.index = index;
