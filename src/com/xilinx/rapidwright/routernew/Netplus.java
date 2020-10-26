@@ -29,7 +29,7 @@ public class Netplus{
 		this.net = net;
 		this.type = net.getType();
 		this.connections = new ArrayList<>();
-		this.fanout = (short) this.net.getFanOut();//getSinkPins().size();
+		this.fanout = (short) this.net.getSinkPins().size();
 		this.getBoundingXYs(net);
 	}
 	
@@ -46,22 +46,20 @@ public class Netplus{
 		short[] xArray = new short[numPins];
 		short[] yArray = new short[numPins];
 		
-//		xArray[0] = (short) net.getSource().getTile().getColumn();
-//		yArray[0] = (short) net.getSource().getTile().getRow();
-//		
-//		x_geo_sum += xArray[0];
-//		y_geo_sum += yArray[0];
-		
-		
 		int iPin = 0;
-		for(SitePinInst sink:net.getPins()){
-			short x = (short) sink.getTile().getColumn();
-			short y = (short) sink.getTile().getRow();
-			xArray[iPin] = x;
-			yArray[iPin] = y;
-			x_geo_sum += x;
-			y_geo_sum += y;
-			iPin++;
+		for(SitePinInst spi:net.getPins()){
+			
+			try{
+				short x = (short) spi.getTile().getColumn();
+				short y = (short) spi.getTile().getRow();
+				xArray[iPin] = x;
+				yArray[iPin] = y;
+				x_geo_sum += x;
+				y_geo_sum += y;
+				iPin++;
+			}catch(Exception e){
+				System.out.println(net.toStringFull() + ", spi = " + spi.getName() + ", is source? " + spi.isOutPin());
+			}
 		}
 		
 		for(int i = 0; i < numPins; i++){
