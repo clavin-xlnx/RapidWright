@@ -233,12 +233,13 @@ public class RoutableTimingGroup implements Routable{
 	@Override
 	public void setXY() {
 		List<Wire> wiresInTG = new ArrayList<>();
-		for(ImmutableTimingGroup tg:this.sibTimingGroups.getSiblings()){
+		/*for(ImmutableTimingGroup tg:this.sibTimingGroups.getSiblings()){
 			if(tg.entryNode() != null)
 				wiresInTG.addAll(Arrays.asList(tg.entryNode().getAllWiresInNode()));
 			if(tg.exitNode() != null)
 				wiresInTG.addAll(Arrays.asList(tg.exitNode().getAllWiresInNode()));
-		}
+		}*/
+		wiresInTG.addAll(Arrays.asList(this.sibTimingGroups.getExitNode().getAllWiresInNode()));
 		
 		List<Short> xCoordinates = new ArrayList<>();
 		List<Short> yCoordinates = new ArrayList<>();
@@ -299,7 +300,7 @@ public class RoutableTimingGroup implements Routable{
 		} else {
 			entry.setPresCost(1 + (occ - cap + 1) * pres_fac);
 		}
-		entryNodesExpanded.add(entry);//TODO redundant?
+//		entryNodesExpanded.add(entry);//redundant
 	}
 	
 	public static void updateEntryNodesCosts(float pres_fac, float acc_fac){
@@ -313,7 +314,7 @@ public class RoutableTimingGroup implements Routable{
 				entry.setAccCost(entry.getAccCost() + overuse * acc_fac);
 				
 			}
-			entryNodesExpanded.add(entry);
+//			entryNodesExpanded.add(entry);
 		}
 	}
 
