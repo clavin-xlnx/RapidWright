@@ -25,7 +25,10 @@ package com.xilinx.rapidwright.timing.delayestimator;
 
 
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.GroupDelayType;
+import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.TimingModel;
 import com.xilinx.rapidwright.util.Pair;
 
@@ -38,6 +41,8 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -93,6 +98,225 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         this(device, ictInfo, 0);
 
     }
+
+
+    public short getDelayOf(ImmutableTimingGroup tg) {
+        RoutingNode node = getTermInfo(tg);
+
+        Double delay = calcTimingGroupDelay(node.tg, node.begin(), node.end(), 0d);
+        return 0;
+    }
+
+    protected class RoutingNode {
+        // INT_TILE coordinate
+        short x;
+        short y;
+        // E or W side of INT_TILE
+        T.TileSide side;
+        // U or D
+        T.Orientation orientation;
+        T.TimingGroup tg;
+
+        RoutingNode(int x, int y, String side, String direction, String tg) {
+            this.x         = (short) x;
+            this.y         = (short) y;
+            this.side      = T.TileSide.valueOf(side);
+            this.orientation = T.Orientation.valueOf(direction);
+            this.tg        = T.TimingGroup.valueOf(tg);
+        }
+
+        RoutingNode() {
+            this.tg  = null;
+        }
+        void setHorTG(short len) {
+            if (len == 1)
+                this.tg = T.TimingGroup.valueOf("HORT_SINGLE");
+            else if (len == 2)
+                this.tg = T.TimingGroup.valueOf("HORT_DOUBLE");
+            else if (len == 4)
+                this.tg = T.TimingGroup.valueOf("HORT_QUAD");
+            else
+                this.tg = T.TimingGroup.valueOf("HORT_LONG");
+        }
+
+        void setVerTG(short len) {
+            if (len == 1)
+                this.tg = T.TimingGroup.valueOf("VERT_SINGLE");
+            else if (len == 2)
+                this.tg = T.TimingGroup.valueOf("VERT_DOUBLE");
+            else if (len == 4)
+                this.tg = T.TimingGroup.valueOf("VERT_QUAD");
+            else
+                this.tg = T.TimingGroup.valueOf("VERT_LONG");
+        }
+        public String toString() {
+            return String.format("x:%d y:%d %s %s %s", x,y,side.name(),tg.name(),orientation.name());
+        }
+
+        public short begin() {
+            return tg.direction() == T.Direction.HORIZONTAL ? x : y;
+        }
+
+        public short end() {
+            short delta = tg.length();
+            short start = tg.direction() == T.Direction.HORIZONTAL ? x : y;
+            return  (short) (start + (orientation == T.Orientation.U ? -delta : delta));
+        }
+    }
+
+    // input node is exitNode of a tg
+    // TODO: This method is loop heavy. If TG is prebuilt, this problem will be solved because all info is pre-recorded.
+    private T.TileSide findTileSideForInternalSingle(Node node) {
+        Pattern EPattern = Pattern.compile("([\\w]+)_(E)_");
+        Pattern WPattern = Pattern.compile("([\\w]+)_(W)_");
+
+        for (Node prvNode : node.getAllUphillNodes()) {
+            String prvNodeName = prvNode.getAllWiresInNode()[0].getWireName();
+
+            Matcher EMatcher = EPattern.matcher(prvNodeName);
+            if (EMatcher.find()) {
+                return T.TileSide.E;
+            } else {
+                Matcher WMatcher = WPattern.matcher(prvNodeName);
+                if (WMatcher.find())
+                    return T.TileSide.W;
+            }
+
+        }
+        return T.TileSide.M;
+    }
+
+    // TODO: This method is loop heavy. If TG is prebuilt, this problem will be solved because all info is pre-recorded.
+    private T.TileSide findTileSideForGlobal(Node node) {
+        Pattern EPattern = Pattern.compile("([\\w]+)_(E)_");
+        Pattern WPattern = Pattern.compile("([\\w]+)_(W)_");
+
+        for (Node nxtNode : node.getAllDownhillNodes()) {
+            for (Node nxtNxtNode : nxtNode.getAllDownhillNodes()) {
+                String nxtNxtNodeName = nxtNxtNode.getAllWiresInNode()[0].getWireName();
+
+                Matcher EMatcher = EPattern.matcher(nxtNxtNodeName);
+                if (EMatcher.find()) {
+                    return T.TileSide.E;
+                } else {
+                    Matcher WMatcher = WPattern.matcher(nxtNxtNodeName);
+                    if (WMatcher.find())
+                        return T.TileSide.W;
+                }
+            }
+
+        }
+        return T.TileSide.M;
+    }
+
+    // node.toString()     -  node.getAllWiresInNode()[0].getIntentCode()
+    // INT_X0Y0/BYPASS_E9  - NODE_PINBOUNCE  :
+    // INT_X0Y0/IMUX_E9  - NODE_PINFEED  :
+    // INT_X0Y0/EE2_E_BEG3  - NODE_DOUBLE  :
+    // INT_X0Y0/NN1_E_BEG3  - NODE_SINGLE  :
+    // INT_X0Y0/NN4_E_BEG2  - NODE_VQUAD  :
+    // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
+    protected RoutingNode getTermInfo(ImmutableTimingGroup tg) {
+
+        Node node = tg.exitNode();
+        IntentCode ic = node.getAllWiresInNode()[0].getIntentCode();
+        Pattern tilePattern = Pattern.compile("X([\\d]+)Y([\\d]+)");
+        Pattern EE          = Pattern.compile("EE([\\d]+)");
+        Pattern WW          = Pattern.compile("WW([\\d]+)");
+        Pattern NN          = Pattern.compile("NN([\\d]+)");
+        Pattern SS          = Pattern.compile("SS([\\d]+)");
+
+        Pattern skip         = Pattern.compile("WW1_E");
+
+        RoutingNode res = new RoutingNode();
+
+
+        // INT_X45Y109/EE2_E_BEG6
+        // TODO: should I use getTile and wire instead of spliting the name?
+        String[] int_node = node.toString().split("/");
+
+        Matcher tileMatcher = tilePattern.matcher(int_node[0]);
+        if (tileMatcher.find()) {
+            res.x = Short.valueOf(tileMatcher.group(1));
+            res.y = Short.valueOf(tileMatcher.group(2));
+        } else {
+            System.out.println("getTermInfo coordinate matching error for node " + node.toString());
+        }
+
+        if (skip.matcher(int_node[1]).find())
+            return res; // res.tg is null
+
+        String[] tg_side = int_node[1].split("_");
+
+        // THIS IF MUST BE ABOVE THE IF BELOW (for res.side).
+        // Can't use intendCode because there are two kinds of NODE_SINGLE, internal and not
+        Matcher EEMatcher = EE.matcher(tg_side[0]);
+        if (EEMatcher.find()) {
+            res.orientation = T.Orientation.U;
+            res.setHorTG(Short.valueOf(EEMatcher.group(1)));
+        } else {
+            Matcher WWMatcher = WW.matcher(tg_side[0]);
+            if (WWMatcher.find()) {
+                res.orientation = T.Orientation.D;
+                res.setHorTG(Short.valueOf(WWMatcher.group(1)));
+            } else {
+                Matcher NNMatcher = NN.matcher(tg_side[0]);
+                if (NNMatcher.find()) {
+                    res.orientation = T.Orientation.U;
+                    res.setVerTG(Short.valueOf(NNMatcher.group(1)));
+                } else {
+                    Matcher SSMatcher = SS.matcher(tg_side[0]);
+                    if (SSMatcher.find()) {
+                        res.orientation = T.Orientation.D;
+                        res.setVerTG(Short.valueOf(SSMatcher.group(1)));
+                    } else {
+                        res.orientation = T.Orientation.S;
+                        // For internal single, it will be set by the below
+                        if (ic == IntentCode.NODE_PINBOUNCE)
+                            // FF input
+                            // TODO: Getting to FF has higher delay. How to handle that?
+                            res.tg = T.TimingGroup.valueOf("CLE_IN");
+                        else if (ic == IntentCode.NODE_PINFEED)
+                            // LUT input
+                            res.tg = T.TimingGroup.valueOf("CLE_IN");
+                        else if (ic == IntentCode.NODE_LOCAL) {
+                            // the only exitNode that can be NODE_LOCAL is GLOBAL node
+                            res.tg = T.TimingGroup.valueOf("GLOBAL");
+                            // have E_U_GLOBAL and E_D_GLOBAL (because reuse "SAME_SIDE" rule) connect to E_S_CLE_IN
+                            // always use U, and waste D node
+                            res.orientation = T.Orientation.U;
+                        } else // can be CLE_OUT or INTERNAL_SINGLE. the next if will change it if INTERNAL_SINGLE
+                            res.tg = T.TimingGroup.valueOf("CLE_OUT");
+                    }
+                }
+            }
+        }
+
+        // THIS IF MUST BE BELOW THE IF ABOVE (for res.orientation).
+        if (tg_side[1].startsWith("E"))
+            res.side = T.TileSide.E;
+        else if (tg_side[1].startsWith("W"))
+            res.side = T.TileSide.W;
+        else
+        if (int_node[1].startsWith("INT")) {
+            if (ic == IntentCode.NODE_LOCAL) {
+                res.side = findTileSideForGlobal(node);
+            } else {
+                // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
+                // Check intendcode is an alternative to above if condition.
+                res.side = findTileSideForInternalSingle(tg.entryNode());
+                // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
+                res.orientation = (res.side == T.TileSide.E) ? T.Orientation.D : T.Orientation.U;
+                res.tg = T.TimingGroup.valueOf("INTERNAL_SINGLE");
+            }
+        } else {
+            res.side = T.TileSide.M;
+        }
+
+        return res;
+    }
+
+
     @FunctionalInterface
     interface BuildAccumulativeList<T> {
         List<T> apply(List<T> l);
