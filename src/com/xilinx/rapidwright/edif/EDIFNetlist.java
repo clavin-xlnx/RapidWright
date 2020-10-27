@@ -484,7 +484,7 @@ public class EDIFNetlist extends EDIFName {
 	 */
 	public EDIFCellInst getCellInstFromHierName(String name){
 		EDIFCellInst currInst = getTopCellInst();
-		if(name.equals("")) return currInst;
+		if(name.isEmpty()) return currInst;
 		String[] parts = name.split(EDIFTools.EDIF_HIER_SEP);
 		for(int i=0; i < parts.length; i++){
 			EDIFCellInst checkInst = currInst.getCellType().getCellInst(parts[i]);
@@ -557,6 +557,30 @@ public class EDIFNetlist extends EDIFName {
 	}
 	
 	/**
+	 * Gets the next level hierarchical child instance name from an ancestor. Assumes descendent is
+	 * instantiated within ancestor at some level.  
+	 * 
+	 * For example:
+	 * getNextHierChildName("a/b/c", "a/b/c/d/e") returns "a/b/c/d"
+	 * getNextHierChildName("a/b/c", "a/b/c/d") returns "a/b/c/d"
+	 * getNextHierChildName("a/b/c", "a/b/d") returns null
+	 * getNextHierChildName("a/b/c", "a/b/c") returns null
+	 * 
+	 * @param ancestor The parent or more shallow instance in a netlist 
+	 * @param descendent The child or deeper instance in a netlist
+	 * @return The name of the next hierarchical child instance in the ancestor/descendent chain.  
+	 * Returns null if none could be found.  
+	 */
+	public static String getNextHierChildName(String ancestor, String descendent) {
+		if(ancestor == null || descendent == null) return null;
+		if(!descendent.startsWith(ancestor)) return null;
+		if(ancestor.equals(descendent)) return null;
+		int nextHierSeparator = descendent.indexOf(EDIFTools.EDIF_HIER_SEP, ancestor.length()+1);
+		if(nextHierSeparator == -1) return descendent;
+		return descendent.substring(0,nextHierSeparator);
+	}
+	
+	/**
 	 * Creates a new hierarchical cell instance reference from the provided hierarchical cell 
 	 * instance name
 	 * @param instName Full hierarchical cell instance name
@@ -604,7 +628,7 @@ public class EDIFNetlist extends EDIFName {
 
 	public Net getPhysicalNetFromPin(String parentHierInstName, EDIFPortInst p, Design d){
 		String hierarchicalNetName = null;
-		if(parentHierInstName.equals("")){
+		if(parentHierInstName.isEmpty()){
 			hierarchicalNetName = p.getNet().getName();
 		}else{
 			hierarchicalNetName = parentHierInstName + EDIFTools.EDIF_HIER_SEP + p.getNet().getName();
@@ -625,7 +649,11 @@ public class EDIFNetlist extends EDIFName {
 					if(cellType.equals("VCC")) return d.getVccNet();
 				}
 			}
-			
+			if(parentNetName == null) {
+				System.err.println("WARNING: Could not find parent of net \"" + hierarchicalNetName +
+						"\", please check that the netlist is fully connected through all levels of "
+						+ "hierarchy for this net.");
+			}
 			EDIFNet logicalNet = getNetFromHierName(parentNetName);
 			List<EDIFPortInst> eprList = logicalNet.getSourcePortInsts(false);
 			if(eprList.size() > 1) throw new RuntimeException("ERROR: Bad assumption on net, has two sources.");
@@ -826,7 +854,7 @@ public class EDIFNetlist extends EDIFName {
 					checkInst = getCellInstFromHierName(instName);
 				}
 				StringBuilder sb = new StringBuilder(instName);
-				if(!instName.equals("")) sb.append(EDIFTools.EDIF_HIER_SEP);
+				if(!instName.isEmpty()) sb.append(EDIFTools.EDIF_HIER_SEP);
 				sb.append(otherNet);
 				aliases.add(sb.toString());
 				for(EDIFPortInst opr : otherNet.getPortInsts()){
@@ -859,7 +887,7 @@ public class EDIFNetlist extends EDIFName {
 						continue;
 					}
 					StringBuilder sb = new StringBuilder(p.getHierarchicalInstName());
-					if(!p.getHierarchicalInstName().equals("")) sb.append(EDIFTools.EDIF_HIER_SEP);
+					if(!p.getHierarchicalInstName().isEmpty()) sb.append(EDIFTools.EDIF_HIER_SEP);
 					sb.append(p.getPortInst().getCellInst().getName());
 					String instName = sb.toString();
 					sb.append(EDIFTools.EDIF_HIER_SEP);

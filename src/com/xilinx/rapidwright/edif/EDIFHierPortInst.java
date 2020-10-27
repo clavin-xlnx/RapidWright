@@ -77,7 +77,7 @@ public class EDIFHierPortInst {
 			return hierarchicalInstName;
 		}
 		EDIFCellInst topCellInst = portInst.getCellInst().getCellType().getLibrary().getNetlist().getTopCellInst();
-		if(hierarchicalInstName.equals(""))
+		if(hierarchicalInstName.isEmpty())
 			return portInst.getCellInst().equals(topCellInst) ? "" : portInst.getCellInst().getName(); 
 		return hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + portInst.getCellInst().getName();
 	}
@@ -96,6 +96,12 @@ public class EDIFHierPortInst {
 		return portInst;
 	}
 
+	public EDIFCell getCellType() {
+		if(portInst == null) return null;
+		if(portInst.getCellInst() == null) return null;
+		return portInst.getCellInst().getCellType();
+	}
+	
 	/**
 	 * @param portInst the port instance to set
 	 */
@@ -145,12 +151,12 @@ public class EDIFHierPortInst {
 	 */
 	@Override
 	public String toString() {
-		if(hierarchicalInstName.equals("")) return portInst.getFullName();
+		if(hierarchicalInstName.isEmpty()) return portInst.getFullName();
 		return hierarchicalInstName + "/" + portInst.getFullName();
 	}
 
 	public String getHierarchicalNetName(){
-		if(hierarchicalInstName.equals("")) return portInst.getNet().getName();
+		if(hierarchicalInstName.isEmpty()) return portInst.getNet().getName();
 		return hierarchicalInstName + EDIFTools.EDIF_HIER_SEP + portInst.getNet();
 	}
 	
@@ -168,7 +174,7 @@ public class EDIFHierPortInst {
 		}else{
 			portName = portInst.getFullName();
 		}
-		if(hierarchicalInstName.equals("")) return portName;
+		if(hierarchicalInstName.isEmpty()) return portName;
 		return hierarchicalInstName + "/" + portName;
 	}
 	
