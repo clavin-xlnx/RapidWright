@@ -104,7 +104,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         RoutingNode node = getTermInfo(tg);
 
         Double delay = calcTimingGroupDelay(node.tg, node.begin(), node.end(), 0d);
-        return 0;
+        return delay.shortValue();
     }
 
     protected class RoutingNode {
@@ -160,7 +160,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         public short end() {
             short delta = tg.length();
             short start = tg.direction() == T.Direction.HORIZONTAL ? x : y;
-            return  (short) (start + (orientation == T.Orientation.U ? -delta : delta));
+            return  (short) (start + (orientation == T.Orientation.U ? delta : -delta));
         }
     }
 
@@ -226,6 +226,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         Pattern NN          = Pattern.compile("NN([\\d]+)");
         Pattern SS          = Pattern.compile("SS([\\d]+)");
 
+        // WW1_E is an exception. It is actually going north!
         Pattern skip         = Pattern.compile("WW1_E");
 
         RoutingNode res = new RoutingNode();
@@ -243,10 +244,13 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             System.out.println("getTermInfo coordinate matching error for node " + node.toString());
         }
 
+        String nodeType = null;
         if (skip.matcher(int_node[1]).find())
-            return res; // res.tg is null
+            nodeType = "NN1_E";
+        else
+            nodeType = int_node[1];
 
-        String[] tg_side = int_node[1].split("_");
+        String[] tg_side = nodeType.split("_");
 
         // THIS IF MUST BE ABOVE THE IF BELOW (for res.side).
         // Can't use intendCode because there are two kinds of NODE_SINGLE, internal and not
@@ -298,7 +302,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         else if (tg_side[1].startsWith("W"))
             res.side = T.TileSide.W;
         else
-        if (int_node[1].startsWith("INT")) {
+        if (nodeType.startsWith("INT")) {
             if (ic == IntentCode.NODE_LOCAL) {
                 res.side = findTileSideForGlobal(node);
             } else {
