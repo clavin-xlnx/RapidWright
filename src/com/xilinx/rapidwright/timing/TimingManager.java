@@ -20,9 +20,15 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.util.List;
+
+import org.jgrapht.GraphPath;
+
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.routernew.Connection;
+
 
 /**
  * A TimingManager sets up and creates an example TimingModel and an example TimingGraph for a given
@@ -64,6 +70,40 @@ public class TimingManager {
         if (doBuild)
             build();
     }
+    
+    //-------------- added for timing-driven functionality ------------------
+    
+    public void updateRouteDelays(List<Connection> cons){
+    	for(Connection c: cons){
+    		c.updateRouteDelay();
+    		// TODO there exists an addition of inter delay and intra delay in the setNetDelay
+    		//setNetDelay also includes the setEdgeWeight()
+//    		this.timingGraph.setEdgeWeight(e, e.getDelay());
+    	}
+    }
+    //TODO how to deal with required time (set to the max delay?)
+    public void calculateArrivalRequireAndSlack(){
+    	this.timingGraph.computeArrivalTimes();
+    	this.timingGraph.computeSlacks();
+    }
+    
+    public void calculateCriticality(List<Connection> cons, 
+    		float maxCriticality, 
+    		float criticalityExponent){
+    	
+    	for(Connection c:cons){
+    		c.resetCriticality();
+    	}
+    	
+    	GraphPath<TimingVertex, TimingEdge> maxPath = this.timingGraph.getMaxDelayPath();
+		float maxDelay = (float) maxPath.getWeight();
+    	
+    	for(Connection c : cons){
+    		c.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
+    		System.out.println(c.criticality);
+    	}
+    }
+  //-------------------------------------------------------------------------
 
     /**
      * Builds the TimingModel and TimingGraph.
