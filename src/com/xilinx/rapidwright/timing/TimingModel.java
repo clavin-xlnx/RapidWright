@@ -1029,6 +1029,10 @@ public class TimingModel {
         return calcDelay(null, null, null, null, groups);
     }
 
+    //TODO check
+    public float getIntraSiteDelay(){
+    	return this.intrasiteDelay;
+    }
 
     private float intrasiteDelay;
     private SitePinInst startPinInst;
