@@ -7,6 +7,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingVertex;
@@ -23,8 +24,9 @@ public class Connection{
     //TODO timing-driven
     public TimingVertex sourceTimingVertex;
     public TimingVertex sinkTimingVertex;
-    public TimingEdge timingEdge;
+    public TimingEdge timingEdge;//an intra site delay added
     public float criticality;
+//    public float intraSiteDelay;//TODO set
     
 	private Routable sourceRNode;
 	private Routable sinkRNode;
@@ -32,11 +34,12 @@ public class Connection{
 	public List<Routable> pathFromSinkToSwitchBox;
 	
 	public List<Node> nodes;
+	public List<ImmutableTimingGroup> timingGroups;
 	
 	public void newNodes(){
 		this.nodes = new ArrayList<>();
 	}
-	
+		
 	public void addNode(Node node){
 		this.nodes.add(node);
 	}
@@ -46,11 +49,13 @@ public class Connection{
 		
 		this.source = source;
 		this.sink = sink;
-		this.criticality = 0.99f;
+		this.criticality = 0;
 		
 		this.boundingBox = this.calculateBoundingBox();
 		
 		this.rnodes = new ArrayList<>();
+		this.timingGroups = new ArrayList<>();
+//		this.intraSiteDelay = -1;
 	}
 	
 	public short calculateBoundingBox() {
@@ -79,6 +84,14 @@ public class Connection{
 		return (short) ((max_x - min_x + 1) + (max_y - min_y + 1));
 	}
 	
+	/*public float getIntraSiteDelay() {
+		return intraSiteDelay;
+	}
+
+	public void setIntraSiteDelay(float intraSiteDelay) {
+		this.intraSiteDelay = intraSiteDelay;
+	}*/
+
 	public void setNet(Netplus net){
 		this.net = net;
 	}
@@ -107,9 +120,34 @@ public class Connection{
 		return timingEdge;
 	}
 	
-	//TODO debug
+	public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
+		float slackCon = this.sinkTimingVertex.getRequiredTime() - this.sourceTimingVertex.getArrivalTime() - this.timingEdge.getDelay();
+		float tempCriticality  = (1 - slackCon / maxDelay);//TODO check up on criticality values
+    	tempCriticality = (float) (Math.pow(tempCriticality, criticalityExponent) * maxCriticality);
+    	
+    	if(tempCriticality > this.criticality) 
+    		this.setCriticality(tempCriticality);
+	}
+	
+	public void setCriticality(float criticality){
+		this.criticality = criticality;
+	}
+	
+	public void resetCriticality(){
+		this.criticality = 0;
+	}
+	
+	public float getCriticality(){
+		return this.criticality;
+	}
+	
+	//TODO debug - bugs due to the unmatched SitePinInst - TimingVertex
 	public void setTimingEdge(TimingGraph timingGraph, EDIFNet edifNet, Net n) {
 		this.timingEdge = new TimingEdge(timingGraph, this.sourceTimingVertex, this.sinkTimingVertex, edifNet, n);
+	}
+	
+	public void setTimingEdge(TimingEdge e){
+		this.timingEdge = e;
 	}
 
 	public void printInfo(String s){
@@ -258,8 +296,24 @@ public class Connection{
 	public void addRNode(Routable rn) {
 		this.rnodes.add(rn);	
 	}
-
-	public float getCriticality() {
-		return this.criticality;
+	
+	public void addTimingGroup(ImmutableTimingGroup timingGroup){
+		this.timingGroups.add(timingGroup);
+	}
+	
+	public void updateRouteDelay(){
+		float routeDelay = 0;
+		for(ImmutableTimingGroup tg : this.timingGroups){//TODO per siblings
+			routeDelay += tg.getDelay();
+		}
+		this.timingEdge.setNetDelay(routeDelay);
+	}
+	
+	public float getRouteDelay() {
+		float routeDelay = 0;
+		for(ImmutableTimingGroup tg : this.timingGroups){//TODO per siblings
+			routeDelay += tg.getDelay();
+		}
+		return routeDelay;
 	}
 }
