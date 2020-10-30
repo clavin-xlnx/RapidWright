@@ -18,6 +18,7 @@ import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.NodeWithFaninInfo;
 import com.xilinx.rapidwright.timing.SiblingsTimingGroup;
 import com.xilinx.rapidwright.timing.TimingModel;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorTable;
 import com.xilinx.rapidwright.util.Pair;
 
 public class RoutableTimingGroup implements Routable{
@@ -83,7 +84,8 @@ public class RoutableTimingGroup implements Routable{
 	public int setChildren(int globalIndex, float base_cost_fac, 
 			Map<NodeWithFaninInfo, RoutableTimingGroup> createdRoutable, 
 			Set<Node> reservedNodes,
-			RouteThruHelper helper){
+			RouteThruHelper helper,
+			DelayEstimatorTable estimator){
 		
 		this.childrenImmuTG = new ArrayList<>();
 		
@@ -95,15 +97,23 @@ public class RoutableTimingGroup implements Routable{
 			RoutableTimingGroup childRNode;
 			ImmutableTimingGroup thruImmuTg;
 			Pair<RoutableTimingGroup,ImmutableTimingGroup> childThruImmuTg;
+			short delay = 0;
 			
-			NodeWithFaninInfo key = stGroups.getExitNode();//TODO Yun - using node as the key is necessary, different nodes may have a same hasCode()
-//			String key = stGroups.getFirst().getExitNode().toString();
+			NodeWithFaninInfo key = stGroups.getExitNode();//using node as the key is necessary, different nodes may have a same hasCode()
 			
 			if(!createdRoutable.containsKey(key)){
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups);
 				childRNode.setBaseCost(base_cost_fac);
 				
 				thruImmuTg = stGroups.getThruImmuTg(this.sibTimingGroups.getExitNode());
+				/*if(this.debug){
+					System.out.println(thruImmuTg.toString());
+				}*/
+				
+				delay = estimator.getDelayOf(thruImmuTg);
+//				if(delay == -3)
+//					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+				thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
 				
 				/*if(thruImmuTg == null){
 					NodeWithFaninInfo exit = this.sibTimingGroups.getExitNode();		
@@ -126,6 +136,17 @@ public class RoutableTimingGroup implements Routable{
 				childRNode = createdRoutable.get(key);
 				
 				thruImmuTg = childRNode.getSiblingsTimingGroup().getThruImmuTg(this.sibTimingGroups.getExitNode());//RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key));
+				
+				/*if(this.debug){
+					System.out.println(thruImmuTg.toString());
+				}*/
+				
+				
+				delay = estimator.getDelayOf(thruImmuTg);
+//				if(delay == -3)
+//					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+				thruImmuTg.setDelay(delay);//TODO check
+				
 				if(thruImmuTg.entryNode() != null) thruImmuTg.entryNode().entryHolders.add(childRNode.index);
 				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
 			}
