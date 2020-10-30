@@ -45,7 +45,10 @@ public class TimingEdge extends DefaultEdge {
     private float logicDelay = 0.0f;
     private float netDelay = 0.0f;
     private float delay = 0.0f;
-
+    
+    //TODO
+    private float intraSiteDelay = 0.0f;
+    
     private SitePinInst first;
     private SitePinInst second;
 
@@ -233,14 +236,23 @@ public class TimingEdge extends DefaultEdge {
     public float getDelay() {
         return delay;
     }
+    
+    //TODO added for timing-driven router
+    public float getIntraSiteDelay() {
+		return intraSiteDelay;
+	}
 
-    /**
+	public void setIntraSiteDelay(float intraSiteDelay) {
+		this.intraSiteDelay = intraSiteDelay;
+	}
+
+	/**
      * Sets the net-related component of the delay in ps for this edge.
      * @param netDelay Net delay in picoseconds.
      */
     public void setNetDelay(float netDelay) {
         this.netDelay = netDelay;
-        this.delay = logicDelay+netDelay;
+        this.delay = this.intraSiteDelay + logicDelay+netDelay;
         if (timingGraph.containsEdge(this))
             timingGraph.setEdgeWeight(this, this.delay);
     }
