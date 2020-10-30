@@ -81,6 +81,14 @@ public class ImmutableTimingGroup {
         return entryNode;
     }
     
+    public void setDelay(short groupDelay){
+    	this.groupDelay = groupDelay;
+    }
+    
+    public short getDelay(){
+    	return this.groupDelay;
+    }
+    
     @Override
     public String toString(){
     	String s = "ImmuTg = ( ";
@@ -103,6 +111,7 @@ public class ImmutableTimingGroup {
     final private GroupDelayType groupDelayType;
     // used to lookup coefficients based on directions
     final private GroupWireDirection groupWireDir; // ver, hor
+    private short groupDelay; //TODO Yun
 
 
     private GroupWireDirection getDirection (NodeWithFaninInfo node) {
