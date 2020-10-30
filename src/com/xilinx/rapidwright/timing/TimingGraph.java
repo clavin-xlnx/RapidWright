@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.util.Pair;
 
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.AllDirectedPaths;
@@ -85,7 +86,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     static HashSet<String> unisimFlipFlopTypes;
     
     //TODO Yun needed
-    Map<SitePinInst, TimingVertex> spiAndtimingVertex = new HashMap<>();
+    Map<SitePinInst, TimingVertex> spiAndTimingVertices = new HashMap<>();
+    Map<Pair<SitePinInst, SitePinInst>, TimingEdge> spiPairsAndTimingEdges = new HashMap<>();
 
     static {
         
@@ -183,6 +185,13 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             setTimingRequirement(requirement, path);
         }
         computeArrivalTimes();
+    }
+    
+    //TODO check
+    public void setTimingRequirementOnly(float requirement) {
+        for (GraphPath<TimingVertex, TimingEdge> path : getGraphPaths()) {
+            setTimingRequirement(requirement, path);
+        }
     }
 
     /**
@@ -1061,6 +1070,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     private List<SitePinInst> spi_sinks;
     private SiteInst si;
 
+    //TODO check, extracting intra site delay for timing edges
+    private float intraSiteDelay = 0.0f;
 
     /**
      * This method is called per physical "Net" object for adding TimingEdges into the TimingGraph 
@@ -1099,8 +1110,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
        
         
         for (EDIFHierPortInst hport : hports) {
-        	/*if(n.getName().equals("ncda") && hport.isOutput()){
-        		System.out.println("hport output of net ncda found");
+        	/*if(n.getName().equals("n9ab") && hport.isOutput()){
+        		System.out.println("hport output of net ncda found" + hport.toString());
         	}*/
             String portName = hport.getPortInst().getName();
             String cellName = hport.getFullHierarchicalInstName();
@@ -1130,7 +1141,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
             } else {
                 physPinName = cell.getPhysicalPinMapping(portName);
-                spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);
+                spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);//TODO why H_O
             }
 
             si = cell.getSiteInst();
@@ -1213,19 +1224,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             e = getEdge(vS, vD);
             if (e == null)
                 e = new TimingEdge(this, vS, vD, edifNet, net);
-            
-          //TODO Yun needed
-            if(!this.spiAndtimingVertex.containsKey(local_spi_source)){//local_spi_source = G_O // G_MUX
-            	this.spiAndtimingVertex.put(local_spi_source, vS);
-            }
-            if(!this.spiAndtimingVertex.containsKey(spi_sink)){
-            	this.spiAndtimingVertex.put(spi_sink, vD);
-            }
 
             boolean forceUpdateEdge = false;
             float netDelay = 0f;
 
-            if (haveIntrasiteNet) {
+            if (haveIntrasiteNet) {// net.getSinkPins().size() == 0, TODO what to do for multi-connection net with an internal connections
                 String param2 = srcCell.getBELName()+"/"+ source.getName();
                 String param3 = null;
                 if (sink_belpins.get(D) == null) {
@@ -1243,6 +1246,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 } catch (IllegalArgumentException iae) {
                     continue;
                 }
+                
+                this.intraSiteDelay = Math.max(0f, tmpNetDelay);//TODO check
+                
                 netDelay = Math.max(0f, tmpNetDelay);
                 forceUpdateEdge = true;
             } else {
@@ -1259,28 +1265,47 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                 param2,
                                 param3);
                         netDelay = tmpNetDelay;
+                        
+                        this.intraSiteDelay = tmpNetDelay;//TODO check
+                        
                         forceUpdateEdge = true;
                     }
                     else {
                         netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, 
                                 local_spi_source.getSite(), null, net);
+                        
+                        this.intraSiteDelay = this.timingModel.getIntraSiteDelay();//TODO check
+                        
                         forceUpdateEdge = true;
                     }
                 }
                 else {
                     netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, 
                             local_spi_source.getSite(), spi_sink.getSite(), net);
+                    
+                    this.intraSiteDelay = this.timingModel.getIntraSiteDelay();//TODO check
+                    
                     forceUpdateEdge = true;
                 }
             }
             if (e.getNetDelay() != 0f || forceUpdateEdge) {
                 e.setNetDelay(netDelay);
                 e.setLogicDelay(logicDelay);
+                e.setIntraSiteDelay(this.intraSiteDelay);//TODO check
             }
             e.setFirstSitePinInst(local_spi_source);
             e.setSecondSitePinInst(spi_sink);
             safeAddEdge(vS, vD, e);
             setEdgeWeight(e, e.getDelay());
+            
+            //TODO check, needed by the router
+            Pair<SitePinInst, SitePinInst> spiPair = new Pair<SitePinInst, SitePinInst>(local_spi_source, spi_sink);
+            if(!this.spiPairsAndTimingEdges.containsKey(spiPair)){
+            	this.spiPairsAndTimingEdges.put(spiPair, e);
+            }
+            
+            this.spiAndTimingVertices.putIfAbsent(local_spi_source, vS);
+            this.spiAndTimingVertices.putIfAbsent(spi_sink, vD);
             
         }
         return 1;
@@ -1288,10 +1313,18 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     
     /**
      * Returns a map of <SitePinInst, TimingVertex> for the timing-driven router
-     * Yun needed
+     * TODO Yun needed
      */
+    public Map<Pair<SitePinInst, SitePinInst>, TimingEdge> getSpiAndTimingEdges(){
+    	return this.spiPairsAndTimingEdges;
+    }
+    
     public Map<SitePinInst, TimingVertex> getSpiAndTimingVertex(){
-    	return this.spiAndtimingVertex;
+    	return this.spiAndTimingVertices;
+    }
+    
+    public DelayModel getintraSiteAndLogicDelayModel(){
+    	return this.intrasiteAndLogicDelayModel;
     }
 
     /**
