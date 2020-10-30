@@ -1479,8 +1479,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
                 // The start will be quad/long on the direction that is farther aware from the box.
                 // table ranges have exclusive end points.
-                int gapX = (distX > width) ? Math.abs(distX - width + 1) : 0;
-                int gapY = (distY > height) ? Math.abs(distY - height + 1) : 0;
+                int gapX = (distX >= width) ? Math.abs(distX - width + 1) : 0;
+                int gapY = (distY >= height) ? Math.abs(distY - height + 1) : 0;
 
                 if (gapX < gapY) {
                     info.swap();
@@ -1680,8 +1680,18 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         while (gap > 0) {
             final int dist_constant = dist;
-            List<T.TimingGroup> nxtTgs = ictInfo.nextTimingGroups(lastTg, (T.TimingGroup e) ->
-                    (e.direction() == dir) && (e.length() <= dist_constant));
+            List<T.TimingGroup> nxtTgs = null;
+            if (dir == T.Direction.HORIZONTAL) {
+                nxtTgs = ictInfo.nextTimingGroups(lastTg, (T.TimingGroup e) ->
+                        // don't use single to avoid complication of b2b INT tile, ie., there is no EE1_W
+                        (e.direction() == dir) && (e.length() <= dist_constant) && (e != T.TimingGroup.HORT_SINGLE));
+            }
+            else  {
+                nxtTgs = ictInfo.nextTimingGroups(lastTg, (T.TimingGroup e) ->
+                        (e.direction() == dir) && (e.length() <= dist_constant));
+            }
+
+
             T.TimingGroup tg = pickTheLongestTg(nxtTgs);
             lastTg = tg;
             outTgs.add(tg);
@@ -2330,7 +2340,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        est.rgBuilder.deserializeFrom(args[1] + ".ser");
 
 //        est.testBounceToSink();
-//        est.testSpecialCase(device);
+        est.testSpecialCase(device);
 //        est.testGetDelayOf(device);
 
 
