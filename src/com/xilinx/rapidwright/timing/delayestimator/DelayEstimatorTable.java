@@ -44,6 +44,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -55,6 +56,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -78,10 +80,16 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
     DelayEstimatorTable(Device device, T ictInfo) {
-        this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), 0);
-        String inFileName = "onexwithdetour.ser";
+        this(device, ictInfo, true);
+    }
+
+    DelayEstimatorTable(Device device, T ictInfo, boolean fastMode) {
+//        this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), fastMode, "", 0);
+        this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), fastMode, "cle_out_intable.ser", 0);
+//        String inFileName = "cle_out_intable.ser";
+//        String inFileName = "onexwithdetour.ser";
 //        String inFileName = "onex_merge.ser";
-        this.rgBuilder.deserializeFrom(inFileName);
+//        this.rgBuilder.deserializeFrom(inFileName);
     }
 
     /**
@@ -92,7 +100,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @param width   Width of delay tables.
      * @param height  Height of delay tables.
      */
-    DelayEstimatorTable(Device device, T ictInfo, short width, short height, int verbose) {
+    DelayEstimatorTable(Device device, T ictInfo, short width, short height, boolean fastMode, String loadFrom, int verbose) {
         super(device, ictInfo, verbose);
 
 //        assert width < ictInfo.minTableWidth() :
@@ -113,32 +121,41 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         this.topLeft = new Pair<>(left, top);
         this.topRight = new Pair<>(right, top);
 
-        build();
-    }
-
-    DelayEstimatorTable(Device device, T ictInfo, int verbose) {
-        super(device, ictInfo, verbose);
-        this.width = ictInfo.minTableWidth();
-        this.height = ictInfo.minTableHeight();
-        build();
-    }
-
-    DelayEstimatorTable(Device device, T ictInfo, int verbose, boolean build) {
-        super(device, ictInfo, verbose);
-        this.width = ictInfo.minTableWidth();
-        this.height = ictInfo.minTableHeight();
-        if (build) {
-            build();
+        this.fastMode = fastMode;
+        if (fastMode) {
+            tgToSrcNodeMapper = this::getClosetOutSitePin;
+            tgToDstNodeMapper = this::getClosetInSitePin;
+        } else {
+            tgToSrcNodeMapper = this::getTermInfo;
+            tgToDstNodeMapper = this::getTermInfo;
         }
+
+        build(loadFrom);
     }
 
-    DelayEstimatorTable(String partName, T ictInfo, short width, short height, int verbose) {
-        this(Device.getDevice(partName), ictInfo, width, height, verbose);
-    }
-
-    DelayEstimatorTable(String partName, T ictInfo, int verbose) {
-        this(Device.getDevice(partName), ictInfo, verbose);
-    }
+//    DelayEstimatorTable(Device device, T ictInfo, int verbose) {
+//        super(device, ictInfo, verbose);
+//        this.width = ictInfo.minTableWidth();
+//        this.height = ictInfo.minTableHeight();
+//        build();
+//    }
+//
+//    DelayEstimatorTable(Device device, T ictInfo, int verbose, boolean build) {
+//        super(device, ictInfo, verbose);
+//        this.width = ictInfo.minTableWidth();
+//        this.height = ictInfo.minTableHeight();
+//        if (build) {
+//            build();
+//        }
+//    }
+//
+//    DelayEstimatorTable(String partName, T ictInfo, short width, short height, int verbose) {
+//        this(Device.getDevice(partName), ictInfo, width, height, verbose);
+//    }
+//
+//    DelayEstimatorTable(String partName, T ictInfo, int verbose) {
+//        this(Device.getDevice(partName), ictInfo, verbose);
+//    }
     /**
      * Get the min estimated delay between two timing groups.
      *
@@ -165,7 +182,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         } else if (timingGroup.delayType() == GroupDelayType.PINFEED) {
             return Short.MAX_VALUE;
         } else {
-            return getMinDelayToSinkPin(getTermInfo(timingGroup), getTermInfo(sinkPin)).getFirst();
+            return getMinDelayToSinkPin(tgToSrcNodeMapper.apply(timingGroup), tgToDstNodeMapper.apply(sinkPin)).getFirst();
         }
 
 ////        Node tgNode = timingGroup.getLastNode();
@@ -197,6 +214,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 ////        return delay;
     }
 
+
+
     // TODO: load and store if it turns out to be slow to build
     @Override
     public boolean load(String filename) {
@@ -210,6 +229,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     // ------------------------------------   private ----------------------------------------
 
+    private boolean fastMode;
+
+//    protected Function<ImmutableTimingGroup,RoutingNode> tgToNodeMapper;
+    interface SerializableFunction<T,R> extends Function<T,R>, Serializable {}
+    protected SerializableFunction<ImmutableTimingGroup,RoutingNode> tgToSrcNodeMapper;
+    protected SerializableFunction<ImmutableTimingGroup,RoutingNode> tgToDstNodeMapper;
 
     private short width;
     private short height;
@@ -321,8 +346,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     private Map<NodePair,Short> delayFrBounceToSink;
 
 
-    private void build() {
-        rgBuilder = new ResourceGraphBuilder(extendedWidth, extendedHeight, 0);
+    private void build(String loadFrom) {
+        rgBuilder = new ResourceGraphBuilder(extendedWidth, extendedHeight, loadFrom, 0);
         System.out.println("num nodes : " + rgBuilder.nodeMan.getGraph().vertexSet().size());
         System.out.println("num edges : " + rgBuilder.nodeMan.getGraph().edgeSet().size());
         if (this.verbose > 5 || this.verbose == -1)
@@ -425,11 +450,17 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         NodeManager nodeMan;
         int verboseLevel;
 
-        ResourceGraphBuilder(int width, int height, int verboseLevel) {
+        ResourceGraphBuilder(int width, int height, String loadFrom, int verboseLevel) {
             this.verboseLevel = verboseLevel;
             // use the beginning of a TG as loc
             nodeMan = new NodeManager();
-            buildResourceGraph();
+            if (loadFrom.isEmpty()) {
+                System.out.println("build resource graph");
+                buildResourceGraph();
+            } else {
+                System.out.println("load resource graph");
+                deserializeFrom(loadFrom);
+            }
         }
 
 
@@ -1058,7 +1089,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 for (short srcY = botLeft.getSecond(); srcY <= topLeft.getSecond(); srcY++) {
                     for (Pair<Short, Short> endPoint : endPoints) {
                         // sweep over possible source tg
-                        trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) ->
+                        if (fastMode)
+                            trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) ->
+                                            (e == InterconnectInfo.TimingGroup.CLE_OUT)),
+                                    box, toTg, new Pair<>(srcX, srcY), endPoint, xCoor, yCoor);
+                        else
+                            trimHelper(ictInfo.getTimingGroup((T.TimingGroup e) ->
                                    (e.type() != GroupDelayType.PINFEED) && (e.type() != GroupDelayType.GLOBAL)),
                                     box, toTg, new Pair<>(srcX, srcY), endPoint, xCoor, yCoor);
                     }
@@ -1479,15 +1515,15 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
                 // The start will be quad/long on the direction that is farther aware from the box.
                 // table ranges have exclusive end points.
-                int gapX = (distX >= width) ? Math.abs(distX - width + 1) : 0;
+                int gapX = (distX >= width)  ? Math.abs(distX - width  + 1) : 0;
                 int gapY = (distY >= height) ? Math.abs(distY - height + 1) : 0;
 
                 if (gapX < gapY) {
                     info.swap();
                 }
 
-                PartialRoute partialFirst = extend(begTg, info.firstBeg(), info.firstEnd(), info.firstDir(), info.firstLim());
-                T.TimingGroup switchingTG = partialFirst.isEmpty() ? begTg : partialFirst.lastTg();
+                PartialRoute partialFirst  = extend(begTg, info.firstBeg(), info.firstEnd(), info.firstDir(), info.firstLim());
+                T.TimingGroup switchingTG  = partialFirst.isEmpty() ? begTg : partialFirst.lastTg();
                 PartialRoute partialSecond = extend(switchingTG, info.secondBeg(), info.secondEnd(), info.secondDir(), info.secondLim());
 
                 String route = "";
@@ -1605,10 +1641,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         short newBegX = (firstDir == T.Direction.HORIZONTAL) ?  partialFirst.loc() : partialSecond.loc();
         short newBegY = (firstDir == T.Direction.VERTICAL)   ?  partialFirst.loc() : partialSecond.loc();
 
-        // TODO: this is very conservative and expensive. Need to pick just a few possibilities
         // TODO: take it from interconnectInfo
         T.TileSide lastSide = ((lastTg == T.TimingGroup.VERT_LONG) || (lastTg == T.TimingGroup.HORT_LONG))
                 ? T.TileSide.M : begSide;
+
+//            // This is very conservative and expensive. Need to pick just a few possibilities.
 //            Pair<Short,Short> offset = getOffsetToTable(begX, begY, endX, endY);
 //            Rectangle tableRect = new Rectangle((short)(0-offset.getFirst()),(short)(0-offset.getSecond()),
 //                    (short) (extendedWidth-offset.getFirst()), (short) (extendedHeight-offset.getSecond()));
@@ -2244,7 +2281,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 2, (short) 2, 6);
-//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
+//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, true, 0);
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo);
 
         short yCoor = 60;
@@ -2326,11 +2363,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 String inFileName = args[1] + "_merge" + ".ser";
                 est.rgBuilder.deserializeFrom(inFileName);
             }
-            else if (args[0].equalsIgnoreCase("TestOct23")) {
+            else if (args[0].equalsIgnoreCase("TestNov2")) {
                 est.trimTableAt((short)50,(short)60,true);
                 est.trimTableAt((short)50,(short)60,false);
                 est.rgBuilder.removeUnmarked();
-                est.rgBuilder.serializeTo("testoct23_merge.ser");
+                est.rgBuilder.serializeTo("testnov2_merge.ser");
             }
         }
 
@@ -2340,14 +2377,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        est.rgBuilder.deserializeFrom(args[1] + ".ser");
 
 //        est.testBounceToSink();
-        est.testSpecialCase(device);
+//        est.testSpecialCase(device);
 //        est.testGetDelayOf(device);
 
 
         long endBuildTime = System.nanoTime();
         long elapsedBuildTime = endBuildTime - startTime;
         System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-
 
         int count = 0;
 

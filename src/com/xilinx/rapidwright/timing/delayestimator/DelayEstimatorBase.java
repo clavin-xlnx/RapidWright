@@ -96,7 +96,6 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 
     DelayEstimatorBase(Device device, T ictInfo) {
         this(device, ictInfo, 0);
-
     }
 
 
@@ -216,11 +215,65 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     // INT_X0Y0/NN1_E_BEG3  - NODE_SINGLE  :
     // INT_X0Y0/NN4_E_BEG2  - NODE_VQUAD  :
     // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
+
+    protected RoutingNode getClosetOutSitePin(ImmutableTimingGroup tg) {
+        RoutingNode res = getClosetSitePin(tg);
+        res.tg = T.TimingGroup.CLE_OUT;
+        return res;
+    }
+    protected RoutingNode getClosetInSitePin(ImmutableTimingGroup tg) {
+        RoutingNode res = getClosetSitePin(tg);
+        res.tg = T.TimingGroup.CLE_IN;
+        return res;
+    }
+    private RoutingNode getClosetSitePin(ImmutableTimingGroup tg) {
+        RoutingNode res = new RoutingNode();
+        res.orientation = T.Orientation.S;
+
+        Node node = tg.exitNode();
+        IntentCode ic = node.getAllWiresInNode()[0].getIntentCode();
+
+        // INT_X45Y109/EE2_E_BEG6
+        // TODO: should I use getTile and wire instead of spliting the name?
+        String[] int_node = node.toString().split("/");
+
+        Pair<Short,Short> xy = getIntTileXY(int_node[0]);
+        res.x = xy.getFirst();
+        res.y = xy.getSecond();
+
+        String nodeName = int_node[1];
+        if (ic == IntentCode.NODE_SINGLE && nodeName.startsWith("I")) {
+            res.side = findTileSideForInternalSingle(tg.entryNode());
+        } else if (ic == IntentCode.NODE_LOCAL) {
+            res.side = findTileSideForGlobal(node);
+        } else{
+            // TODO don't project global to CLE_OUT
+            String[] tg_side = nodeName.split("_");
+            if (tg_side[1].startsWith("E"))
+                res.side = T.TileSide.E;
+            else if (tg_side[1].startsWith("W"))
+                res.side = T.TileSide.W;
+        }
+
+        return res;
+    }
+
+    private Pair<Short,Short> getIntTileXY(String intTileName) {
+        Pattern tilePattern = Pattern.compile("X([\\d]+)Y([\\d]+)");
+
+        Matcher tileMatcher = tilePattern.matcher(intTileName);
+        if (tileMatcher.find()) {
+            return new Pair<>(Short.valueOf(tileMatcher.group(1)), Short.valueOf(tileMatcher.group(2)));
+        } else {
+            System.out.println("getTermInfo coordinate matching error for IntTile " + intTileName);
+            return null;
+        }
+    }
+
     protected RoutingNode getTermInfo(ImmutableTimingGroup tg) {
 
         Node node = tg.exitNode();
         IntentCode ic = node.getAllWiresInNode()[0].getIntentCode();
-        Pattern tilePattern = Pattern.compile("X([\\d]+)Y([\\d]+)");
         Pattern EE          = Pattern.compile("EE([\\d]+)");
         Pattern WW          = Pattern.compile("WW([\\d]+)");
         Pattern NN          = Pattern.compile("NN([\\d]+)");
@@ -236,13 +289,10 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         // TODO: should I use getTile and wire instead of spliting the name?
         String[] int_node = node.toString().split("/");
 
-        Matcher tileMatcher = tilePattern.matcher(int_node[0]);
-        if (tileMatcher.find()) {
-            res.x = Short.valueOf(tileMatcher.group(1));
-            res.y = Short.valueOf(tileMatcher.group(2));
-        } else {
-            System.out.println("getTermInfo coordinate matching error for node " + node.toString());
-        }
+        Pair<Short,Short> xy = getIntTileXY(int_node[0]);
+        res.x = xy.getFirst();
+        res.y = xy.getSecond();
+
 
         String nodeType = null;
         if (skip.matcher(int_node[1]).find())
@@ -301,20 +351,21 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             res.side = T.TileSide.E;
         else if (tg_side[1].startsWith("W"))
             res.side = T.TileSide.W;
-        else
-        if (nodeType.startsWith("INT")) {
-            if (ic == IntentCode.NODE_LOCAL) {
-                res.side = findTileSideForGlobal(node);
+        else {
+            if (nodeType.startsWith("INT")) {
+                if (ic == IntentCode.NODE_LOCAL) {
+                    res.side = findTileSideForGlobal(node);
+                } else {
+                    // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
+                    // Check intendcode is an alternative to above if condition.
+                    res.side = findTileSideForInternalSingle(tg.entryNode());
+                    // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
+                    res.orientation = (res.side == T.TileSide.E) ? T.Orientation.D : T.Orientation.U;
+                    res.tg = T.TimingGroup.valueOf("INTERNAL_SINGLE");
+                }
             } else {
-                // Special for internal single such as INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE
-                // Check intendcode is an alternative to above if condition.
-                res.side = findTileSideForInternalSingle(tg.entryNode());
-                // let res.orientation above set a wrong value and override it because findTileSideForInternalSingle is slow
-                res.orientation = (res.side == T.TileSide.E) ? T.Orientation.D : T.Orientation.U;
-                res.tg = T.TimingGroup.valueOf("INTERNAL_SINGLE");
+                res.side = T.TileSide.M;
             }
-        } else {
-            res.side = T.TileSide.M;
         }
 
         return res;
