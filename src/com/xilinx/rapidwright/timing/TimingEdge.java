@@ -252,9 +252,21 @@ public class TimingEdge extends DefaultEdge {
      */
     public void setNetDelay(float netDelay) {
         this.netDelay = netDelay;
-        this.delay = this.intraSiteDelay + logicDelay+netDelay;
+        this.delay = logicDelay + netDelay;
         if (timingGraph.containsEdge(this))
             timingGraph.setEdgeWeight(this, this.delay);
+    }
+    
+    //TODO check
+    public void setRouteDelay(float routeDelay){
+    	this.netDelay = this.intraSiteDelay + routeDelay;
+    	this.delay = logicDelay + this.netDelay;
+//    	System.out.println("RouteDelay = " + routeDelay + ", intra site delay = "  + this.intraSiteDelay + ", logic delay = " + logicDelay);
+    	if (timingGraph.containsEdge(this))
+            timingGraph.setEdgeWeight(this, this.delay);
+    	else
+    		System.err.println("timing graph does not contain timing edge");
+//    	System.out.println(timingGraph.getEdgeWeight(this) == this.delay);
     }
 
     /**
