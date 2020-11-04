@@ -29,7 +29,6 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.util.Pair;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -98,6 +97,7 @@ public class SiblingsTimingGroup {
         this.siblings = siblings.toArray(new ImmutableTimingGroup[siblings.size()]);
         this.hashCode = this.siblings[0].exitNode().hashCode();
         this.type     = GroupDelayType.PINFEED;
+        this.virtual  = false;
     }
 
     /**
@@ -105,8 +105,19 @@ public class SiblingsTimingGroup {
      * @return a list of list of timing groups representing a list of siblings -- timing groups sharing the same last nodes,
      * instead of an array of timing groups, returned by getNextTimingGroups().
      */
-    public List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> getNextSiblingTimingGroups(Set<Node> reservedNodes) {
-        List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> result =  new ArrayList<>();
+    public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes) {
+
+        List<SiblingsTimingGroup> result =  new ArrayList<>();
+
+        if (this.isVirtual()) {
+            this.virtual = false;
+//             Route should evaluate MH distance of the virtual node and delay of its parent. Does this make sense?
+//             It will not if none of the virtual nodes in this batch will become least cost.
+            result.add(this);
+            return result;
+        }
+
+
         Node prevNode = siblings[0].exitNode();
 
         // I don't see pip is used in computeTypes or delay calculation. Thus, I don't populate it.
@@ -126,16 +137,16 @@ public class SiblingsTimingGroup {
                 // TG with one node has no siblings.
                 if (nextNodeHasGlobalWire) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}},
-                                                                  GroupDelayType.GLOBAL), newTS));
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}},
+                                                                  GroupDelayType.GLOBAL, false));
                 } else if (ic == IntentCode.NODE_CLE_OUTPUT) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
-                                                                  GroupDelayType.OTHER),newTS));
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
+                                                                  GroupDelayType.OTHER, false));
                 } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new Pair<>(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
-                                                                  GroupDelayType.LONG),newTS));
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
+                                                                  GroupDelayType.LONG, false));
                 } else {
                     // for other TGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
@@ -143,8 +154,12 @@ public class SiblingsTimingGroup {
                             IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
 
                             List<ImmutableTimingGroup> tgs = new ArrayList<>();
-                            ImmutableTimingGroup throughTg = null;
                             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) { // need to get all downhill PIPs
+
+                                String[] int_node = nextPrvNode.toString().split("/");
+                                if (int_node[1].contains("VCC_WIRE"))
+                                    continue;
+
                                 // TODO: Currently the whole sibling is considered together as a whole.
                                 // TODO: (need to revisit this if the assumption changes.)
                                 // TODO: Thus only check nodes that can be key nodes. nextPrvNode is not a key node.
@@ -154,11 +169,9 @@ public class SiblingsTimingGroup {
                                         NodeWithFaninInfo.create(nextPrvNode),
                                         nextNextIc, nextPrvIc);
                                 tgs.add(newTS);
-                                if (nextPrvNode.equals(nextNode))
-                                    throughTg = newTS;
                             }
                             // TODO: find out the type if the type is needed. Don't do it to reduce runtime
-                            result.add(new Pair<>(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER),throughTg));
+                            result.add(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER,true));
                         }
                     }
                 }
@@ -205,6 +218,10 @@ public class SiblingsTimingGroup {
         return hashCode;
     }
 
+    public boolean isVirtual() {
+        return this.virtual;
+    }
+
 
     // ------------------------------------   private ----------------------------------------
 
@@ -212,12 +229,14 @@ public class SiblingsTimingGroup {
     final private ImmutableTimingGroup[] siblings;
     final private int                    hashCode;
     final private GroupDelayType         type;
+    private       boolean                virtual;
 
 
-    private SiblingsTimingGroup (List<ImmutableTimingGroup> tgs, GroupDelayType type) {
-        this.siblings = tgs.toArray(new ImmutableTimingGroup[tgs.size()]); // *******
+    private SiblingsTimingGroup (List<ImmutableTimingGroup> tgs, GroupDelayType type, boolean virtual) {
+        this.siblings = tgs.toArray(new ImmutableTimingGroup[tgs.size()]);
         this.hashCode = this.siblings[0].hashCode();
         this.type     = type;
+        this.virtual  = virtual;
     }
 
 
@@ -237,12 +256,12 @@ public class SiblingsTimingGroup {
         Set<Node> empty = new HashSet<Node>();
         for (int i = 0; i < numExpansion; i++) {
             System.out.println("----");
-            List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = s.getNextSiblingTimingGroups(empty);
-            for (Pair<SiblingsTimingGroup,ImmutableTimingGroup> sb : next) {
+            List<SiblingsTimingGroup> next = s.getNextSiblingTimingGroups(empty);
+            for (SiblingsTimingGroup sb : next) {
                 System.out.println(sb.toString());
             }
             // just pack one to expand
-            s = next.get(0).getFirst();
+            s = next.get(0);
         }
     }
 }

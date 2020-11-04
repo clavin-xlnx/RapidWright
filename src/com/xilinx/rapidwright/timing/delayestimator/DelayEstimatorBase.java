@@ -246,6 +246,9 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             res.side = findTileSideForInternalSingle(tg.entryNode());
         } else if (ic == IntentCode.NODE_LOCAL) {
             res.side = findTileSideForGlobal(node);
+        } else if (ic == IntentCode.NODE_VLONG || ic == IntentCode.NODE_HLONG) {
+            // arbitrary decision. It is more resonable to be the same side as the sink.
+            res.side = T.TileSide.E;
         } else{
             // TODO don't project global to CLE_OUT
             String[] tg_side = nodeName.split("_");
