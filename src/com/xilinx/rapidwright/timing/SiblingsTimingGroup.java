@@ -120,6 +120,10 @@ public class SiblingsTimingGroup {
         List<SiblingsTimingGroup> result = new ArrayList<SiblingsTimingGroup>();
 
         Node prevNode = siblings[0].exitNode();
+        if(prevNode.getAllWiresInNode()[0].getIntentCode() == IntentCode.NODE_PINFEED){ 
+        	return result;
+        }
+        
         // I don't see pip is used in computeTypes or delay calculation. Thus, I don't populate it.
         for (Node nextNode : prevNode.getAllDownhillNodes()) {
             if (!reservedNodes.contains(nextNode)){// && (rthHelper!= null && !rthHelper.isRouteThru(prevNode, nextNode))) {
