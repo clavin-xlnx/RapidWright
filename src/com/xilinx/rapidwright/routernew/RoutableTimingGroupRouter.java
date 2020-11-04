@@ -46,7 +46,10 @@ public class RoutableTimingGroupRouter{
 	public TimingModel timingModel;
 	public TimingGraph timingGraph;
 	private static final float MAX_CRITICALITY = 0.99f;
-	private static final float CRITICALITY_EXPONENT = 3;
+	private static final float CRITICALITY_EXPONENT = 1;
+	private float MIN_REROUTE_CRITICALITY = 0.85f, REROUTE_CRITICALITY;
+	private int MAX_PERCENTAGE_CRITICAL_CONNECTIONS = 3;
+	private final List<Connection> criticalConnections;
 	
 	public List<Netplus> nets;
 	public List<Connection> connections;
@@ -143,8 +146,8 @@ public class RoutableTimingGroupRouter{
 			this.timingGraph = this.timingManager.getTimingGraph();
 			
 			//original setTimingRequirement includes compute arrival time
-			//TODO check. 1290 is got from the example
-			this.timingGraph.setTimingRequirementOnly(1500);
+			//TODO check. 1290ps is got from the example PipelineGneratorWithRouting
+			this.timingGraph.setTimingRequirementOnly(5000);
 			
 			Device device = Device.getDevice("xcvu3p-ffvc1517");
 			
@@ -159,6 +162,7 @@ public class RoutableTimingGroupRouter{
 		this.t = t;
 		
 		this.connectionEntryNodes = new HashMap<>();
+		this.criticalConnections = new ArrayList<>();
 		
 		this.initial_pres_fac = initial_pres_fac;
 		this.pres_fac_mult = pres_fac_mult;
@@ -478,6 +482,25 @@ public class RoutableTimingGroupRouter{
 		System.out.println("average shaing for used entry nodes: " + sum/RoutableTimingGroup.entryNodesExpanded.size());
 	}
 	
+	private void setRerouteCriticality(List<Connection> connections) {
+    	//Limit number of critical connections
+    	REROUTE_CRITICALITY = MIN_REROUTE_CRITICALITY;
+    	this.criticalConnections.clear();
+    	
+    	int maxNumberOfCriticalConnections = (int) (this.connections.size() * 0.01 * MAX_PERCENTAGE_CRITICAL_CONNECTIONS);
+    	
+    	for(Connection con : connections) {
+    		if(con.getCriticality() > REROUTE_CRITICALITY) {
+    			this.criticalConnections.add(con);
+    		}
+    	}
+    	
+    	if(this.criticalConnections.size() > maxNumberOfCriticalConnections) {
+    		Collections.sort(this.criticalConnections, Comparators.ConnectionCriticality);
+    		REROUTE_CRITICALITY = this.criticalConnections.get(maxNumberOfCriticalConnections).getCriticality();
+    	}
+    }
+	
 	public void route(){
 		//sorted nets and connections
 		this.sortedListOfConnection = new ArrayList<>();
@@ -518,7 +541,10 @@ public class RoutableTimingGroupRouter{
 			this.iterationStart = System.nanoTime();
 			//TODO TIMING GRAPH HERE
 			this.connectionsRoutedIteration = 0;	
-			validRouting = true;	
+			validRouting = true;
+			
+			this.setRerouteCriticality(this.sortedListOfConnection);
+			
 			if(this.trial) this.printInfo("iteration " + this.itry + " begins");
 			
 			if(!this.trial){
@@ -688,6 +714,11 @@ public class RoutableTimingGroupRouter{
 			this.routerTimer.firstIteration.finish();
 			
 		}else if(con.congested() || this.conEntryNodeCongested(con)){			
+			this.routerTimer.rerouteCongestion.start();
+			this.routeACon(con);
+			this.routerTimer.rerouteCongestion.finish();
+			
+		}else if (con.getCriticality() > REROUTE_CRITICALITY) {
 			this.routerTimer.rerouteCongestion.start();
 			this.routeACon(con);
 			this.routerTimer.rerouteCongestion.finish();
@@ -891,7 +922,7 @@ public class RoutableTimingGroupRouter{
 						this.ripup(c);
 					}
 					//remove cycles
-					System.out.println(illegalTree.getNet().getName() + " cycle exists");
+//					System.out.println(illegalTree.getNet().getName() + " cycle exists");
 					graphHelper.cutOffCycles(illegalTree);//TODO clean version (update to router fields)
 				}else{
 //					System.out.println(illegalTree.getNet().getName() + " no cycles illegal tree");
@@ -1523,7 +1554,8 @@ public class RoutableTimingGroupRouter{
 		float rnodeCost = this.getRouteNodeCost(childRNode, thruImmuTg, con, countSourceUses);
 //		this.routerTimer.getRouteNodeCost.finish();
 		
-		float new_partial_path_cost = partial_path_cost + rnodeCost;//upstream path cost + cost of node under consideration
+//		float new_partial_path_cost = partial_path_cost + (1 - con.getCriticality()) * rnodeCost + con.criticality * thruImmuTg.getDelay()/20f;//upstream path cost + cost of node under consideration
+		float new_partial_path_cost = partial_path_cost + rnodeCost + 0.0001f * thruImmuTg.getDelay()/20f;//upstream path cost + cost of node under consideration
 		int childLevel = rnode.rnodeData.getLevel() + 1;
 		float new_lower_bound_total_path_cost;
 		float expected_distance_cost = 0;
@@ -1538,7 +1570,10 @@ public class RoutableTimingGroupRouter{
 			}*/
 			
 			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
-			new_lower_bound_total_path_cost = new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * childLevel;
+//			new_lower_bound_total_path_cost = (float) (new_partial_path_cost + (1 - con.getCriticality() > 1?0.99:con.getCriticality()) * this.mdWeight * expected_wire_cost + this.hopWeight * childLevel);
+			
+			new_lower_bound_total_path_cost = (float) (new_partial_path_cost + (1 - con.getCriticality() > 1?0.99:con.getCriticality()) * this.mdWeight * expected_wire_cost + this.hopWeight * childLevel);
+			
 			
 			if(this.timingDriven){
 				ImmutableTimingGroup immuTG = thruImmuTg;
@@ -1584,7 +1619,7 @@ public class RoutableTimingGroupRouter{
 				}
 				if(debugTiming) System.out.println(" delay = " + delay);
 				
-				new_lower_bound_total_path_cost += delay/20f;
+				new_lower_bound_total_path_cost +=  delay/20f;
 			}
 			
 		}else{//lut input pin (sink)
