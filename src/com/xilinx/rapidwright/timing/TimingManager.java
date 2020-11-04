@@ -81,9 +81,11 @@ public class TimingManager {
 //    		this.timingGraph.setEdgeWeight(e, e.getDelay());
     	}
     }
-    //TODO how to deal with required time (set to the max delay?)
+    //TODO to deal with required time (set to the max delay)
     public void calculateArrivalRequireAndSlack(){
     	this.timingGraph.computeArrivalTimes();
+//    	float maxDelay = (float) this.timingGraph.getMaxDelayPath().getWeight();
+//    	this.timingGraph.setTimingRequirementOnly(maxDelay);
     	this.timingGraph.computeSlacks();
     }
     
@@ -100,7 +102,7 @@ public class TimingManager {
     	
     	for(Connection c : cons){
     		c.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
-    		System.out.println(c.criticality);
+//    		System.out.println(c.criticality);
     	}
     }
   //-------------------------------------------------------------------------
@@ -117,7 +119,7 @@ public class TimingManager {
 
     private boolean postBuild() {
         timingGraph.removeClockCrossingPaths();
-        timingGraph.buildGraphPaths(BUILD_GRAPH_PATHS_DEFAULT_PARAM);
+        timingGraph.buildGraphPaths(0);//(BUILD_GRAPH_PATHS_DEFAULT_PARAM);
         timingGraph.computeArrivalTimes();
         timingGraph.computeSlacks();
         return true;
