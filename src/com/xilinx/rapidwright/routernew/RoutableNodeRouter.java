@@ -16,7 +16,9 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
@@ -26,6 +28,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.device.e;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
 public class RoutableNodeRouter{
@@ -48,10 +51,12 @@ public class RoutableNodeRouter{
 	public PriorityQueue<QueueElement> queue;
 	public Collection<RoutableData> rnodesTouched;
 	public Map<Node, RoutableNode> rnodesCreated;//node and rnode pair
+	public Set<Node> reservedNodes;
+	private static HashSet<String> lutOutputPinNames;
 	
 	public List<Connection> sortedListOfConnection;
 	public List<Netplus> sortedListOfNetplus;
-	public List<Netplus> staticNets;
+	public List<Net> staticNets;
 
 	public RouteThruHelper routethruHelper;
 //	public RouterHelper routerHelper;
@@ -97,6 +102,14 @@ public class RoutableNodeRouter{
 	boolean printNodeInfo = false;
 	public float firtRnodeT;
 	
+	static {
+		lutOutputPinNames = new HashSet<String>();
+		for(String cle : new String[]{"L", "M"}){
+			for(String pin : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}){
+				lutOutputPinNames.add("CLE_CLE_"+cle+"_SITE_0_"+pin+"_O");
+			}
+		}
+	}
 	
 	public RoutableNodeRouter(Design design,
 			String dcpFileName,
@@ -113,7 +126,7 @@ public class RoutableNodeRouter{
 		this.design = design;
 		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
-		
+		this.reservedNodes = new HashSet<>();
 		this.rnodesCreated = new HashMap<>();
 		this.dcpFileName = dcpFileName;
 		this.nrOfTrials = nrOfTrials;
@@ -172,7 +185,10 @@ public class RoutableNodeRouter{
 				this.iclockAndStaticNet++;
 				
 			}else if(n.isStaticNet()){
-				this.reserveNet(n);
+//				this.reserveNet(n);
+//				this.printInfo(n.toStringFull());
+				n.unroute();
+				this.staticNets.add(n);
 				this.iclockAndStaticNet++;
 				
 			}else if (n.getType().equals(NetType.WIRE)){
@@ -258,7 +274,157 @@ public class RoutableNodeRouter{
 		return rrgNodeId;
 	}
 	
+	public void routeStaticNets(){
+		for(Net n:this.staticNets){
+			this.routeStaticNet(n);
+		}
+	}
 	
+	public void routeStaticNet(Net currNet){
+		NetType netType = currNet.getType();
+		Set<Node> unavailableNodes = this.getAllUsedNodesOfRoutedNets();
+		unavailableNodes.addAll(this.reservedNodes);//TODO not reserve static net
+		Set<PIP> netPIPs = new HashSet<>();
+		
+		for(SitePinInst sink : currNet.getPins()){
+			boolean debug = false;
+			if(sink.isOutPin()) continue;
+			int watchdog = 10000;
+			int wire = sink.getSiteInst().getSite().getTileWireIndexFromPinName(sink.getName());
+			
+			if(wire == -1) {
+				throw new RuntimeException("ERROR: Problem while trying to route static sink " + sink);
+			}
+			Tile t = sink.getTile();
+			if(debug) {
+				System.out.println("SINK: " + t.getName() + " " + t.getWireName(wire));
+			}
+			
+			Node node = new Node(t,wire); // same as sink.getConnectedNode()
+			RoutableNode sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.SINKRR, this.base_cost_fac);
+			sinkRNode.type = RoutableType.SINKRR;
+			sinkRNode.rnodeData.setPrev(null);
+			Queue<RoutableNode> q = new LinkedList<>();
+			List<Node> pathNodes = new ArrayList<>();
+			q.add(sinkRNode);
+			boolean success = false;
+			while(!q.isEmpty()){
+				RoutableNode n = q.poll();
+				if(debug) System.out.println("DEQUEUE:" + n);
+				
+				if(success = this.isThisOurStaticSource(n, netType, debug)){
+					n.type = RoutableType.SOURCERR;//set as a VCC source
+					//trace back for a complete path
+					if(debug){
+						System.out.println("SOURCE " + n.toString() + " found");
+					}
+					
+					while(n != null){
+						pathNodes.add(n.getNode());
+						n = (RoutableNode) n.rnodeData.getPrev();
+					}
+					Collections.reverse(pathNodes);
+					if(debug){
+						for(Node pathNode:pathNodes){
+							System.out.println(pathNode.toString());
+						}
+					}
+					netPIPs.addAll(RouterHelper.conPIPs(pathNodes));
+					break;
+				}
+				
+				if(debug){
+					System.out.println("KEEP LOOKING FOR A SOURCE...");
+				}
+				for(Node uphillNode : n.getNode().getAllUphillNodes()){
+					if(this.routethruHelper.isRouteThru(uphillNode, n.getNode())) continue;
+					RoutableNode nParent = this.createRoutableNodeAndAdd(this.rrgNodeId, uphillNode, RoutableType.INTERRR, this.base_cost_fac);
+					nParent.rnodeData.setPrev(n);
+					if(!this.pruneNode(nParent, unavailableNodes)) q.add(nParent);
+				}
+				watchdog--;
+				if(watchdog < 0) {
+					break;
+				}
+			}
+			if(!success){
+				System.out.println("FAILED to route " + netType + " pin " + sink.toString());
+			}else{
+				sink.setRouted(true);
+			}
+		}
+		
+		currNet.setPIPs(netPIPs);
+	}
+	
+	private boolean pruneNode(RoutableNode parent, Set<Node> unavailableNodes){//, Set<RoutableNode> visited){
+		Node n = parent.getNode();
+		IntentCode ic = n.getTile().getWireIntentCode(n.getWire());
+		switch(ic){
+			case NODE_GLOBAL_VDISTR:
+			case NODE_GLOBAL_HROUTE:
+			case NODE_GLOBAL_HDISTR:
+			case NODE_HLONG:
+			case NODE_VLONG:
+			case NODE_GLOBAL_VROUTE:
+			case NODE_GLOBAL_LEAF:
+			case NODE_GLOBAL_BUFG:
+				return true;
+			default:
+		}
+		if(unavailableNodes.contains(n)) return true;
+//		if(visited.contains(parent)) return true;
+		return false;
+	}
+	
+	/**
+	 * Determines if the given node can serve as our sink.
+	 * @param rnode RoutableNode in question
+	 * @param type The net type to designate the static source type
+	 * @return true if this sources is usable, false otherwise. 
+	 */
+	private boolean isThisOurStaticSource(RoutableNode rnode, NetType type, boolean debug){
+		return this.isNodeUsableStaticSource(rnode, type);
+	}
+	
+	/**
+	 * This method handles queries during the static source routing process. 
+	 * It determines if the node in question can be used as a source for the current
+	 * NetType.
+	 * @param n The node in question
+	 * @param type The NetType to indicate what kind of static source we need (GND/VCC)
+	 * @return True if the pin is a hard source or an unused LUT output that can be repurposed as a source
+	 */
+	private boolean isNodeUsableStaticSource(RoutableNode rnode, NetType type){
+		// We should look for 3 different potential sources
+		// before we stop:
+		// (1) GND_WIRE 
+		// (2) VCC_WIRE 
+		// (3) Unused LUT Outputs (A_0, B_0,...,H_0)
+		String pinName = type == NetType.VCC ? Net.VCC_WIRE_NAME : Net.GND_WIRE_NAME;
+		Node n = rnode.getNode();
+		if(n.getWireName().startsWith(pinName)){
+			return true;
+		}else if(lutOutputPinNames.contains(n.getWireName())){
+			Site slice = n.getTile().getSites()[0];
+			SiteInst i = design.getSiteInstFromSite(slice);			
+			if(i == null) return true; // Site is not used
+			char uniqueId = n.getWireName().charAt(n.getWireName().length()-3);
+			Net currNet = i.getNetFromSiteWire(uniqueId + "_O");
+			if(currNet == null) return true;
+			if(currNet.getType() == type) return true;
+			return false;
+		}
+		return false;
+	}
+	
+	public Set<Node> getAllUsedNodesOfRoutedNets(){
+		Set<Node> nodes = new HashSet<>();
+		for(Connection c:this.sortedListOfConnection){
+			nodes.addAll(c.nodes);
+		}	
+		return nodes;
+	}
 	
 	public void reserveNet(Net n){
 		if(n.hasPIPs()){
@@ -301,7 +467,7 @@ public class RoutableNodeRouter{
 			c.setSinkRNode(sinkRNode);
 			
 			this.connections.add(c);
-			c.setNet(np);//TODO new and set its TimingEdge for timing-driven version
+			c.setNet(np);
 			np.addCons(c);
 			this.iconToBeRouted++;
 		}
@@ -316,6 +482,9 @@ public class RoutableNodeRouter{
 			
 			Node nodeEnd = pip.getEndNode();
 			this.createRoutableNodeAndAdd(this.rrgNodeId, nodeEnd, RoutableType.RESERVED, Float.MAX_VALUE - 1);
+		
+			this.reservedNodes.add(nodeStart);
+			this.reservedNodes.add(nodeEnd);
 		}
 	}
 	
@@ -323,6 +492,8 @@ public class RoutableNodeRouter{
 		for(SitePinInst pin:n.getPins()){
 			Node node = pin.getConnectedNode();
 			this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.RESERVED, Float.MAX_VALUE - 1);			
+			
+			this.reservedNodes.add(node);
 		}
 	}
 	
@@ -335,7 +506,7 @@ public class RoutableNodeRouter{
 			this.rrgNodeId++;
 		}else{
 			rrgNode = this.rnodesCreated.get(node);
-			System.err.println("routing resource conflicts");
+			if(rrgNode.type == type && type == RoutableType.SINKRR) System.err.println("routing resource conflicts");
 		}
 		
 		return rrgNode;
@@ -365,7 +536,7 @@ public class RoutableNodeRouter{
 	}
 	
 	public List<Routable> findINTNodeOfOutputPin(){
-		//TODO for CLBs, it is true that there is only one possible connected tile
+		//for CLBs, it is true that there is only one possible connected tile
 		List<Routable> rns = new ArrayList<>();
 		for(Netplus netp:this.sortedListOfNetplus){
 			
@@ -391,10 +562,10 @@ public class RoutableNodeRouter{
 			Node tmpNode = rnode.getNode();
 			if(this.isSwitchBox(tmpNode)){
 				while(rnode != null){
-					partialPath.add(rnode);//TODO rip-up and re-routing should not clear this path?
+					partialPath.add(rnode);//rip-up and re-routing should not clear this path?
 					rnode = (RoutableNode) rnode.rnodeData.getPrev();
 				}
-				//TODO add all INT nodes to partial path as the sources of a con
+				//add all INT nodes to partial path as the sources of a con
 				return partialPath;
 			}
 			
@@ -421,10 +592,11 @@ public class RoutableNodeRouter{
 		return null;
 	}
 	
+	//TODO use this for INT-based routing
 	public List<Routable> findInputPinFeed(Node node){
 		List<Routable> partialPath = new ArrayList<>();
 		
-		//TODO this should be handled well, otherwise it will impact the routing functionality, e.g. con target unreachable
+		//this should be handled well, otherwise it will impact the routing functionality, e.g. con target unreachable
 		RoutableNode rnode = this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.SINKRR, this.base_cost_fac);
 		rnode.rnodeData.setPrev(null);
 		
@@ -437,7 +609,7 @@ public class RoutableNodeRouter{
 			Node tmpNode = rnode.getNode();
 			if(this.isSwitchBox(tmpNode)){
 				while(rnode != null){
-					partialPath.add(rnode);//TODO rip-up and re-routing should not clear this path?
+					partialPath.add(rnode);//rip-up and re-routing should not clear this path?
 					rnode = (RoutableNode) rnode.rnodeData.getPrev();
 				}
 				
@@ -454,7 +626,7 @@ public class RoutableNodeRouter{
 				
 				Wire newNodeHead = tmpWire.getStartWire();
 				if(!newNodeHead.equals(tmpWire)){
-//					System.out.println("----many----");//TODO what does this mean, it is the same case for the existing rw router
+//					System.out.println("----many----");//what does this mean? it is the same case for the existing rw router
 					Node newHeadNode = new Node(newNodeHead.getTile(), newNodeHead.getWireIndex());
 					RoutableNode rnewHeadNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newHeadNode, RoutableType.INTERRR, this.base_cost_fac);
 					rnewHeadNode.rnodeData.setPrev(rnode);
@@ -466,7 +638,7 @@ public class RoutableNodeRouter{
 		return null;
 	}
 	
-	//TODO not possible to get all sitePins of a tile, a name needed to get the sitePin
+	//not possible to get all sitePins of a tile, a name needed to get the sitePin
 	public void checkDeviceWideInputPinFeed(){
 		for(Tile tile:this.design.getDevice().getAllTiles()){
 			int siteLength = tile.getSites().length;
@@ -479,7 +651,7 @@ public class RoutableNodeRouter{
 				for(int i = 0; i< pinCount; i++){
 					Node node = site.getConnectedNode(i);
 					if(node != null){
-						List<Routable> path = this.findInputPinFeed(node);//TODO check INT nodes of a single site
+						List<Routable> path = this.findInputPinFeed(node);//check INT nodes of a single site
 						System.out.println("path length = " + path.size() + " " + path.get(0).toString());
 					}
 				}
@@ -595,7 +767,7 @@ public class RoutableNodeRouter{
         	}
         }
         
-        //TODO check INT node of con.source
+        //check INT node of con.source
 //        this.findINTNodeOfOutputPin();
         
 		while(this.itry < this.nrOfTrials){
@@ -629,7 +801,7 @@ public class RoutableNodeRouter{
 			//fix illegal routing trees if any
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
-//				this.debugRoutingCon = true;//TODO fix cycles in the tree
+//				this.debugRoutingCon = true;//fix cycles in the tree
 //				boolean printNodeInfo = true;
 				
 				//for fixing illegalTree using nodes
@@ -655,8 +827,6 @@ public class RoutableNodeRouter{
 				this.routerTimer.rerouteIllegal.finish();
 			}
 			
-			//TODO update timing and criticalities of connections
-			
 			this.iterationEnd = System.nanoTime();
 			//statistics
 			this.routerTimer.calculateStatistics.start();
@@ -671,7 +841,7 @@ public class RoutableNodeRouter{
 			if (validRouting) {
 				//generate and assign a list of PIPs for each Net net
 				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
-							
+				this.routeStaticNets();	
 				this.routerTimer.pipsAssignment.start();
 				this.pipsAssignment();
 				this.routerTimer.pipsAssignment.finish();
@@ -807,7 +977,7 @@ public class RoutableNodeRouter{
 			}
 			
 			if(rn.overUsed() || rn.illegal()){
-				System.err.println(rn.toString());//TODO because the fixingIllegalTree method in GraphHelper does not change records of RNodes
+				System.err.println(rn.toString());//if the fixingIllegalTree method in GraphHelper does not change records of RNodes, err will be non-zero
 				err++;
 			}
 		}
@@ -1008,7 +1178,7 @@ public class RoutableNodeRouter{
 					illegalConnection.addNode(newRouteNode.getNode());
 				}
 				
-				this.add(illegalConnection);//TODO update entry node info 0925 and pip assignment based on con.nodes
+				this.add(illegalConnection);//update entry node info and pip assignment based on con.nodes
 			}
 			
 		}
