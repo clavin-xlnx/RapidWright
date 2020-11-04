@@ -90,7 +90,7 @@ public class RoutableTimingGroup implements Routable{
 		this.childrenImmuTG = new ArrayList<>();
 		
 		
-		List<SiblingsTimingGroup> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes, helper);
+		List<SiblingsTimingGroup> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes);
 		
 		for(SiblingsTimingGroup stGroups : next){
 			
