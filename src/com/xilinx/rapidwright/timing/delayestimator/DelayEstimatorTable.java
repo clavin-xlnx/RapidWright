@@ -56,7 +56,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -123,11 +123,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         this.fastMode = fastMode;
         if (fastMode) {
-            tgToSrcNodeMapper = this::getClosetOutSitePin;
-            tgToDstNodeMapper = this::getClosetInSitePin;
+            tgsToSrcDstNodeMapper = this::getClosetSrcDstSitePin;
         } else {
-            tgToSrcNodeMapper = this::getTermInfo;
-            tgToDstNodeMapper = this::getTermInfo;
+            tgsToSrcDstNodeMapper = this::getSrcDstTermInfo;
         }
 
         build(loadFrom);
@@ -182,7 +180,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         } else if (timingGroup.delayType() == GroupDelayType.PINFEED) {
             return Short.MAX_VALUE;
         } else {
-            return getMinDelayToSinkPin(tgToSrcNodeMapper.apply(timingGroup), tgToDstNodeMapper.apply(sinkPin)).getFirst();
+            Pair<RoutingNode,RoutingNode> srcDst = tgsToSrcDstNodeMapper.apply(timingGroup, sinkPin);
+            return getMinDelayToSinkPin(srcDst.getFirst(), srcDst.getSecond()).getFirst();
         }
 
 ////        Node tgNode = timingGroup.getLastNode();
@@ -232,9 +231,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     private boolean fastMode;
 
 //    protected Function<ImmutableTimingGroup,RoutingNode> tgToNodeMapper;
-    interface SerializableFunction<T,R> extends Function<T,R>, Serializable {}
-    protected SerializableFunction<ImmutableTimingGroup,RoutingNode> tgToSrcNodeMapper;
-    protected SerializableFunction<ImmutableTimingGroup,RoutingNode> tgToDstNodeMapper;
+    interface SerializableBiFunction<T,U,R> extends BiFunction<T,U,R>, Serializable {}
+    protected SerializableBiFunction<ImmutableTimingGroup,ImmutableTimingGroup,Pair<RoutingNode,RoutingNode>> tgsToSrcDstNodeMapper;
 
     private short width;
     private short height;
@@ -2284,7 +2282,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 2, (short) 2, 6);
-//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, true, 0);
+//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, true, "", 0);
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo);
 
         short yCoor = 60;
@@ -2366,11 +2364,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 String inFileName = args[1] + "_merge" + ".ser";
                 est.rgBuilder.deserializeFrom(inFileName);
             }
-            else if (args[0].equalsIgnoreCase("TestNov2")) {
+            else if (args[0].equalsIgnoreCase("TestNov4")) {
                 est.trimTableAt((short)50,(short)60,true);
                 est.trimTableAt((short)50,(short)60,false);
                 est.rgBuilder.removeUnmarked();
-                est.rgBuilder.serializeTo("testnov2_merge.ser");
+                est.rgBuilder.serializeTo("testnov4_merge.ser");
             }
         }
 
@@ -2380,37 +2378,37 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        est.rgBuilder.deserializeFrom(args[1] + ".ser");
 
 //        est.testBounceToSink();
-        est.testSpecialCase(device);
+//        est.testSpecialCase(device);
 //        est.testGetDelayOf(device);
 
 
-//        long endBuildTime = System.nanoTime();
-//        long elapsedBuildTime = endBuildTime - startTime;
-//        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-//
-//        int count = 0;
-//
-//        long startLookupTime = System.nanoTime();
-//        // diagonal in table
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-//        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
-//
-//        //  out of table
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
-//        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
-//
-//        long endLookupTime = System.nanoTime();
-//        long elapsedLookupTime = endLookupTime - startLookupTime;
-//
-//
-//        System.out.println();
-//        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-//        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
-//        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
+        long endBuildTime = System.nanoTime();
+        long elapsedBuildTime = endBuildTime - startTime;
+        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+
+        int count = 0;
+
+        long startLookupTime = System.nanoTime();
+        // diagonal in table
+        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+
+        //  out of table
+        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
+        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
+
+        long endLookupTime = System.nanoTime();
+        long elapsedLookupTime = endLookupTime - startLookupTime;
+
+
+        System.out.println();
+        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
+        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
 
 //        est.testOne(37, 37, 60, 120, "E", "E");
 ////        est.testOne(37, 53, 60, 90, "E", "E");

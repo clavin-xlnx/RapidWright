@@ -215,7 +215,15 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     // INT_X0Y0/NN1_E_BEG3  - NODE_SINGLE  :
     // INT_X0Y0/NN4_E_BEG2  - NODE_VQUAD  :
     // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
+    // INT_X29Y205/INT_NODE_GLOBAL_0_INT_OUT1 - NODE_LOCAL
 
+    protected Pair<RoutingNode,RoutingNode> getClosetSrcDstSitePin(ImmutableTimingGroup frTg, ImmutableTimingGroup toTg) {
+        RoutingNode src = getClosetOutSitePin(frTg);
+        RoutingNode dst = getClosetInSitePin(toTg);
+        if (src.side == T.TileSide.M)
+            src.side = dst.side;
+        return new Pair<>(src,dst);
+    }
     protected RoutingNode getClosetOutSitePin(ImmutableTimingGroup tg) {
         RoutingNode res = getClosetSitePin(tg);
         res.tg = T.TimingGroup.CLE_OUT;
@@ -247,8 +255,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         } else if (ic == IntentCode.NODE_LOCAL) {
             res.side = findTileSideForGlobal(node);
         } else if (ic == IntentCode.NODE_VLONG || ic == IntentCode.NODE_HLONG) {
-            // arbitrary decision. It is more resonable to be the same side as the sink.
-            res.side = T.TileSide.E;
+            res.side = T.TileSide.M;
         } else{
             // TODO don't project global to CLE_OUT
             String[] tg_side = nodeName.split("_");
@@ -272,8 +279,12 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             return null;
         }
     }
-
-    protected RoutingNode getTermInfo(ImmutableTimingGroup tg) {
+    protected Pair<RoutingNode,RoutingNode> getSrcDstTermInfo(ImmutableTimingGroup frTg, ImmutableTimingGroup toTg) {
+        RoutingNode src = getTermInfo(frTg);
+        RoutingNode dst = getTermInfo(toTg);
+        return new Pair<>(src,dst);
+    }
+    private RoutingNode getTermInfo(ImmutableTimingGroup tg) {
 
         Node node = tg.exitNode();
         IntentCode ic = node.getAllWiresInNode()[0].getIntentCode();
