@@ -20,6 +20,7 @@ public class Connection{
 	
 	public Netplus net;
     public final short boundingBox;
+//    private short x_min_b, x_max_b, y_min_b, y_max_b;
 	
     //TODO timing-driven
     public TimingVertex sourceTimingVertex;
@@ -121,9 +122,14 @@ public class Connection{
 	}
 	
 	public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
-		float slackCon = this.sinkTimingVertex.getRequiredTime() - this.sourceTimingVertex.getArrivalTime() - this.timingEdge.getDelay();
+		float slackCon = this.sinkTimingVertex.getRequiredTime() - this.sourceTimingVertex.getArrivalTime();// - this.timingEdge.getDelay(); //TODO check
+//		float slack = this.sinkTimingVertex.getSlack();
+//		System.out.println("slack con = " + slackCon + ", sink TV slack = " + slack);
 		float tempCriticality  = (1 - slackCon / maxDelay);//TODO check up on criticality values
     	tempCriticality = (float) (Math.pow(tempCriticality, criticalityExponent) * maxCriticality);
+    	
+//    	if(tempCriticality > 1)
+//    		System.out.println("required = " + this.sinkTimingVertex.getRequiredTime() + ", arrival = " + this.sourceTimingVertex.getArrivalTime() + ", delay = " + this.timingEdge.getDelay());
     	
     	if(tempCriticality > this.criticality) 
     		this.setCriticality(tempCriticality);
@@ -306,7 +312,7 @@ public class Connection{
 		for(ImmutableTimingGroup tg : this.timingGroups){//TODO per siblings
 			routeDelay += tg.getDelay();
 		}
-		this.timingEdge.setNetDelay(routeDelay);
+		this.timingEdge.setRouteDelay(routeDelay);
 	}
 	
 	public float getRouteDelay() {
