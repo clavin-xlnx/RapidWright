@@ -111,8 +111,8 @@ public class RoutableTimingGroup implements Routable{
 				}*/
 				
 				delay = estimator.getDelayOf(thruImmuTg);
-//				if(delay == -3)
-//					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+				if(delay == -3)
+					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 				thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
 				
 				/*if(thruImmuTg == null){
@@ -143,8 +143,8 @@ public class RoutableTimingGroup implements Routable{
 				
 				
 				delay = estimator.getDelayOf(thruImmuTg);
-//				if(delay == -3)
-//					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+				if(delay == -3)
+					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 				thruImmuTg.setDelay(delay);//TODO check
 				
 				if(thruImmuTg.entryNode() != null) thruImmuTg.entryNode().entryHolders.add(childRNode.index);
