@@ -192,6 +192,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         for (GraphPath<TimingVertex, TimingEdge> path : getGraphPaths()) {
             setTimingRequirement(requirement, path);
         }
+//        System.out.println("timing graph paths size = " + getGraphPaths().size());
     }
 
     /**
@@ -489,7 +490,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             TimingVertex superSource = null;
             TimingVertex superSink = null;
             if (superSource == null) {
-                superSource = new TimingVertex("superSource");
+                superSource = new TimingVertex("superSource");//TODO Yun 
                 superSink = new TimingVertex("superSink");
             }
             if (!vertexSet().contains(superSource))
@@ -538,6 +539,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             result.add(path);
             graphPathHashSet.add(path);
         }
+        System.out.println("list path size = " + result.size());// TODO check, 1
+        System.out.println("path size = " + paths.size());
+        System.out.println("source size = " + sources.size());
+        System.out.println("sink size = " + sinks.size());
         return result;
     }
 
@@ -548,7 +553,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     public void computeArrivalTimes() {
         for (GraphPath<TimingVertex, TimingEdge> p : graphPathHashSet) {
             float arrival = 0;
-            for (TimingEdge e : (List<TimingEdge>) p.getEdgeList()) {
+            for (TimingEdge e : (List<TimingEdge>) p.getEdgeList()) {//TopologicalOrderIterator
                 arrival += e.getDelay();
                 e.getDst().setArrivalTime(arrival);
                 if (inDegreeOf(e.getSrc())==0) {
@@ -567,7 +572,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             v.setSlack(v.getRequiredTime() - v.getArrivalTime());
         }
     }
-
+    
     /**
      * This helper function is used to avoid duplicate insertions of vertices within the TimingGraph.  
      * To avoid duplicates, the helper function first checks if a vertex with the same name already 
