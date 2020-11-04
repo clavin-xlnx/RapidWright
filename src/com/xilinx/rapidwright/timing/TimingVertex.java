@@ -130,7 +130,11 @@ public class TimingVertex {
         }
         this.slack = requiredTime - arrivalTime;
     }
-
+    
+    public void setRequiredTimeOnly(float requiredTime){
+    	this.requiredTime = requiredTime;
+    }
+    
     /**
      * Sets the arrival time stored at this vertex.
      * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to 
