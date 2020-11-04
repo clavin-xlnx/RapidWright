@@ -136,7 +136,6 @@ public class GraphHelper{
 			this.resetVistedAndStack();
 			this.debug = false;
 			cycleExists = this.isCyclic(this.vertices, this.nodeEdges, this.visited, this.stack);
-			if(!cycleExists) System.out.println("cycles removed");
 		}
 		
 		this.rebuildPathsOfNetCons(netp);
