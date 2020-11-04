@@ -101,8 +101,13 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 
 
     public short getDelayOf(ImmutableTimingGroup tg) {
-        RoutingNode node = getTermInfo(tg);
-        Double delay = calcTimingGroupDelay(node.tg, node.begin(), node.end(), 0d);
+        Double delay = (double) -3;
+        try{
+        	RoutingNode node = getTermInfo(tg);
+        	delay = calcTimingGroupDelay(node.tg, node.begin(), node.end(), 0d);
+        }catch(Exception e){
+        	System.out.println(tg.toString());
+        }
         return delay.shortValue();
     }
 
