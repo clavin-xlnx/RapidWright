@@ -56,7 +56,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -122,11 +122,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         this.fastMode = fastMode;
         if (fastMode) {
-            tgToSrcNodeMapper = this::getClosetOutSitePin;
-            tgToDstNodeMapper = this::getClosetInSitePin;
+            tgsToSrcDstNodeMapper = this::getClosetSrcDstSitePin;
         } else {
-            tgToSrcNodeMapper = this::getTermInfo;
-            tgToDstNodeMapper = this::getTermInfo;
+            tgsToSrcDstNodeMapper = this::getSrcDstTermInfo;
         }
 
         build(loadFrom);
@@ -181,7 +179,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         } else if (timingGroup.delayType() == GroupDelayType.PINFEED) {
             return Short.MAX_VALUE;
         } else {
-            return getMinDelayToSinkPin(tgToSrcNodeMapper.apply(timingGroup), tgToDstNodeMapper.apply(sinkPin)).getFirst();
+            Pair<RoutingNode,RoutingNode> srcDst = tgsToSrcDstNodeMapper.apply(timingGroup, sinkPin);
+            return getMinDelayToSinkPin(srcDst.getFirst(), srcDst.getSecond()).getFirst();
         }
 
 ////        Node tgNode = timingGroup.getLastNode();
@@ -231,9 +230,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     private boolean fastMode;
 
 //    protected Function<ImmutableTimingGroup,RoutingNode> tgToNodeMapper;
-    interface SerializableFunction<T,R> extends Function<T,R>, Serializable {}
-    protected SerializableFunction<ImmutableTimingGroup,RoutingNode> tgToSrcNodeMapper;
-    protected SerializableFunction<ImmutableTimingGroup,RoutingNode> tgToDstNodeMapper;
+    interface SerializableBiFunction<T,U,R> extends BiFunction<T,U,R>, Serializable {}
+    protected SerializableBiFunction<ImmutableTimingGroup,ImmutableTimingGroup,Pair<RoutingNode,RoutingNode>> tgsToSrcDstNodeMapper;
 
     private short width;
     private short height;
@@ -2264,8 +2262,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E32","INT_X10Y111/INT_NODE_IMUX_10_INT_OUT0",  device );
 //        ImmutableTimingGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
 //        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E37" ,"INT_X10Y111/INT_NODE_IMUX_12_INT_OUT0",  device );
-        ImmutableTimingGroup src = createTG("INT_X9Y115/INT_INT_SDQ_75_INT_OUT0" ,"INT_X9Y115/INT_NODE_SDQ_38_INT_OUT1" ,  device);
-        ImmutableTimingGroup dst = createTG("INT_X19Y115/IMUX_E13" ,"INT_X19Y115/INT_NODE_IMUX_18_INT_OUT0",  device );
+//        ImmutableTimingGroup src = createTG("INT_X9Y115/INT_INT_SDQ_75_INT_OUT0" ,"INT_X9Y115/INT_NODE_SDQ_38_INT_OUT1" ,  device);
+//        ImmutableTimingGroup dst = createTG("INT_X19Y115/IMUX_E13" ,"INT_X19Y115/INT_NODE_IMUX_18_INT_OUT0",  device );
+        ImmutableTimingGroup src = createTG("INT_X18Y97/NN12_BEG4" ,  device);
+        ImmutableTimingGroup dst = createTG("INT_X12Y99/IMUX_E43" ,"INT_X12Y100/INODE_E_3_FT1",  device );
+
 
         short dly = getMinDelayToSinkPin(src, dst);
         System.out.println("delay " + dly);
@@ -2280,7 +2281,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 2, (short) 2, 6);
-//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, true, 0);
+//        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, true, "", 0);
         DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo);
 
         short yCoor = 60;
@@ -2362,11 +2363,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 String inFileName = args[1] + "_merge" + ".ser";
                 est.rgBuilder.deserializeFrom(inFileName);
             }
-            else if (args[0].equalsIgnoreCase("TestNov2")) {
+            else if (args[0].equalsIgnoreCase("TestNov4")) {
                 est.trimTableAt((short)50,(short)60,true);
                 est.trimTableAt((short)50,(short)60,false);
                 est.rgBuilder.removeUnmarked();
-                est.rgBuilder.serializeTo("testnov2_merge.ser");
+                est.rgBuilder.serializeTo("testnov4_merge.ser");
             }
         }
 

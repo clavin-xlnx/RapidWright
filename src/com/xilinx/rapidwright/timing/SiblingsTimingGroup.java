@@ -29,9 +29,6 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import com.xilinx.rapidwright.util.Pair;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -108,7 +105,9 @@ public class SiblingsTimingGroup {
         this.siblings = siblings.toArray(new ImmutableTimingGroup[siblings.size()]);
         this.hashCode = this.siblings[0].exitNode().hashCode();
         this.type     = GroupDelayType.PINFEED;
+
         this.populateFanin();
+        this.virtual  = false;
     }
 
     /**
@@ -116,8 +115,17 @@ public class SiblingsTimingGroup {
      * @return a list of list of timing groups representing a list of siblings -- timing groups sharing the same last nodes,
      * instead of an array of timing groups, returned by getNextTimingGroups().
      */
-    public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes, RouteThruHelper rthHelper) {
-        List<SiblingsTimingGroup> result = new ArrayList<SiblingsTimingGroup>();
+    public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes) {
+
+        List<SiblingsTimingGroup> result =  new ArrayList<>();
+
+        if (this.isVirtual()) {
+            this.virtual = false;
+//             Route should evaluate MH distance of the virtual node and delay of its parent. Does this make sense?
+//             It will not if none of the virtual nodes in this batch will become least cost.
+            result.add(this);
+            return result;
+        }
 
         Node prevNode = siblings[0].exitNode();
         if(prevNode.getAllWiresInNode()[0].getIntentCode() == IntentCode.NODE_PINFEED){ 
@@ -145,19 +153,17 @@ public class SiblingsTimingGroup {
                 // TG with one node has no siblings.
                 if (nextNodeHasGlobalWire) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}}, 
-                    		GroupDelayType.GLOBAL));
-
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}},
+                                                                  GroupDelayType.GLOBAL, false));
                 } else if (ic == IntentCode.NODE_CLE_OUTPUT) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
                     result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
-                                                                  GroupDelayType.OTHER));
-
+                                                                  GroupDelayType.OTHER, false));
                 } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}, 
-                    									GroupDelayType.LONG));
 
+                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
+                                                                  GroupDelayType.LONG, false));
                 } else {
                     // for other TGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
@@ -170,8 +176,12 @@ public class SiblingsTimingGroup {
                         if (!reservedNodes.contains(nextNextNode)) {
                             IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
                             List<ImmutableTimingGroup> tgs = new ArrayList<>();
-                            ImmutableTimingGroup throughTg = null;
                             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) { // need to get all downhill PIPs
+
+                                String[] int_node = nextPrvNode.toString().split("/");
+                                if (int_node[1].contains("VCC_WIRE"))
+                                    continue;
+
                                 // TODO: Currently the whole sibling is considered together as a whole.
                                 // TODO: (need to revisit this if the assumption changes.)
                                 // TODO: Thus only check nodes that can be key nodes. nextPrvNode is not a key node.
@@ -181,15 +191,10 @@ public class SiblingsTimingGroup {
                                         NodeWithFaninInfo.create(nextPrvNode),
                                         nextNextIc, nextPrvIc);
                                 tgs.add(newTS);
-                                if (nextPrvNode.equals(nextNode))
-                                    throughTg = newTS;
-                                    /*if(prevNode.toString().equals("INT_X12Y97/EE12_BEG7") && 
-                                    		nextNextNode.toString().equals("INT_X18Y97/INT_INT_SDQ_7_INT_OUT0"))
-                                    		System.out.println(throughTg.toString());*/
-                                
+
                             }
                             // TODO: find out the type if the type is needed. Don't do it to reduce runtime
-                            result.add(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER));
+                            result.add(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER,true));
                         }
                     }
                 }
@@ -235,7 +240,10 @@ public class SiblingsTimingGroup {
     public int hashCode() {
         return hashCode;
     }
-    
+
+    public boolean isVirtual() {
+        return this.virtual;
+    }
 
     // ------------------------------------   private ----------------------------------------
 
@@ -243,13 +251,17 @@ public class SiblingsTimingGroup {
     final private ImmutableTimingGroup[] siblings;
     final private int                    hashCode;
     final private GroupDelayType         type;
+
     private Map<NodeWithFaninInfo,ImmutableTimingGroup> fanins; //for nextSiblings <last exit node, timingGroup in this siblings>
 
+    private       boolean                virtual;
 
-    private SiblingsTimingGroup (List<ImmutableTimingGroup> tgs, GroupDelayType type) {
-        this.siblings = tgs.toArray(new ImmutableTimingGroup[tgs.size()]); // *******
+    private SiblingsTimingGroup (List<ImmutableTimingGroup> tgs, GroupDelayType type, boolean virtual) {
+        this.siblings = tgs.toArray(new ImmutableTimingGroup[tgs.size()]);
         this.hashCode = this.siblings[0].hashCode();
         this.type     = type;
+        this.virtual  = virtual;
+
         this.fanins = new HashMap<>();
         this.populateFanin();//use the List<Pair<SiblingsTimingGroup, ImmutbleTimingGroup>> returned from getNextSiblingsTimingGroups()
     }
@@ -267,7 +279,6 @@ public class SiblingsTimingGroup {
         		}
     		}
 		}
-    	
     }
     // ------------------------------------   test ----------------------------------------
 
@@ -286,12 +297,20 @@ public class SiblingsTimingGroup {
         Set<Node> empty = new HashSet<Node>();
         for (int i = 0; i < numExpansion; i++) {
             System.out.println("----");
+<<<<<<< HEAD
             List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = s.getNextSiblingTimingGroups(empty, helper);
             for (Pair<SiblingsTimingGroup,ImmutableTimingGroup> sb : next) {
+||||||| merged common ancestors
+            List<Pair<SiblingsTimingGroup,ImmutableTimingGroup>> next = s.getNextSiblingTimingGroups(empty);
+            for (Pair<SiblingsTimingGroup,ImmutableTimingGroup> sb : next) {
+=======
+            List<SiblingsTimingGroup> next = s.getNextSiblingTimingGroups(empty);
+            for (SiblingsTimingGroup sb : next) {
+>>>>>>> a3778cb4289ab27d14a0d0bea8948f29c362749e
                 System.out.println(sb.toString());
             }
             // just pack one to expand
-            s = next.get(0).getFirst();
+            s = next.get(0);
         }
     }*/
 }
