@@ -20,7 +20,7 @@ public class NodeWithFaninInfo extends Node{
     CountingSet<Routable> parents;
     float pres_cost;
     float acc_cost; 
-    public Set<Integer> entryHolders;
+//    public Set<Integer> entryHolders;
     
     static Map<Node, NodeWithFaninInfo> nodePairs;
     
@@ -56,7 +56,7 @@ public class NodeWithFaninInfo extends Node{
     
     public NodeWithFaninInfo(Wire wire){
         super(wire);
-        this.entryHolders = new HashSet<>();
+//        this.entryHolders = new HashSet<>();
     }
     
     public void setAccCost(float accCost){
