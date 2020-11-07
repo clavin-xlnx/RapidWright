@@ -160,7 +160,8 @@ public class Main {
 						router.nodesExpandedFirstIter,
 						router.nodesPopedFromQueue,
 						router.nodesPopedFromQueueFirstIter,
-						router.routerTimer);
+						router.routerTimer,
+						router.callingOfGetNextRoutable);
 				
 			}else if(this.opt == RoutingGranularityOpt.WIRE){
 				RoutableWireRouter router = new RoutableWireRouter(this.design, 
@@ -205,7 +206,8 @@ public class Main {
 						router.nodesExpandedFirstIter,
 						router.nodesPopedFromQueue,
 						router.nodesPopedFromQueueFirstIter,
-						router.routerTimer);
+						router.routerTimer,
+						0);
 				
 			}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
 				RoutableTimingGroupRouter router = new RoutableTimingGroupRouter(this.design, 
@@ -254,7 +256,8 @@ public class Main {
 						router.nodesExpandedFirstIter,
 						router.nodesPopedFromQueue,
 						router.nodesPopedFromQueueFirstIter,
-						router.routerTimer);
+						router.routerTimer,
+						router.callingOfGetNextRoutable);
 				
 			}		
 		}
@@ -341,20 +344,23 @@ public class Main {
 			long nodesExpandedFirstIter,
 			long nodesPoped,
 			long nodesPopedFirstIter,
-			RouterTimer timer){
-		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
-		System.out.printf("Routing took %.2f s\n", routingRuntime*1e-3);
-		System.out.printf("RnodesT in the 1st iter: %.2f s\n", firstRnodeT);
-		System.out.printf("Routing in the 1st iter: %.2f s\n", firstRouting);
-		float rerouting = (float) (timer.rerouteCongestion.getTime() * 1e-9 - (timer.rnodesCreation.getTime()*1e-9 - firstRnodeT));
-		System.out.printf("Rerouting needed: %.2f s\n", rerouting);
+			RouterTimer timer,
+			long callingOfGetNextRoutable){
+		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");	
 		System.out.println("Num iterations: " + iterations);
 		System.out.println("Connections routed: " + consRouted);
-		System.out.println("Connections rerouted: " + (consRouted - toalCons));
+		System.out.println(" Connections rerouted: " + (consRouted - toalCons));
 		System.out.println("Nodes expanded: " + nodesExpanded);
-		System.out.println("Nodes expanded first iter: " + nodesExpandedFirstIter);
+		System.out.println(" Nodes expanded first iter: " + nodesExpandedFirstIter);
 		System.out.println("Nodes poped: " + nodesPoped);
-		System.out.println("Nodes poped first iter: " + nodesPopedFirstIter);
+		System.out.println(" Nodes poped first iter: " + nodesPopedFirstIter);
+		System.out.println("Calls of get next routables: " + callingOfGetNextRoutable);
+		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
+		System.out.printf("Routing took %.2f s\n", routingRuntime*1e-3);
+		System.out.printf(" RnodesT in the 1st iter: %.2f s\n", firstRnodeT);
+		System.out.printf(" Routing in the 1st iter: %.2f s\n", firstRouting);
+		float rerouting = (float) (timer.rerouteCongestion.getTime() * 1e-9 - (timer.rnodesCreation.getTime()*1e-9 - firstRnodeT));
+		System.out.printf(" Rerouting needed: %.2f s\n", rerouting);
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.print(timer);
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
