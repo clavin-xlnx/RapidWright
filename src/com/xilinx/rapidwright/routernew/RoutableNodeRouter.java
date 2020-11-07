@@ -28,6 +28,9 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.device.e;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
+
+import com.xilinx.rapidwright.util.Pair;
+
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 
@@ -86,6 +89,7 @@ public class RoutableNodeRouter{
 	public int connectionsRoutedIteration;
 	public long nodesPopedFromQueue;
 	public long nodesPopedFromQueueFirstIter;
+	public long callingOfGetNextRoutable;
 	
 	public Set<Integer> overUsedRNodes;
 	public Set<Integer> usedRNodes;
@@ -158,6 +162,7 @@ public class RoutableNodeRouter{
 		this.nodesExpandedFirstIter = 0;
 		this.nodesPopedFromQueue = 0;
 		this.nodesPopedFromQueueFirstIter = 0;
+		this.callingOfGetNextRoutable = 0;
 		
 		this.usedRNodes = new HashSet<>();
 		this.overUsedRNodes = new HashSet<>();
@@ -186,17 +191,16 @@ public class RoutableNodeRouter{
 				
 			}else if(n.isStaticNet()){
 //				this.reserveNet(n);
-//				this.printInfo(n.toStringFull());
 				n.unroute();
 				this.staticNets.add(n);
 				this.iclockAndStaticNet++;
 				
 			}else if (n.getType().equals(NetType.WIRE)){
-				if(n.getName().equals("S_CONTROL_USS/tile1_3_control_S_AXI_WDATA[26]") || 
+				/*if(n.getName().equals("S_CONTROL_USS/tile1_3_control_S_AXI_WDATA[26]") || 
 				   n.getName().equals("S_CONTROL_USS/tile2_2_control_S_AXI_WDATA[24]")){
 					System.out.println(n.toStringFull());
 					continue;//net with a null source SitePinInst
-				}
+				}*/
 				if(RouterHelper.isRegularNetToBeRouted(n)){
 					if(!this.partialRouting){
 						//four nets with BYPASS_W8
@@ -277,6 +281,7 @@ public class RoutableNodeRouter{
 	public void routeStaticNets(){
 		for(Net n:this.staticNets){
 			this.routeStaticNet(n);
+//			this.reserveNet(n);
 		}
 	}
 	
@@ -285,9 +290,17 @@ public class RoutableNodeRouter{
 		Set<Node> unavailableNodes = this.getAllUsedNodesOfRoutedNets();
 		unavailableNodes.addAll(this.reservedNodes);//TODO not reserve static net
 		Set<PIP> netPIPs = new HashSet<>();
+		Map<SitePinInst, List<Node>> sinkPathNodes = new HashMap<>();
+		Queue<RoutableNode> q = new LinkedList<>();
+		Set<RoutableNode> visitedRoutable = new HashSet<>();
+		List<Node> pathNodes = new ArrayList<>();
 		
+		boolean debug = false;
+		if(debug) {
+			System.out.println("Net: " + currNet.getName());
+		}
 		for(SitePinInst sink : currNet.getPins()){
-			boolean debug = false;
+			
 			if(sink.isOutPin()) continue;
 			int watchdog = 10000;
 			int wire = sink.getSiteInst().getSite().getTileWireIndexFromPinName(sink.getName());
@@ -297,20 +310,26 @@ public class RoutableNodeRouter{
 			}
 			Tile t = sink.getTile();
 			if(debug) {
-				System.out.println("SINK: " + t.getName() + " " + t.getWireName(wire));
+				System.out.println("SINK: TILE = " + t.getName() + " WIRE NAME = " + t.getWireName(wire));
 			}
+			
+			q.clear();
+			visitedRoutable.clear();
+			pathNodes.clear();
 			
 			Node node = new Node(t,wire); // same as sink.getConnectedNode()
 			RoutableNode sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.SINKRR, this.base_cost_fac);
 			sinkRNode.type = RoutableType.SINKRR;
 			sinkRNode.rnodeData.setPrev(null);
-			Queue<RoutableNode> q = new LinkedList<>();
-			List<Node> pathNodes = new ArrayList<>();
+			
 			q.add(sinkRNode);
 			boolean success = false;
 			while(!q.isEmpty()){
 				RoutableNode n = q.poll();
+				visitedRoutable.add(n);
+				
 				if(debug) System.out.println("DEQUEUE:" + n);
+				if(debug) System.out.println(", PREV = " + n.rnodeData.getPrev() == null ? " null" : n.rnodeData.getPrev());
 				
 				if(success = this.isThisOurStaticSource(n, netType, debug)){
 					n.type = RoutableType.SOURCERR;//set as a VCC source
@@ -321,15 +340,18 @@ public class RoutableNodeRouter{
 					
 					while(n != null){
 						pathNodes.add(n.getNode());
+						if(debug) System.out.println(n.toString());
 						n = (RoutableNode) n.rnodeData.getPrev();
 					}
 					Collections.reverse(pathNodes);
+					sinkPathNodes.put(sink, pathNodes);
+//					Collections.reverse(pathNodes);
 					if(debug){
 						for(Node pathNode:pathNodes){
 							System.out.println(pathNode.toString());
 						}
 					}
-					netPIPs.addAll(RouterHelper.conPIPs(pathNodes));
+//					netPIPs.addAll(RouterHelper.conPIPs(pathNodes));
 					break;
 				}
 				
@@ -340,7 +362,7 @@ public class RoutableNodeRouter{
 					if(this.routethruHelper.isRouteThru(uphillNode, n.getNode())) continue;
 					RoutableNode nParent = this.createRoutableNodeAndAdd(this.rrgNodeId, uphillNode, RoutableType.INTERRR, this.base_cost_fac);
 					nParent.rnodeData.setPrev(n);
-					if(!this.pruneNode(nParent, unavailableNodes)) q.add(nParent);
+					if(!this.pruneNode(nParent, unavailableNodes, visitedRoutable)) q.add(nParent);
 				}
 				watchdog--;
 				if(watchdog < 0) {
@@ -354,10 +376,14 @@ public class RoutableNodeRouter{
 			}
 		}
 		
+		for(List<Node> nodes:sinkPathNodes.values()){
+			netPIPs.addAll(RouterHelper.conPIPs(nodes));
+		}
+		
 		currNet.setPIPs(netPIPs);
 	}
 	
-	private boolean pruneNode(RoutableNode parent, Set<Node> unavailableNodes){//, Set<RoutableNode> visited){
+	private boolean pruneNode(RoutableNode parent, Set<Node> unavailableNodes, Set<RoutableNode> visitedRoutable){
 		Node n = parent.getNode();
 		IntentCode ic = n.getTile().getWireIntentCode(n.getWire());
 		switch(ic){
@@ -373,7 +399,7 @@ public class RoutableNodeRouter{
 			default:
 		}
 		if(unavailableNodes.contains(n)) return true;
-//		if(visited.contains(parent)) return true;
+		if(visitedRoutable.contains(parent)) return true;
 		return false;
 	}
 	
@@ -421,7 +447,7 @@ public class RoutableNodeRouter{
 	public Set<Node> getAllUsedNodesOfRoutedNets(){
 		Set<Node> nodes = new HashSet<>();
 		for(Connection c:this.sortedListOfConnection){
-			nodes.addAll(c.nodes);
+			if(c.nodes != null) nodes.addAll(c.nodes);
 		}	
 		return nodes;
 	}
@@ -740,8 +766,10 @@ public class RoutableNodeRouter{
 		 return timeInMilliseconds;
 	}
 	
-	public void route(){
+	public void route(){//TODO main route
 		this.sortNetsAndConnections();
+		
+//		this.routeStaticNets();	
 		
 		//initialize router
 		this.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
@@ -835,9 +863,7 @@ public class RoutableNodeRouter{
 					this.rrgNodeId, this.routerTimer.rnodesCreation.getTime());
 			this.routerTimer.calculateStatistics.finish();;
 			//if the routing is valid /realizable return, the routing completed successfully
-	
 			
-	
 			if (validRouting) {
 				//generate and assign a list of PIPs for each Net net
 				this.printInfo("\nvalid routing - no congested/illegal rnodes\n ");
@@ -1358,7 +1384,7 @@ public class RoutableNodeRouter{
 
 	public void routeACon(Connection con){
 		this.prepareForRoutingACon(con);
-		if(this.debugRoutingCon) this.printInfo("routing for " + con.toString());
+//		if(this.debugRoutingCon) this.printInfo("routing for " + con.toString());
 		
 		while(!this.targetReached(con)){
 			
@@ -1366,16 +1392,22 @@ public class RoutableNodeRouter{
 			
 			this.routerTimer.rnodesCreation.start();
 			if(!rnode.childrenSet){
-				this.rrgNodeId = rnode.setChildren(con, this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, this.routethruHelper);
+				Pair<Integer, Long> intPair = rnode.setChildren(con, this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, 
+						this.routethruHelper, this.routerTimer, this.callingOfGetNextRoutable);
+				this.rrgNodeId = intPair.getFirst();
+				this.callingOfGetNextRoutable = intPair.getSecond();
 			}
 			this.routerTimer.rnodesCreation.finish();
+			
+			this.routerTimer.rnodesDummy.start();
+			this.routerTimer.rnodesDummy.finish();
 			
 			this.exploringAndExpansion(rnode, con);
 		}
 		
 		this.finishRoutingACon(con);
 		
-		this.printConRNodes(con);
+//		this.printConRNodes(con);
 	}
 	
 	public void printConRNodes(Connection con){
@@ -1417,10 +1449,10 @@ public class RoutableNodeRouter{
 	public void exploringAndExpansion(RoutableNode rnode, Connection con){
 		this.nodesPopedFromQueue++;
 		
-		if(this.debugExpansion){
-			this.printInfo("\t" + " exploring rnode " + rnode.toString());
-		}
-		if(this.debugExpansion) this.printInfo("\t starting  queue size: " + this.queue.size());
+//		if(this.debugExpansion){
+//			this.printInfo("\t" + " exploring rnode " + rnode.toString());
+//		}
+//		if(this.debugExpansion) this.printInfo("\t starting  queue size: " + this.queue.size());
 		
 		/*if(rnode.getNode().toString().equals("INT_X17Y542/INT_NODE_IMUX_59_INT_OUT1") ||
 				rnode.getNode().toString().equals("INT_X17Y542/INT_NODE_IMUX_49_INT_OUT1")){
@@ -1451,29 +1483,29 @@ public class RoutableNodeRouter{
 			}*/
 			
 			if(childRNode.isTarget()){		
-				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
+//				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
 				this.addNodeToQueue(rnode, childRNode, con);
 				this.nodesExpanded++;
 				
 			}else if(childRNode.type == RoutableType.INTERRR){
 				//this can be done by downsizing the created rnodes
 				if(childRNode.isInBoundingBoxLimit(con)){
-					if(this.debugExpansion) this.printInfo("\t\t" + " add node to the queue");
+//					if(this.debugExpansion) this.printInfo("\t\t" + " add node to the queue");
 					this.addNodeToQueue(rnode, childRNode, con);
 					this.nodesExpanded++;
-					if(this.debugExpansion) this.printInfo("");
+//					if(this.debugExpansion) this.printInfo("");
 				}	
 			}
 		}
 	}
 	
 	private void addNodeToQueue(RoutableNode rnode, RoutableNode childRNode, Connection con) {
-//		this.routerTimer.addRNodeToQueueEvaluation.start();
+		this.routerTimer.addRNodeToQueueEvaluation.start();
 		RoutableData data = childRNode.rnodeData;
 		int countSourceUses = data.countSourceUses(con.source);
-		if(this.debugExpansion){
-			this.printInfo("\t\t childRNode " + childRNode.toString());
-		}
+//		if(this.debugExpansion){
+//			this.printInfo("\t\t childRNode " + childRNode.toString());
+//		}
 		
 		float partial_path_cost = rnode.rnodeData.getPartialPathCost();//upstream path cost
 		
@@ -1497,14 +1529,17 @@ public class RoutableNodeRouter{
 		}else{//lut input pin (sink)
 			new_lower_bound_total_path_cost = new_partial_path_cost;
 		}
-//		this.routerTimer.addRNodeToQueueEvaluation.finish();
+		this.routerTimer.addRNodeToQueueEvaluation.finish();
 		
-//		this.routerTimer.addRNodeToQueuePushing.start();
-		this.addRNodeToQueueSetting(childRNode, rnode, new_partial_path_cost, new_lower_bound_total_path_cost);
-//		this.routerTimer.addRNodeToQueuePushing.finish();
+		this.routerTimer.addRNodeDummy.start();
+		this.routerTimer.addRNodeDummy.finish();
+		
+		this.routerTimer.addRNodeToQueuePushing.start();
+		this.addRNodeToQueuePushing(childRNode, rnode, new_partial_path_cost, new_lower_bound_total_path_cost);
+		this.routerTimer.addRNodeToQueuePushing.finish();
 	}
 	
-	private void addRNodeToQueueSetting(RoutableNode childRNode, RoutableNode rnode, float new_partial_path_cost, float new_lower_bound_total_path_cost) {
+	private void addRNodeToQueuePushing(RoutableNode childRNode, RoutableNode rnode, float new_partial_path_cost, float new_lower_bound_total_path_cost) {
 		RoutableData data = childRNode.rnodeData;
 		
 		if(!data.isTouched()) {
@@ -1587,7 +1622,7 @@ public class RoutableNodeRouter{
 		
 		// Add source to queue
 		RoutableNode source = (RoutableNode) con.getSourceRNode();
-		this.addRNodeToQueueSetting(source, null, 0, 0);
+		this.addRNodeToQueuePushing(source, null, 0, 0);
 	}
 	
 	public float checkAverageNumWires(){
