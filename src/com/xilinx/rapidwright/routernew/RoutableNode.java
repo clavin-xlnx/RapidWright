@@ -13,6 +13,7 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.util.Pair;
 
 public class RoutableNode implements Routable{
 	public int index;
@@ -54,9 +55,19 @@ public class RoutableNode implements Routable{
 		this.setXY();
 	}
 	
-	public int setChildren(Connection c, int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable, RouteThruHelper routethruHelper){
-		this.children = new ArrayList<>();
+	public Pair<Integer, Long> setChildren(Connection c, int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable, 
+			RouteThruHelper routethruHelper, RouterTimer timer, long callingOfGetNextRoutable){
+		
+		timer.getNextRoutable.start();
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
+		timer.getNextRoutable.finish();
+		
+		timer.getNextDummy.start();
+		timer.getNextDummy.finish();
+		
+		timer.addChildren.start();
+		callingOfGetNextRoutable++;
+		this.children = new ArrayList<>();
 		for(Node node:allDownHillNodes){
 			//TODO check if CLK_CMT_MUX_3TO1_32_CLK_OUT connected to the target node is included
 			/*if(this.targetTileOfTheLocalClockNetFound(node, c)){
@@ -78,7 +89,9 @@ public class RoutableNode implements Routable{
 			}
 		}
 		this.childrenSet = true;
-		return globalIndex++;
+		timer.addChildren.finish();
+		
+		return new Pair(globalIndex, callingOfGetNextRoutable);
 	}
 	
 	public boolean targetTileOfTheLocalClockNetFound(Node node, Connection c){
