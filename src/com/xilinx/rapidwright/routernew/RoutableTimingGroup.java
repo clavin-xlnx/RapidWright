@@ -81,53 +81,50 @@ public class RoutableTimingGroup implements Routable{
 		this.thruImmuTg = null;
 	}
 	
-	public int setChildren(int globalIndex, float base_cost_fac, 
+	public Pair<Integer, Long> setChildren(int globalIndex, float base_cost_fac, 
 			Map<NodeWithFaninInfo, RoutableTimingGroup> createdRoutable, 
 			Set<Node> reservedNodes,
 			RouteThruHelper helper,
-			DelayEstimatorTable estimator){
+			DelayEstimatorTable estimator,
+			RouterTimer timer,
+			long callingOfGetNextRoutable){
 		
-		this.childrenImmuTG = new ArrayList<>();
-		
-		
+		timer.getNextRoutable.start();
 		List<SiblingsTimingGroup> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes);
+		timer.getNextRoutable.finish();
 		
+		timer.getNextDummy.start();
+		timer.getNextDummy.finish();
+		
+		timer.addChildren.start();
+		callingOfGetNextRoutable++;
+		this.childrenImmuTG = new ArrayList<>();
 		for(SiblingsTimingGroup stGroups : next){
 			
 			RoutableTimingGroup childRNode;
 			ImmutableTimingGroup thruImmuTg;
 			Pair<RoutableTimingGroup,ImmutableTimingGroup> childThruImmuTg;
-			short delay = 0;
+//			short delay = 0;
 			
 			NodeWithFaninInfo key = stGroups.getExitNode();//using node as the key is necessary, different nodes may have a same hasCode()
-			
-			if(!createdRoutable.containsKey(key)){
+//			Pair keyPair = new Pair(key, false);
+			if(!createdRoutable.containsKey(key)){//TODO also check up on the virtual, key could be a >
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups);
 				childRNode.setBaseCost(base_cost_fac);
 				
+				//TODO timing this getThru()
+				
 				thruImmuTg = stGroups.getThruImmuTg(this.sibTimingGroups.getExitNode());
-				/*if(this.debug){
-					System.out.println(thruImmuTg.toString());
-				}*/
 				
-				delay = estimator.getDelayOf(thruImmuTg);
-				if(delay == -3)
-					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-				thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
 				
-				/*if(thruImmuTg == null){
-					NodeWithFaninInfo exit = this.sibTimingGroups.getExitNode();		
-					System.out.println("null thruImmuTg between: ");
-					System.out.println(this.type + ", " + childRNode.type);
-					System.out.println(this.sibTimingGroups.getExitNode().toString() + ", " + childRNode.getSiblingsTimingGroup().getExitNode().toString());
-					
-				}*/
+//				delay = estimator.getDelayOf(thruImmuTg);
+//				if(delay == -3)
+//					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+//				thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
 				
 				childThruImmuTg = new Pair<>(childRNode, thruImmuTg);
 //				childThruImmuTg = new Pair<>(new RoutableTimingGroup(globalIndex, stGroups.getFirst()), stGroups.getSecond());
-				if(thruImmuTg.entryNode() != null){
-					thruImmuTg.entryNode().entryHolders.add(globalIndex);
-				}
+				
 				globalIndex++;
 
 				this.childrenImmuTG.add(childThruImmuTg);
@@ -135,52 +132,29 @@ public class RoutableTimingGroup implements Routable{
 			}else{
 				childRNode = createdRoutable.get(key);
 				
-				thruImmuTg = childRNode.getSiblingsTimingGroup().getThruImmuTg(this.sibTimingGroups.getExitNode());//RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key));
 				
-				/*if(this.debug){
-					System.out.println(thruImmuTg.toString());
-				}*/
+				thruImmuTg = childRNode.getSiblingsTimingGroup().getThruImmuTg(this.sibTimingGroups.getExitNode());//RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key))
 				
+//				delay = estimator.getDelayOf(thruImmuTg);
+//				if(delay == -3)
+//					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+//				thruImmuTg.setDelay(delay);//TODO check
 				
-				delay = estimator.getDelayOf(thruImmuTg);
-				if(delay == -3)
-					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-				thruImmuTg.setDelay(delay);//TODO check
-				
-				if(thruImmuTg.entryNode() != null) thruImmuTg.entryNode().entryHolders.add(childRNode.index);
 				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
 			}
 			
-			/*if(this.sibTimingGroups.getExitNode().toString().equals("INT_X12Y97/EE12_BEG7") && childRNode.sibTimingGroups.getExitNode().toString().equals("INT_X18Y97/INT_INT_SDQ_7_INT_OUT0")){
-			  //TODO this is where the conflicts come from
-			  //the entry node connecting two exit nodes INT_X9Y101/WW1_E_7_FT0 -> * -> INT_X9Y102/BOUNCE_W_0_FT1 is not identical
-			  //INT_X9Y102/INODE_W_1_FT1 from RouterHelper, while it is INT_X9Y101/INODE_W_62_FT0 from the API getNextSiblings
-				System.out.println("thruImmuTg = " + thruImmuTg.toString()); //ImmuTg = ( INT_X9Y101/INODE_W_62_FT0, INT_X9Y102/BOUNCE_W_0_FT1 )
-				System.out.println();//this thruImmuTg returned from the API is different from when calling RouterHelper.findImmuTgBetweenTwoSiblings()
-			}*/
-			
-			//for checking up on the above finding
-			/*if(this.sibTimingGroups.getExitNode().toString().equals("INT_X12Y97/EE12_BEG7")){
-				System.out.println("all downhill nodes of exit node INT_X12Y97/EE12_BEG7 in Siblings " + this.index + ":");
-				for(Node nextNode:this.sibTimingGroups.getExitNode().getAllDownhillNodes()){
-					System.out.println(nextNode.toString());
-				}
-			}
-			if(this.sibTimingGroups.getExitNode().toString().equals("INT_X18Y97/INT_INT_SDQ_7_INT_OUT0")){
-				System.out.println("all uphill nodes of exit node INT_X18Y97/INT_INT_SDQ_7_INT_OUT0 in Siblings " + this.index + ":");
-				for(Node nextNode:this.sibTimingGroups.getExitNode().getAllUphillNodes()){
-					System.out.println(nextNode.toString());
-				}
-			}*/
-			
 			//store entry nodes and initialize the costs of entry nodes
 			//in consistent with the initialization of each routable
+//			timer.putEntryNodes.start();
 			NodeWithFaninInfo entry = thruImmuTg.entryNode();
 			putNewEntryNode(entry);//better to be here than to be in the expansion
+//			timer.putEntryNodes.finish();
 		}
 		
 		this.childrenSet = true;
-		return globalIndex;
+		timer.addChildren.finish();
+		
+		return new Pair(globalIndex, callingOfGetNextRoutable);
 	}
 	
 	public static void putNewEntryNode(NodeWithFaninInfo entry){
