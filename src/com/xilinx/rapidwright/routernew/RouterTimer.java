@@ -2,66 +2,89 @@ package com.xilinx.rapidwright.routernew;
 
 public class RouterTimer {
 	public Timer firstIteration;
-//	public Timer updateTiming;
-//	public Timer rerouteCritical;
 	public Timer rerouteCongestion;
-//	public Timer rerouteIllegal;
-//	public Timer rerouteOpin;
 	public Timer rerouteIllegal;
-//	public Timer setRerouteCriticality;
+	
 	public Timer rnodesCreation;
+	public Timer rnodesDummy;
+	
 	public Timer calculateStatistics;
 	public Timer updateCost;
 	public Timer pipsAssignment;
-	public Timer rtgFilter;
+	
 	public Timer checkOnEntryNodeCongestion;
 	public Timer checkIfEntryNodesRoutingValid;
+	
 	public Timer addRNodeToQueueEvaluation;
 	public Timer addRNodeToQueuePushing;
+	public Timer addRNodeDummy;
+	
 	public Timer getRouteNodeCost;
+	
+	public Timer getNextRoutable;
+	public Timer getNextDummy;
+	public Timer addChildren;
+	
+	public Timer getThruImmuTg;
+	public Timer putEntryNodes;
 	
 	public RouterTimer() {
 		this.firstIteration = new Timer("first iteration");
-//		this.updateTiming = new Timer("update timing");
-//		this.rerouteCritical = new Timer("reroute critical");
 		this.rerouteCongestion = new Timer("reroute congestion");
-//		this.rerouteIllegal = new Timer("reroute illegal");
+		
 		this.rnodesCreation = new Timer("rnodes creation");
-//		this.rerouteOpin = new Timer("reroute opin");
+		this.rnodesDummy = new Timer("rnodes dummy");
+		
 		this.rerouteIllegal = new Timer("fix illegal tree");
-//		this.setRerouteCriticality = new Timer("set reroute crit");
 		this.calculateStatistics = new Timer("calc stat");
 		this.updateCost = new Timer("update cost");
 		this.pipsAssignment = new Timer("pips assignment");
-		this.rtgFilter = new Timer("rtg filter");
-		this.checkOnEntryNodeCongestion = new Timer("check on entry node congestion");
-		this.checkIfEntryNodesRoutingValid = new Timer("check if entry nodes routing valid");
-		this.addRNodeToQueueEvaluation = new Timer("add RNode To Queue Evaluation");
-		this.addRNodeToQueuePushing = new Timer("add RNode To Queue Pushing");
+		
+		this.checkOnEntryNodeCongestion = new Timer("check on entry congestion");
+		this.checkIfEntryNodesRoutingValid = new Timer("check entry routing valid");
+		
+		this.addRNodeToQueueEvaluation = new Timer("add RNode Evaluation");
+		this.addRNodeToQueuePushing = new Timer("add RNode Pushing");
+		this.addRNodeDummy = new Timer("add RNode dummy");
+		
 		this.getRouteNodeCost = new Timer("get RNode cost");
+		
+		this.getNextRoutable = new Timer(" get next routable");
+		this.getNextDummy = new Timer(" get next dummy");
+		this.addChildren = new Timer(" add Children");
+		
+		this.getThruImmuTg = new Timer("get thruImmuTg");
+		this.putEntryNodes = new Timer("put entry nodes");
 	}
 	
 	@Override
 	public String toString() {
 		String result = "";
 		
-		result += this.firstIteration;
-		result += this.rerouteCongestion;
-//		result += this.rerouteIllegal;
-//		result += this.rerouteCritical;
-//		result += this.setRerouteCriticality;
+//		result += this.firstIteration;
+//		result += this.rerouteCongestion;
 		result += this.rnodesCreation;
+		result += this.rnodesDummy;
+		
+		result += this.getNextRoutable;
+		result += this.addChildren;
+		result += this.getNextDummy;
+		
 		result += this.calculateStatistics;
-//		result += this.updateTiming;
 		result += this.updateCost;
 		result += this.rerouteIllegal;
 		result += this.pipsAssignment;
-		result += this.rtgFilter;
 		result += this.checkOnEntryNodeCongestion;
 		result += this.checkIfEntryNodesRoutingValid;
+		
 		result += this.addRNodeToQueueEvaluation;
 		result += this.addRNodeToQueuePushing;
+		result += this.addRNodeDummy;
+		
 		result += this.getRouteNodeCost;
+		
+		result += this.getThruImmuTg;
+		result += this.putEntryNodes;
 		
 		return result;
 	}
@@ -87,6 +110,6 @@ class Timer {
 		return this.time;
 	}
 	public String toString() {
-		return String.format("%-20s %7.2f s\n", this.name, this.time * 1e-9);
+		return String.format("%-25s %7.3f s\n", this.name, this.time * 1e-9);
 	}
 }
