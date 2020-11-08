@@ -62,7 +62,6 @@ public class RoutableNodeRouter{
 	public List<Net> staticNets;
 
 	public RouteThruHelper routethruHelper;
-//	public RouterHelper routerHelper;
 	
 	public RouterTimer routerTimer;
 	public long iterationStart;
@@ -532,17 +531,11 @@ public class RoutableNodeRouter{
 			this.rrgNodeId++;
 		}else{
 			rrgNode = this.rnodesCreated.get(node);
-			if(rrgNode.type == type && type == RoutableType.SINKRR) System.err.println("routing resource conflicts");
+			if(rrgNode.type == type && type == RoutableType.SINKRR) System.err.println("routing resource conflicts: site pin");
 		}
 		
 		return rrgNode;
 	}
-
-	/*public RoutableNode createRoutableNodeAndAdd(int globalIndex, SitePinInst pin, RoutableType type, float base_cost_fac){
-		RoutableNode rrgNode = new RoutableNode(rrgNodeId, pin, type);
-		this.setBaseCostAndAdd(rrgNode, base_cost_fac);	
-		return rrgNode;
-	}*/
 	
 	public void setBaseCostAndAdd(RoutableNode rrgNode, float base_cost_fac){
 		rrgNode.setBaseCost(base_cost_fac);
@@ -829,25 +822,11 @@ public class RoutableNodeRouter{
 			//fix illegal routing trees if any
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
-//				this.debugRoutingCon = true;//fix cycles in the tree
-//				boolean printNodeInfo = true;
-				
 				//for fixing illegalTree using nodes
 				for(Connection con:this.sortedListOfConnection){
 					con.newNodes();
 					for(Routable rn:con.rnodes){
 						con.nodes.add(rn.getNode());//wire router should check if node has been added or not, different wires belong to same node
-						/*if(printNodeInfo == true){
-							if(rn.getNode().toString().equals("INT_X14Y111/WW2_W_BEG0")){
-								printNodeInfo = false;
-								System.out.println("Node INT_X14Y111/WW2_W_BEG0 wires:");
-								for(Wire wire:rn.getNode().getAllWiresInNode()){
-									Tile tile = wire.getTile();
-									System.out.println("wire " + wire.toString() + ": tile = " + tile.toString() 
-														+ ", tile column = " + tile.getColumn() + ", tile row = " + tile.getRow());
-								}
-							}
-						}*/
 					}
 				}
 				
@@ -881,7 +860,6 @@ public class RoutableNodeRouter{
 			// increase router iteration
 			this.itry++;
 			this.routerTimer.updateCost.finish();
-//			System.out.println(this.routerTimer.rnodesCreation.toString());
 		}
 		
 		if (this.itry == this.nrOfTrials + 1) {
@@ -935,7 +913,7 @@ public class RoutableNodeRouter{
 		return true;
 	}
 	
-	/*
+	/**
 	 * statistics output for each router iteration
 	 */
 	public void staticticsInfo(List<Connection> connections, 
@@ -1157,7 +1135,6 @@ public class RoutableNodeRouter{
 		Node illegalNode;
 		while((illegalRNode = illegalTree.getIllegalRNode()) != null){
 			illegalNode = illegalRNode.getNode();
-//			if(this.debugRoutingCon) System.out.println("dealing rnode: " + illegalRNode.hashCode());
 			Set<Connection> illegalCons = new HashSet<>();
 			for(Connection con : illegalTree.getConnection()) {
 				for(Routable rnode : con.rnodes) {
@@ -1179,14 +1156,12 @@ public class RoutableNodeRouter{
 			
 			//Get the path from the connection with maximum hops
 			List<Routable> newRouteNodes = new ArrayList<>();
-//			List<Node> newNodes = new ArrayList<>();
 			
 			boolean add = false;
 			for(Routable newRouteNode : maxCriticalConnection.rnodes) {
 				if(newRouteNode.equals(illegalRNode)) add = true;
 				if(add) {
 					newRouteNodes.add(newRouteNode);
-//					newNodes.add(newRouteNode.getNode());
 				}
 			}
 			
@@ -1353,12 +1328,6 @@ public class RoutableNodeRouter{
 		for(Connection con:this.sortedListOfConnection){
 			if(con.congested()){
 				congestedCons.add(con);
-				/*Netplus<Node> np = con.getNet();
-				if(congestedNets.containsKey(np)){
-					congestedNets.put(np, congestedNets.get(np)+1);
-				}else{
-					congestedNets.put(np, 1);
-				}*/
 			}
 		}
 		for(Connection con:congestedCons){
@@ -1384,7 +1353,6 @@ public class RoutableNodeRouter{
 
 	public void routeACon(Connection con){
 		this.prepareForRoutingACon(con);
-//		if(this.debugRoutingCon) this.printInfo("routing for " + con.toString());
 		
 		while(!this.targetReached(con)){
 			
@@ -1412,7 +1380,6 @@ public class RoutableNodeRouter{
 	
 	public void printConRNodes(Connection con){
 		if(this.debugRoutingCon){
-//			for(Routable rn:con.rnodes){
 			for(int i = con.rnodes.size() - 1; i >= 0; i-- ){
 				Routable rn = con.rnodes.get(i);
 				this.printInfo(((RoutableNode)(rn)).toString());
@@ -1454,33 +1421,7 @@ public class RoutableNodeRouter{
 //		}
 //		if(this.debugExpansion) this.printInfo("\t starting  queue size: " + this.queue.size());
 		
-		/*if(rnode.getNode().toString().equals("INT_X17Y542/INT_NODE_IMUX_59_INT_OUT1") ||
-				rnode.getNode().toString().equals("INT_X17Y542/INT_NODE_IMUX_49_INT_OUT1")){
-			
-			System.out.println(rnode.toString() + " children rnodes: ");
-			for(RoutableNode child:rnode.children){
-				System.out.println(child.toString());
-				System.out.println(child.isTarget());
-				if(child.getNode().toString().equals("INT_X17Y542/BYPASS_W14") || child.getNode().toString().equals("INT_X17Y542/BYPASS_W8")){
-					System.out.println(child.getNode().toString() + "connected sitepin " + child.getNode().getSitePin().toString());
-				}
-			}
-		}*/
-		
 		for(RoutableNode childRNode:rnode.children){
-			
-			/*if(printNodeInfo){
-				if(childRNode.getNode().toString().equals("INT_X17Y542/BYPASS_W8")){
-					printNodeInfo = false;
-					System.out.println("INT_X17Y542/BYPASS_W8 " + childRNode.toString());
-					System.out.println("INT_X17Y542/BYPASS_W8 wires:");
-					for(Wire wire:childRNode.getNode().getAllWiresInNode()){
-						Tile tile = wire.getTile();
-						System.out.println("wire " + wire.toString() + ": tile = " + tile.toString() 
-											+ ", tile column = " + tile.getColumn() + ", tile row = " + tile.getRow());
-					}
-				}
-			}*/
 			
 			if(childRNode.isTarget()){		
 //				if(this.debugExpansion) this.printInfo("\t\t childRNode is the target");
@@ -1613,12 +1554,6 @@ public class RoutableNodeRouter{
 		//set the sink rrg node of con as the target
 		RoutableNode sink = (RoutableNode) con.getSinkRNode();
 		sink.target = true;
-		
-		/*if(con.id == 39702){
-			System.out.println(sink.toString());
-			System.out.println(sink.isTarget());
-			System.out.println();
-		}*/
 		
 		// Add source to queue
 		RoutableNode source = (RoutableNode) con.getSourceRNode();
