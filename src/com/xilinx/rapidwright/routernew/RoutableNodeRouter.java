@@ -1257,7 +1257,7 @@ public class RoutableNodeRouter{
 				netPIPs.addAll(RouterHelper.conPIPs(c.nodes));
 			}
 			np.getNet().setPIPs(netPIPs);
-			RouteStatusHelper.pipsInfoOfNetsWithUnroutedPins(np);
+//			RouteStatusHelper.pipsInfoOfNetsWithUnroutedPins(np);
 		}
 		
 		this.checkPIPsUsage();
