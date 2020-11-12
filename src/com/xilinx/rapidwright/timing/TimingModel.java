@@ -761,6 +761,21 @@ public class TimingModel {
         Tile get(int i);
     };
 
+    public Map<String, Short> getInputSitePinDelay() {
+        Map<String,Short> res = new HashMap<>();
+        final char[]   row = {'A','B','C','D','E','F','G','H'};
+        final String[] pin = {"1","2","3","4","5","6","_I","X","WCKEN"};
+        final Float[]  dly = {SITEPIN_A1_DELAY,SITEPIN_A2_DELAY,SITEPIN_A3_DELAY,SITEPIN_A4_DELAY,SITEPIN_A5_DELAY,
+                                                                                // WCKEN = X
+                             SITEPIN_A6_DELAY,SITEPIN_A_I_DELAY,SITEPIN_AX_DELAY,SITEPIN_AX_DELAY};
+        for (char c : row) {
+            for (int i = 0; i < pin.length; i++) {
+                res.put(c + pin[i], dly[i].shortValue());
+            }
+        }
+        return res;
+    }
+
     public Map<GroupDelayType,List<Short>> getHorDistArrayInIntTileGrid() {
 //        System.out.println("getHorDistArrayInIntTileGrid");
         Tile[][] tiles = this.device.getTiles();
