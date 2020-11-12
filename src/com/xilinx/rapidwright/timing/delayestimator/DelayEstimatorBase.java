@@ -109,17 +109,12 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 	        RoutingNode node = getTermInfo(tg);
 	        // don't put this in calcTimingGroupDelay is called many times to estimate delay.
 	        if (node.tg == T.TimingGroup.CLE_IN) {
-	            // figure out which node
-	
 	            String inode = tg.exitNode().toString().split("/")[1];
 	            return inputSitePinDelay.getOrDefault(inode, (short) -1);
 	        }
-	
-	        delay = calcTimingGroupDelay(node.tg, node.begin(), node.end(), 0d);
 		}catch(Exception e){
         	System.out.println(tg.toString());
-        }
-
+		}
         return delay.shortValue();
     }
 
@@ -825,7 +820,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 //                System.out.println();
 //            return (short) 0;
 //        }
-        int size = (tg.direction() == T.Direction.VERTICAL) ? numRow : numCol;
+        int size = (tg.direction() == T.Direction.HORIZONTAL) ? numCol : numRow;
         if (endLoc < 0 || endLoc >= size || begLoc < 0 || begLoc >= size)
             return -1.0;
 
