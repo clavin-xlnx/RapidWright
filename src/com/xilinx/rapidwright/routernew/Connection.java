@@ -122,9 +122,10 @@ public class Connection{
 	}
 	
 	public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
-		float slackCon = this.sinkTimingVertex.getRequiredTime() - this.sourceTimingVertex.getArrivalTime();// - this.timingEdge.getDelay(); //TODO check
-//		float slack = this.sinkTimingVertex.getSlack();
-//		System.out.println("slack con = " + slackCon + ", sink TV slack = " + slack);
+		float slackCon = this.sinkTimingVertex.getRequiredTime() - this.sourceTimingVertex.getArrivalTime() - this.timingEdge.getDelay();
+		// - this.timingEdge.getDelay();
+//		float slack = this.sinkTimingVertex.getSlack();//slaskCon = slack
+//		if(slackCon != slack) System.out.println("slack con = " + slackCon + ", sink TV slack = " + slack + ", " + this.timingEdge.getDelay());
 		float tempCriticality  = (1 - slackCon / maxDelay);//TODO check up on criticality values
     	tempCriticality = (float) (Math.pow(tempCriticality, criticalityExponent) * maxCriticality);
     	
@@ -162,6 +163,7 @@ public class Connection{
 	
 	public void resetConnection(){
 		this.rnodes.clear();
+		this.timingGroups.clear();
 	}
 	
 	public void addPartialPath(Routable routable){
@@ -189,6 +191,20 @@ public class Connection{
 		this.sinkRNode = childRNode;
 	}
 	
+	public String toStringTiming(){
+		StringBuilder s = new StringBuilder();
+		s.append("Con");
+		s.append(String.format("%6s", this.id));
+		s.append(", ");
+		s.append("net = " + this.net.getNet().getName());
+		s.append(", ");
+		s.append(String.format("net fanout = %3s", this.net.fanout));
+		s.append(", TimingEdge = ");
+		s.append(this.timingEdge.toString() + ", " + this.timingEdge.delaysInfo());
+		
+		return s.toString();
+	}
+	
 	public String toString() {
 		
 		StringBuilder s = new StringBuilder();
@@ -198,7 +214,7 @@ public class Connection{
 		String coordinate = "(" + this.net.x_min_b + ", " + this.net.y_min_b + ") to (" 
 				+ this.net.x_max_b + ", " + this.net.y_max_b + ")";
 		
-		s.append("Con");
+		s.append("Con ");
 		s.append(String.format("%6s", this.id));
 		s.append(", ");
 		s.append(String.format("%22s", coordinate));
