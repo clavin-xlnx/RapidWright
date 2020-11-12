@@ -14,7 +14,6 @@ public class Netplus{
 	 */
 	private List<Connection> connections;
 	public Net net;
-	private NetType type;
 	private int id;
 	public short x_min_b, x_max_b;//short better
 	public short y_min_b, y_max_b;
@@ -27,7 +26,6 @@ public class Netplus{
 		this.id = id;
 		this.bbRange = bbRange;
 		this.net = net;
-		this.type = net.getType();
 		this.connections = new ArrayList<>();
 		this.fanout = (short) this.net.getSinkPins().size();
 		this.getBoundingXYs(net);
@@ -92,7 +90,7 @@ public class Netplus{
 		return this.net;
 	}
 	public NetType getType() {
-		return type;
+		return this.net.getType();
 	}
 	
 	public int getId() {
