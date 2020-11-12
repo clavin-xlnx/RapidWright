@@ -26,7 +26,7 @@ public class RoutableTimingGroup implements Routable{
 	private SiblingsTimingGroup sibTimingGroups;
 	public GroupDelayType groupType;
 	public RoutableType type;
-	private ImmutableTimingGroup thruImmuTg;//could be removed? TODO use index of the childrenImmuTG objects, ArrayList.indexOf()?
+	private ImmutableTimingGroup thruImmuTg;//could be removed? use index of the childrenImmuTG objects, ArrayList.indexOf()?
 	
 	public short xlow, xhigh;
 	public short ylow, yhigh;
@@ -34,6 +34,12 @@ public class RoutableTimingGroup implements Routable{
 	public float base_cost;
 	
 	public final RoutableData rnodeData;//data for the siblings, that is for the exit nodes
+	
+	/** A flag to indicate the router in expansion
+	* true: should be pushed into the queue directly with cost copied from the parent
+	* false: after being popped out from the queue, cost should be calculated
+	*/
+	public boolean virtualMode;
 	
 //	static Map<Node, CountingSet<SitePinInst>> entryNodeSources;
 //	static Map<Node, CountingSet<Routable>> entryNodeParents;
@@ -67,6 +73,12 @@ public class RoutableTimingGroup implements Routable{
 		this.childrenSet = false;
 		this.setXY();
 		this.thruImmuTg = null;
+		
+		if(this.type == RoutableType.SOURCERR){
+			this.virtualMode = false;
+		}else{
+			this.virtualMode = true; // true or false does not matter to sinkrr, becase of the isTarget() check
+		}
 	}
 	
 	public RoutableTimingGroup(int index, SiblingsTimingGroup sTimingGroups){
@@ -79,6 +91,7 @@ public class RoutableTimingGroup implements Routable{
 		this.childrenSet = false;	
 		this.setXY();
 		this.thruImmuTg = null;
+		this.virtualMode = true;
 	}
 	
 	public Pair<Integer, Long> setChildren(int globalIndex, float base_cost_fac, 
@@ -89,14 +102,14 @@ public class RoutableTimingGroup implements Routable{
 			RouterTimer timer,
 			long callingOfGetNextRoutable){
 		
-		timer.getNextRoutable.start();
+//		timer.getNextRoutable.start();
 		List<SiblingsTimingGroup> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes);
-		timer.getNextRoutable.finish();
+//		timer.getNextRoutable.finish();
 		
-		timer.getNextDummy.start();
-		timer.getNextDummy.finish();
+//		timer.getNextDummy.start();
+//		timer.getNextDummy.finish();
 		
-		timer.addChildren.start();
+//		timer.addChildren.start();
 		callingOfGetNextRoutable++;
 		this.childrenImmuTG = new ArrayList<>();
 		for(SiblingsTimingGroup stGroups : next){
@@ -104,26 +117,25 @@ public class RoutableTimingGroup implements Routable{
 			RoutableTimingGroup childRNode;
 			ImmutableTimingGroup thruImmuTg;
 			Pair<RoutableTimingGroup,ImmutableTimingGroup> childThruImmuTg;
-//			short delay = 0;
+			short delay = 0;
 			
 			NodeWithFaninInfo key = stGroups.getExitNode();//using node as the key is necessary, different nodes may have a same hasCode()
-//			Pair keyPair = new Pair(key, false);
-			if(!createdRoutable.containsKey(key)){//TODO also check up on the virtual, key could be a >
+			
+			if(!createdRoutable.containsKey(key)){
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups);
 				childRNode.setBaseCost(base_cost_fac);
-				
-				//TODO timing this getThru()
-				
+							
 				thruImmuTg = stGroups.getThruImmuTg(this.sibTimingGroups.getExitNode());
 				
-				
-//				delay = estimator.getDelayOf(thruImmuTg);
-//				if(delay == -3)
-//					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-//				thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
+				delay = estimator.getDelayOf(thruImmuTg);
+				if(delay == -3)
+					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+				if(delay < 0){
+					delay = 0;
+				}
+				thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
 				
 				childThruImmuTg = new Pair<>(childRNode, thruImmuTg);
-//				childThruImmuTg = new Pair<>(new RoutableTimingGroup(globalIndex, stGroups.getFirst()), stGroups.getSecond());
 				
 				globalIndex++;
 
@@ -135,10 +147,13 @@ public class RoutableTimingGroup implements Routable{
 				
 				thruImmuTg = childRNode.getSiblingsTimingGroup().getThruImmuTg(this.sibTimingGroups.getExitNode());//RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key))
 				
-//				delay = estimator.getDelayOf(thruImmuTg);
-//				if(delay == -3)
-//					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-//				thruImmuTg.setDelay(delay);//TODO check
+				delay = estimator.getDelayOf(thruImmuTg);
+				if(delay == -3)
+					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+				if(delay < 0){
+					delay = 0;
+				}
+				thruImmuTg.setDelay(delay);
 				
 				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
 			}
@@ -152,7 +167,7 @@ public class RoutableTimingGroup implements Routable{
 		}
 		
 		this.childrenSet = true;
-		timer.addChildren.finish();
+//		timer.addChildren.finish();
 		
 		return new Pair(globalIndex, callingOfGetNextRoutable);
 	}
@@ -211,7 +226,7 @@ public class RoutableTimingGroup implements Routable{
 		return Routable.capacity < this.rnodeData.numUniqueParents();
 	}
 	
-	//TODO separating occupancy methods of rnode and the entry node makes sense and makes the router 3x faster
+	//separating occupancy methods of rnode and the entry node makes sense and makes the router 3x faster
 	public int getOccupancy(){
 //		return Math.max(this.findMaximumOccEntryNodes(), this.rnodeData.getOccupancy());//not valid any more if the entry node costs are added to the siblings cost
 		return this.rnodeData.getOccupancy();
@@ -438,13 +453,12 @@ public class RoutableTimingGroup implements Routable{
 
 	@Override
 	public boolean isGlobal() {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
 	public boolean isBounce() {
-		// TODO Auto-generated method stub
+		
 		return false;
 	}
 	
