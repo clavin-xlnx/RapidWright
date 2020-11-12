@@ -5,8 +5,16 @@ public class RouterTimer {
 	public Timer rerouteCongestion;
 	public Timer rerouteIllegal;
 	
+	public Timer prepareRouting;
+	public Timer prepareRoutingDummy;
+	
 	public Timer rnodesCreation;
 	public Timer rnodesDummy;
+	
+	public Timer saveRouting;
+	public Timer resetPath;
+	public Timer addRouting;
+	public Timer saveRoutingDummy;
 	
 	public Timer calculateStatistics;
 	public Timer updateCost;
@@ -22,8 +30,8 @@ public class RouterTimer {
 	public Timer getRouteNodeCost;
 	
 	public Timer getNextRoutable;
-	public Timer getNextDummy;
 	public Timer addChildren;
+	public Timer getNextDummy;
 	
 	public Timer getThruImmuTg;
 	public Timer putEntryNodes;
@@ -32,8 +40,20 @@ public class RouterTimer {
 		this.firstIteration = new Timer("first iteration");
 		this.rerouteCongestion = new Timer("reroute congestion");
 		
+		this.prepareRouting = new Timer("prepare for routing");
+		this.prepareRoutingDummy = new Timer("perpare routing dummy");
+		
 		this.rnodesCreation = new Timer("rnodes creation");
 		this.rnodesDummy = new Timer("rnodes dummy");
+		
+		this.getNextRoutable = new Timer(" get next routable");
+		this.addChildren = new Timer(" add Children");
+		this.getNextDummy = new Timer(" get next dummy");
+		
+		this.saveRouting = new Timer("save routing");
+		this.resetPath = new Timer("reset path");
+		this.addRouting = new Timer("add routing");
+		this.saveRoutingDummy = new Timer("save-routing dummy");
 		
 		this.rerouteIllegal = new Timer("fix illegal tree");
 		this.calculateStatistics = new Timer("calc stat");
@@ -49,10 +69,6 @@ public class RouterTimer {
 		
 		this.getRouteNodeCost = new Timer("get RNode cost");
 		
-		this.getNextRoutable = new Timer(" get next routable");
-		this.getNextDummy = new Timer(" get next dummy");
-		this.addChildren = new Timer(" add Children");
-		
 		this.getThruImmuTg = new Timer("get thruImmuTg");
 		this.putEntryNodes = new Timer("put entry nodes");
 	}
@@ -63,12 +79,21 @@ public class RouterTimer {
 		
 //		result += this.firstIteration;
 //		result += this.rerouteCongestion;
+		
+		result += this.prepareRouting;
+		result += this.prepareRoutingDummy;
+		
 		result += this.rnodesCreation;
 		result += this.rnodesDummy;
 		
 		result += this.getNextRoutable;
 		result += this.addChildren;
 		result += this.getNextDummy;
+		
+		result += this.saveRouting;
+		result += this.resetPath;
+		result += this.addRouting;
+		result += this.saveRoutingDummy;
 		
 		result += this.calculateStatistics;
 		result += this.updateCost;
