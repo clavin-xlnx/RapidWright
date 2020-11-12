@@ -265,7 +265,7 @@ public class Main {
 							router.callingOfGetNextRoutable);
 					
 					}else{
-						RoutableGroupRouterWithVirtualMode router = new RoutableGroupRouterWithVirtualMode(this.design, 
+						/*RoutableGroupRouterWithVirtualMode router = new RoutableGroupRouterWithVirtualMode(this.design, 
 								this.toWriteDCPfileName,
 								this.nrOfTrials,
 								this.t,
@@ -311,7 +311,7 @@ public class Main {
 								router.nodesPopedFromQueue,
 								router.nodesPopedFromQueueFirstIter,
 								router.routerTimer,
-								router.callingOfGetNextRoutable);
+								router.callingOfGetNextRoutable);*/
 					}
 				
 			}		
