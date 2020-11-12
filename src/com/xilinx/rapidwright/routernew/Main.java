@@ -29,6 +29,7 @@ public class Main {
 	private float base_cost_fac = 1;
 	private boolean timingDriven = false;
 	private boolean partialRouting = false;
+	private boolean virtualModeAvailable = false;
 	
 	public Main(String[] arguments) {
 		if(arguments.length < 2){
@@ -88,6 +89,9 @@ public class Main {
 				
 			}else if(arguments[i].contains("partialRouting")){
 				this.partialRouting = true;
+				
+			}else if(arguments[i].contains("virtualModeAvailable")){
+				this.virtualModeAvailable = true;
 			}
 		}
 	}
@@ -210,7 +214,9 @@ public class Main {
 						0);
 				
 			}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
-				RoutableTimingGroupRouter router = new RoutableTimingGroupRouter(this.design, 
+				
+				if(!this.virtualModeAvailable){
+					RoutableTimingGroupRouter router = new RoutableTimingGroupRouter(this.design, 
 						this.toWriteDCPfileName,
 						this.nrOfTrials,
 						this.t,
@@ -222,42 +228,91 @@ public class Main {
 						this.acc_fac,
 						this.base_cost_fac,
 						this.timingDriven);
-				
-				router.designInfo();
-				this.routerConfigurationInfo();
-				
-				this.t.start("Route Design");
-				routingRuntime = router.routingRuntime();
-				this.t.stop();
-				
-				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
-				
-				router.getAllHopsAndManhattanD();
-				router.checkAverageNumWires();
-				
-				this.rnodesInfo(router.manhattanD,
-						router.hops,
-						router.firstIterRNodes,
-						router.rrgNodeId,
-						router.usedRNodes.size(),
-						router.averWire,
-						router.averNodePerImmuTg,
-						router.averImmuTgPerSiblings,
-						router.averNodePerSiblings,
-						router.averFanoutRNodes);
-				
-				this.runtimeInfoPrinting(routingRuntime, 
-						router.firstRouting,
-						router.firtRnodeT,
-						router.itry, 
-						router.connectionsRouted,
-						router.sortedListOfConnection.size(),
-						router.nodesExpanded,
-						router.nodesExpandedFirstIter,
-						router.nodesPopedFromQueue,
-						router.nodesPopedFromQueueFirstIter,
-						router.routerTimer,
-						router.callingOfGetNextRoutable);
+					router.designInfo();
+					this.routerConfigurationInfo();
+					
+					this.t.start("Route Design");
+					routingRuntime = router.routingRuntime();
+					this.t.stop();
+					
+					router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
+					
+					router.getAllHopsAndManhattanD();
+					router.checkAverageNumWires();
+					
+					this.rnodesInfo(router.manhattanD,
+							router.hops,
+							router.firstIterRNodes,
+							router.rrgNodeId,
+							router.getUsedRNodes(),
+							router.averWire,
+							router.averNodePerImmuTg,
+							router.averImmuTgPerSiblings,
+							router.averNodePerSiblings,
+							router.averFanoutRNodes);
+					
+					this.runtimeInfoPrinting(routingRuntime, 
+							router.firstRouting,
+							router.firtRnodeT,
+							router.itry, 
+							router.connectionsRouted,
+							router.sortedListOfConnection.size(),
+							router.nodesExpanded,
+							router.nodesExpandedFirstIter,
+							router.nodesPopedFromQueue,
+							router.nodesPopedFromQueueFirstIter,
+							router.routerTimer,
+							router.callingOfGetNextRoutable);
+					
+					}else{
+						RoutableGroupRouterWithVirtualMode router = new RoutableGroupRouterWithVirtualMode(this.design, 
+								this.toWriteDCPfileName,
+								this.nrOfTrials,
+								this.t,
+								(short) this.bbRange,
+								this.mdWeight,
+								this.hopWeight,
+								this.initial_pres_fac,
+								this.pres_fac_mult,
+								this.acc_fac,
+								this.base_cost_fac,
+								this.timingDriven);
+						router.designInfo();
+						this.routerConfigurationInfo();
+						
+						this.t.start("Route Design");
+						routingRuntime = router.routingRuntime();
+						this.t.stop();
+						
+						router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
+						
+						router.getAllHopsAndManhattanD();
+						router.checkAverageNumWires();
+						
+						this.rnodesInfo(router.manhattanD,
+								router.hops,
+								router.firstIterRNodes,
+								router.rrgNodeId,
+								router.getUsedRNodes(),
+								router.averWire,
+								router.averNodePerImmuTg,
+								router.averImmuTgPerSiblings,
+								router.averNodePerSiblings,
+								router.averFanoutRNodes);
+						
+						this.runtimeInfoPrinting(routingRuntime, 
+								router.firstRouting,
+								router.firtRnodeT,
+								router.itry, 
+								router.connectionsRouted,
+								router.sortedListOfConnection.size(),
+								router.nodesExpanded,
+								router.nodesExpandedFirstIter,
+								router.nodesPopedFromQueue,
+								router.nodesPopedFromQueueFirstIter,
+								router.routerTimer,
+								router.callingOfGetNextRoutable);
+					}
 				
 			}		
 		}
