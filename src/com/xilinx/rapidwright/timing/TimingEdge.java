@@ -46,8 +46,9 @@ public class TimingEdge extends DefaultEdge {
     private float netDelay = 0.0f;
     private float delay = 0.0f;
     
-    //TODO
+    //======== added for router ========
     private float intraSiteDelay = 0.0f;
+    //======== added for router ========
     
     private SitePinInst first;
     private SitePinInst second;
@@ -237,7 +238,8 @@ public class TimingEdge extends DefaultEdge {
         return delay;
     }
     
-    //TODO added for timing-driven router
+    //=============================== methods added for routing and debugging ===============================
+    //added for timing-driven router
     public float getIntraSiteDelay() {
 		return intraSiteDelay;
 	}
@@ -245,6 +247,26 @@ public class TimingEdge extends DefaultEdge {
 	public void setIntraSiteDelay(float intraSiteDelay) {
 		this.intraSiteDelay = intraSiteDelay;
 	}
+    
+    public String toStringOnSitePinInsts(){
+    	return this.getFirstPin().toString() + " -> " + this.getSecondPin().toString();
+    }
+    
+    public String delaysInfo(){
+    	return "logic = " + this.logicDelay + ", intrasite = " + this.intraSiteDelay + ", net = " + this.netDelay;
+    }
+    
+    public void setRouteDelay(float routeDelay){
+    	this.netDelay = this.intraSiteDelay + routeDelay;
+    	this.delay = logicDelay + this.netDelay;
+//    	System.out.println("RouteDelay = " + routeDelay + ", intra site delay = "  + this.intraSiteDelay + ", logic delay = " + logicDelay);
+    	if (timingGraph.containsEdge(this))
+            timingGraph.setEdgeWeight(this, this.delay);
+    	else
+    		System.err.println("timing graph does not contain timing edge");
+//    	System.out.println(timingGraph.getEdgeWeight(this) == this.delay);
+    }
+    //=============================== methods added for routing and debugging =============================== 
 
 	/**
      * Sets the net-related component of the delay in ps for this edge.
@@ -255,18 +277,6 @@ public class TimingEdge extends DefaultEdge {
         this.delay = logicDelay + netDelay;
         if (timingGraph.containsEdge(this))
             timingGraph.setEdgeWeight(this, this.delay);
-    }
-    
-    //TODO check
-    public void setRouteDelay(float routeDelay){
-    	this.netDelay = this.intraSiteDelay + routeDelay;
-    	this.delay = logicDelay + this.netDelay;
-//    	System.out.println("RouteDelay = " + routeDelay + ", intra site delay = "  + this.intraSiteDelay + ", logic delay = " + logicDelay);
-    	if (timingGraph.containsEdge(this))
-            timingGraph.setEdgeWeight(this, this.delay);
-    	else
-    		System.err.println("timing graph does not contain timing edge");
-//    	System.out.println(timingGraph.getEdgeWeight(this) == this.delay);
     }
 
     /**

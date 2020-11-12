@@ -42,6 +42,8 @@ import org.jgrapht.alg.shortestpath.BellmanFordShortestPath;
 import org.jgrapht.alg.shortestpath.KShortestSimplePaths;
 import org.jgrapht.graph.DefaultDirectedWeightedGraph;
 import org.jgrapht.graph.GraphWalk;
+import org.jgrapht.traverse.TopologicalOrderIterator;
+import org.python.google.common.collect.Lists;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
@@ -56,6 +58,7 @@ import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.Collection;
+import java.util.Collections;
 
 
 /**
@@ -85,9 +88,11 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     private HashMap<String, TimingVertex> safeVertexCheck = new HashMap<>();
     static HashSet<String> unisimFlipFlopTypes;
     
-    //TODO Yun needed
+    //========================= for router =================================================
     Map<SitePinInst, TimingVertex> spiAndTimingVertices = new HashMap<>();
     Map<Pair<SitePinInst, SitePinInst>, TimingEdge> spiPairsAndTimingEdges = new HashMap<>();
+    Map<TimingVertex, SitePinInst> timingVertexSitePinInsts = new HashMap<>();
+    //========================= for router =================================================
 
     static {
         
@@ -187,14 +192,155 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         computeArrivalTimes();
     }
     
-    //TODO check
-    public void setTimingRequirementOnly(float requirement) {
-        for (GraphPath<TimingVertex, TimingEdge> path : getGraphPaths()) {
-            setTimingRequirement(requirement, path);
+    //==================================== methods added for timing-driven routing ===================================
+    boolean routerDebugging = false;
+    /**
+     * Computes/recomputes the arrival times stored at the vertices of the graph based on the edge 
+     * using TopologicalOrderIterator
+     * delays.
+     */
+    public void computeArrivalTimesTopologicalOrder() {
+    	TopologicalOrderIterator<TimingVertex, TimingEdge> orderIterator = new TopologicalOrderIterator<>(this);
+    	while(orderIterator.hasNext()){
+        	for (TimingEdge e : edgesOf(orderIterator.next())){
+        		if (inDegreeOf(e.getSrc()) == 0) {
+                    e.getSrc().setArrivalTime(0);
+                } 
+        		float arrival = e.getSrc().getArrivalTime() + e.getDelay();
+                e.getDst().setMaxArrivalTime(arrival);       
+        	}
         }
-//        System.out.println("timing graph paths size = " + getGraphPaths().size());
     }
 
+ 	//Topological order  
+    public void setTimingRequirementOnly(float requirement) {
+        for (GraphPath<TimingVertex, TimingEdge> path : getGraphPaths()) {
+            setMinTimingRequirement(requirement, path);
+        }
+    }
+    
+    public void setMinTimingRequirement(float requirement, GraphPath<TimingVertex, TimingEdge> graphPath) {
+        List<TimingEdge> edgeList = (List<TimingEdge>)graphPath.getEdgeList();
+        int sz = edgeList.size();
+        for(int i=sz-1; i>=0; i-- ) {
+            TimingEdge e = edgeList.get(i);
+            if(outDegreeOf(e.getDst()) == 0){
+            	e.getDst().setMinRequiredTime(requirement);
+            }
+            float remainingRequiredTime = e.getDst().getRequiredTime() - e.getDelay();
+            e.getSrc().setMinRequiredTime(remainingRequiredTime);
+        }
+    }
+    
+    public void setTimingRequirementTopologicalOrder(float requirement){
+    	for(TimingVertex v : this.getReversedOrder()){
+    		for (TimingEdge e : edgesOf(v)){
+    			if(outDegreeOf(e.getDst()) == 0){
+    				e.getDst().setMinRequiredTime(requirement);
+    			}
+    			float remainingRequiredTime = e.getDst().getRequiredTime() - e.getDelay();
+    			e.getSrc().setMinRequiredTime(remainingRequiredTime);
+    		}
+    	}
+    }
+    
+    public void resetRequiredAndArrivalTime(){
+    	for(TimingVertex v : this.vertexSet()){
+    		v.resetArrivalTime();
+    		v.resetRequiredTime();
+    	}
+    }
+    
+    /**
+     * get maxDelay, i.e. max arrival time
+     */
+    public Pair<Float, TimingVertex> getMaxDelay(){
+		float maxDelay = 0;
+		TimingVertex maxV = null;
+		/*TopologicalOrderIterator<TimingVertex, TimingEdge> orderIterator = new TopologicalOrderIterator<>(this);
+        while(orderIterator.hasNext()){
+        	for (TimingEdge e : edgesOf(orderIterator.next())){
+        		float arrival = e.getDst().getArrivalTime();
+        		if(maxDelay <  arrival){
+        			maxDelay = arrival;
+        		}
+        	}
+        }*/
+		for(TimingVertex v : this.vertexSet()){
+			if(v.getArrivalTime() > maxDelay){
+				maxDelay = v.getArrivalTime();
+				maxV = v;
+			}
+		}
+    	return new Pair(maxDelay, maxV);
+    }
+    
+    public List<TimingVertex> getReversedOrder(){
+    	List<TimingVertex> reversedOrderedTimingVertices = new ArrayList<>();
+    	TopologicalOrderIterator<TimingVertex, TimingEdge> orderIterator = new TopologicalOrderIterator<>(this);
+    	while(orderIterator.hasNext()){
+    		TimingVertex v = orderIterator.next();
+    		reversedOrderedTimingVertices.add(v);
+    	}
+
+    	Collections.reverse(reversedOrderedTimingVertices);
+    	return reversedOrderedTimingVertices;
+    }
+    
+    public List<TimingVertex> getCriticalVerticesInOrder(TimingVertex maxV){
+    	List<TimingVertex> criticalVertices = new ArrayList<>();
+    	
+    	TimingVertex timingVertex = maxV;
+    	criticalVertices.add(timingVertex);
+    	while(incomingEdgesOf(timingVertex).size() != 0){
+    		timingVertex = this.getCriticalSourceTimingVertex(timingVertex);
+    		if(routerDebugging) System.out.println(timingVertex);
+    		criticalVertices.add(timingVertex);
+    	}
+    	Collections.reverse(criticalVertices);
+    	System.out.println(criticalVertices);
+    	return criticalVertices;
+    }
+    
+    public TimingVertex getCriticalSourceTimingVertex(TimingVertex sinkV){
+    	Set<TimingEdge> incomingEdges = incomingEdgesOf(sinkV);
+    	if(routerDebugging) System.out.println(sinkV + ", incoming edges size = " + incomingEdges.size());
+    	for(TimingEdge e : incomingEdges){
+//    		System.out.println(e.toStringOnSitePinInsts());
+    		if(this.comparableFloat(e.getSrc().getArrivalTime(), sinkV.getArrivalTime() - e.getDelay())){
+//    			if(this.spiPairsAndTimingEdges.values().contains(e)){ // not co
+    				//return source TimingVertex if the edge is involved in the connections
+    				return e.getSrc();
+//    			}
+    		}
+    	}
+    	return null;
+    }
+    
+    public boolean comparableFloat(float a, float b){
+    	return Math.abs( a - b) < Math.pow(10, -6);
+    }
+    
+    /**
+     * Return maps for the timing-driven router
+     */
+    public Map<Pair<SitePinInst, SitePinInst>, TimingEdge> getSpiAndTimingEdges(){
+    	return this.spiPairsAndTimingEdges;
+    }
+    
+    public Map<SitePinInst, TimingVertex> getSpiAndTimingVertex(){
+    	return this.spiAndTimingVertices;
+    }
+    
+    public Map<TimingVertex, SitePinInst> getTimingVertexandSpiMap(){
+    	for(SitePinInst spi : this.spiAndTimingVertices.keySet()){
+    		this.timingVertexSitePinInsts.putIfAbsent(this.spiAndTimingVertices.get(spi), spi);
+    	}
+    	return this.timingVertexSitePinInsts;
+    }
+    
+  //===================================================================================================================
+    
     /**
      * Sets the same specified timing requirement on a specified GraphPath.
      * @param requirement The required time in picoseconds at the sink of the path.
@@ -361,6 +507,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         return result/ graphPathHashSet.size();
     }
 */
+    
     /**
      * Finds and returns the path from the TimingGraph having maximum delay.
      * @return The GraphPath that is the critical path found in the TimingGraph, which might be null
@@ -490,7 +637,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             TimingVertex superSource = null;
             TimingVertex superSink = null;
             if (superSource == null) {
-                superSource = new TimingVertex("superSource");//TODO Yun 
+                superSource = new TimingVertex("superSource");
                 superSink = new TimingVertex("superSink");
             }
             if (!vertexSet().contains(superSource))
@@ -539,7 +686,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             result.add(path);
             graphPathHashSet.add(path);
         }
-        System.out.println("list path size = " + result.size());// TODO check, 1
+        System.out.println("list path size = " + result.size());
         System.out.println("path size = " + paths.size());
         System.out.println("source size = " + sources.size());
         System.out.println("sink size = " + sinks.size());
@@ -553,7 +700,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     public void computeArrivalTimes() {
         for (GraphPath<TimingVertex, TimingEdge> p : graphPathHashSet) {
             float arrival = 0;
-            for (TimingEdge e : (List<TimingEdge>) p.getEdgeList()) {//TopologicalOrderIterator
+            for (TimingEdge e : (List<TimingEdge>) p.getEdgeList()) {
                 arrival += e.getDelay();
                 e.getDst().setArrivalTime(arrival);
                 if (inDegreeOf(e.getSrc())==0) {
@@ -562,7 +709,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             }
         }
     }
-
+    
     /**
      * Computes/recomputes the slack stored at vertices of the graph based on comparing required 
      * times and arrival times.
@@ -1075,8 +1222,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     private List<SitePinInst> spi_sinks;
     private SiteInst si;
 
-    //TODO check, extracting intra site delay for timing edges
+    //================== extracting intra site delay for timing edges for router =============
     private float intraSiteDelay = 0.0f;
+    //================== extracting intra site delay for timing edges for router =============
 
     /**
      * This method is called per physical "Net" object for adding TimingEdges into the TimingGraph 
@@ -1110,14 +1258,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
         Cell testSourceCell = null;
 
-        logicDelay = 0f;
-
-       
+        logicDelay = 0f;      
         
         for (EDIFHierPortInst hport : hports) {
-        	/*if(n.getName().equals("n9ab") && hport.isOutput()){
-        		System.out.println("hport output of net ncda found" + hport.toString());
-        	}*/
             String portName = hport.getPortInst().getName();
             String cellName = hport.getFullHierarchicalInstName();
             Cell cell = design.getCell(cellName);
@@ -1146,7 +1289,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
             } else {
                 physPinName = cell.getPhysicalPinMapping(portName);
-                spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);//TODO why H_O
+                spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);
             }
 
             si = cell.getSiteInst();
@@ -1252,7 +1395,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     continue;
                 }
                 
-                this.intraSiteDelay = Math.max(0f, tmpNetDelay);//TODO check
+                this.intraSiteDelay = Math.max(0f, tmpNetDelay);
                 
                 netDelay = Math.max(0f, tmpNetDelay);
                 forceUpdateEdge = true;
@@ -1271,7 +1414,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                                 param3);
                         netDelay = tmpNetDelay;
                         
-                        this.intraSiteDelay = tmpNetDelay;//TODO check
+                        this.intraSiteDelay = tmpNetDelay;// Yun - for timing-driven router
                         
                         forceUpdateEdge = true;
                     }
@@ -1279,7 +1422,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                         netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, 
                                 local_spi_source.getSite(), null, net);
                         
-                        this.intraSiteDelay = this.timingModel.getIntraSiteDelay();//TODO check
+                        this.intraSiteDelay = this.timingModel.getIntraSiteDelay();// Yun - for timing-driven router
                         
                         forceUpdateEdge = true;
                     }
@@ -1288,7 +1431,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     netDelay = timingModel.calcDelay(local_spi_source, spi_sink, source, sink, 
                             local_spi_source.getSite(), spi_sink.getSite(), net);
                     
-                    this.intraSiteDelay = this.timingModel.getIntraSiteDelay();//TODO check
+                    this.intraSiteDelay = this.timingModel.getIntraSiteDelay();// Yun - for timing-driven router
                     
                     forceUpdateEdge = true;
                 }
@@ -1296,14 +1439,14 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (e.getNetDelay() != 0f || forceUpdateEdge) {
                 e.setNetDelay(netDelay);
                 e.setLogicDelay(logicDelay);
-                e.setIntraSiteDelay(this.intraSiteDelay);//TODO check
+                e.setIntraSiteDelay(this.intraSiteDelay);// Yun - for timing-driven router
             }
             e.setFirstSitePinInst(local_spi_source);
             e.setSecondSitePinInst(spi_sink);
             safeAddEdge(vS, vD, e);
             setEdgeWeight(e, e.getDelay());
             
-            //TODO check, needed by the router
+            //========================== for the router ================================
             Pair<SitePinInst, SitePinInst> spiPair = new Pair<SitePinInst, SitePinInst>(local_spi_source, spi_sink);
             if(!this.spiPairsAndTimingEdges.containsKey(spiPair)){
             	this.spiPairsAndTimingEdges.put(spiPair, e);
@@ -1311,21 +1454,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             
             this.spiAndTimingVertices.putIfAbsent(local_spi_source, vS);
             this.spiAndTimingVertices.putIfAbsent(spi_sink, vD);
-            
+            //========================== for the router ================================
         }
         return 1;
-    }
-    
-    /**
-     * Returns a map of <SitePinInst, TimingVertex> for the timing-driven router
-     * TODO Yun needed
-     */
-    public Map<Pair<SitePinInst, SitePinInst>, TimingEdge> getSpiAndTimingEdges(){
-    	return this.spiPairsAndTimingEdges;
-    }
-    
-    public Map<SitePinInst, TimingVertex> getSpiAndTimingVertex(){
-    	return this.spiAndTimingVertices;
     }
     
     public DelayModel getintraSiteAndLogicDelayModel(){

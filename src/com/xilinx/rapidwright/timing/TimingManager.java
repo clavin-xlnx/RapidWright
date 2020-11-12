@@ -20,7 +20,9 @@
 
 package com.xilinx.rapidwright.timing;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.jgrapht.GraphPath;
 
@@ -28,6 +30,8 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.routernew.Connection;
+import com.xilinx.rapidwright.routernew.RoutableTimingGroupRouter;
+import com.xilinx.rapidwright.util.Pair;
 
 
 /**
@@ -71,41 +75,79 @@ public class TimingManager {
             build();
     }
     
-    //-------------- added for timing-driven functionality ------------------
+    //----------------------- methods added for timing-driven routing -------------------------------
     
     public void updateRouteDelays(List<Connection> cons){
     	for(Connection c: cons){
     		c.updateRouteDelay();
-    		// TODO there exists an addition of inter delay and intra delay in the setNetDelay
-    		//setNetDelay also includes the setEdgeWeight()
-//    		this.timingGraph.setEdgeWeight(e, e.getDelay());
     	}
     }
-    //TODO to deal with required time (set to the max delay)
-    public void calculateArrivalRequireAndSlack(){
-    	this.timingGraph.computeArrivalTimes();
-//    	float maxDelay = (float) this.timingGraph.getMaxDelayPath().getWeight();
-//    	this.timingGraph.setTimingRequirementOnly(maxDelay);
-    	this.timingGraph.computeSlacks();
+      
+    //dealing with required time: set to the max delay, i.e. max arrival time
+    public Pair<Float, TimingVertex> calculateArrivalRequireAndSlack(){
+    	this.timingGraph.resetRequiredAndArrivalTime();
+    	this.timingGraph.computeArrivalTimesTopologicalOrder();
+    	Pair<Float, TimingVertex> maxs = this.timingGraph.getMaxDelay();
+    	
+    	this.timingGraph.setTimingRequirementOnly(maxs.getFirst());//setTimingRequirementTopologicalOrder(maxDelay);//.
+    	this.timingGraph.computeSlacks();//if slackCon does not use sinkTimingVertex's slack, not necessary to compute?
+    	//or could be used to report worst slack?
+    	
+    	return maxs;
+    }
+    
+    public void getCriticalPathInfo(RoutableTimingGroupRouter router, TimingVertex maxV){
+    	
+    	Map<TimingVertex, Connection> sinkTimingVrtexAndConMap = router.sinkTimingVertexAndConMap;
+    	List<TimingVertex> criticalVertices = this.timingGraph.getCriticalVerticesInOrder(maxV);
+    	
+    	List<Connection> criticalConnections = new ArrayList<>();
+    	for(TimingVertex v : criticalVertices){
+    		if(sinkTimingVrtexAndConMap.containsKey(v)){
+    			criticalConnections.add(sinkTimingVrtexAndConMap.get(v));
+    		}
+    	}
+    	
+    	for(Connection c:criticalConnections){
+    		System.out.println(c.toStringTiming());
+    		for(ImmutableTimingGroup group : c.timingGroups){
+    			System.out.println("\t " + group);
+    		}
+    		
+    	}
+    	/*
+    	for(Connection c:criticalConnections){
+    		if(c != null){
+    			System.out.println(c.sourceTimingVertex.getName() + " -> " + c.sinkTimingVertex.toString());
+    			System.out.println(c.timingGroups);
+    		}
+    		
+    	}*/
+//    	List<Connection>
+//    	List<TimingEdge> timingEdge -> connection
+//    	List<Node>
     }
     
     public void calculateCriticality(List<Connection> cons, 
-    		float maxCriticality, 
-    		float criticalityExponent){
-    	
+    		float maxCriticality, float criticalityExponent, float maxDelay){
     	for(Connection c:cons){
     		c.resetCriticality();
     	}
     	
-    	GraphPath<TimingVertex, TimingEdge> maxPath = this.timingGraph.getMaxDelayPath();
-		float maxDelay = (float) maxPath.getWeight();
-    	
+    	float maxCriti = 0;
     	for(Connection c : cons){
     		c.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
-//    		System.out.println(c.criticality);
+    		if(c.criticality > 0)
+    			maxCriti = c.criticality;
     	}
+    	System.out.println(maxCriti);
     }
-  //-------------------------------------------------------------------------
+    
+    public boolean comparableFloat(Float a, float b){
+    	return Math.abs(a - b) < Math.pow(10, -9);
+    }
+    
+  //-----------------------------------------------------------------------------------------------
 
     /**
      * Builds the TimingModel and TimingGraph.
@@ -119,8 +161,8 @@ public class TimingManager {
 
     private boolean postBuild() {
         timingGraph.removeClockCrossingPaths();
-        timingGraph.buildGraphPaths(0);//(BUILD_GRAPH_PATHS_DEFAULT_PARAM);
-        timingGraph.computeArrivalTimes();
+        timingGraph.buildGraphPaths(0);//BUILD_GRAPH_PATHS_DEFAULT_PARAM);//default, 0 to build all paths
+        timingGraph.computeArrivalTimesTopologicalOrder();//.computeArrivalTimes();
         timingGraph.computeSlacks();
         return true;
     }
