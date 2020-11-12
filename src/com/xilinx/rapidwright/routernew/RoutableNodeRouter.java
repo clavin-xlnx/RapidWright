@@ -55,11 +55,12 @@ public class RoutableNodeRouter{
 	public Collection<RoutableData> rnodesTouched;
 	public Map<Node, RoutableNode> rnodesCreated;//node and rnode pair
 	public Set<Node> reservedNodes;
+	
 	private static HashSet<String> lutOutputPinNames;
 	
 	public List<Connection> sortedListOfConnection;
 	public List<Netplus> sortedListOfNetplus;
-	public List<Net> staticNets;
+	public Map<Net, List<RoutableNode>> staticNetAndSinkRoutables;
 
 	public RouteThruHelper routethruHelper;
 	
@@ -127,6 +128,11 @@ public class RoutableNodeRouter{
 			float base_cost_fac,
 			boolean partialRouting){
 		this.design = design;
+		
+//		this.design.unrouteDesign();//global signal routing needed for a complete routing flow
+//		DesignTools.unrouteDualOutputSitePinRouting(this.design);//this is for removing the unmatched SitePinInst - TimingVertex issue for TimingGraph 
+		DesignTools.createMissingSitePinInsts(this.design);
+		
 		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
 		this.reservedNodes = new HashSet<>();
@@ -178,9 +184,8 @@ public class RoutableNodeRouter{
 		
 		this.nets = new ArrayList<>();
 		this.connections = new ArrayList<>();
-		this.staticNets = new ArrayList<>();
 		
-		DesignTools.createMissingSitePinInsts(this.design);
+		this.staticNetAndSinkRoutables = new HashMap<>();
 		
 		for(Net n:this.design.getNets()){
 			
@@ -189,10 +194,9 @@ public class RoutableNodeRouter{
 				this.iclockAndStaticNet++;
 				
 			}else if(n.isStaticNet()){
-//				this.reserveNet(n);
 				n.unroute();
-				this.staticNets.add(n);
 				this.iclockAndStaticNet++;
+				this.initializeStaticNets(n);
 				
 			}else if (n.getType().equals(NetType.WIRE)){
 				/*if(n.getName().equals("S_CONTROL_USS/tile1_3_control_S_AXI_WDATA[26]") || 
@@ -277,27 +281,39 @@ public class RoutableNodeRouter{
 		return rrgNodeId;
 	}
 	
+	public void initializeStaticNets(Net currNet){
+		List<RoutableNode> sinkrns = new ArrayList<>();
+		for(SitePinInst sink : currNet.getPins()){
+			if(sink.isOutPin()) continue;
+			sinkrns.add(this.createRoutableNodeAndAdd(this.rrgNodeId, sink.getConnectedNode(), RoutableType.SINKRR, this.base_cost_fac, currNet.getType()));	
+		}
+		this.staticNetAndSinkRoutables.put(currNet, sinkrns);
+	}
+	
 	public void routeStaticNets(){
-		for(Net n:this.staticNets){
+		for(Net n:this.staticNetAndSinkRoutables.keySet()){
 			this.routeStaticNet(n);
-//			this.reserveNet(n);
 		}
 	}
 	
+	//TODO VCC GND routing
 	public void routeStaticNet(Net currNet){
 		NetType netType = currNet.getType();
+		
 		Set<Node> unavailableNodes = this.getAllUsedNodesOfRoutedNets();
-		unavailableNodes.addAll(this.reservedNodes);//TODO not reserve static net
+		unavailableNodes.addAll(this.reservedNodes);
+		
 		Set<PIP> netPIPs = new HashSet<>();
 		Map<SitePinInst, List<Node>> sinkPathNodes = new HashMap<>();
 		Queue<RoutableNode> q = new LinkedList<>();
 		Set<RoutableNode> visitedRoutable = new HashSet<>();
-		List<Node> pathNodes = new ArrayList<>();
+		Set<RoutableNode> usedRoutable = new HashSet<>();
 		
 		boolean debug = false;
 		if(debug) {
 			System.out.println("Net: " + currNet.getName());
 		}
+		
 		for(SitePinInst sink : currNet.getPins()){
 			
 			if(sink.isOutPin()) continue;
@@ -309,15 +325,15 @@ public class RoutableNodeRouter{
 			}
 			Tile t = sink.getTile();
 			if(debug) {
-				System.out.println("SINK: TILE = " + t.getName() + " WIRE NAME = " + t.getWireName(wire));
+				System.out.println("SINK: TILE = " + t.getName() + " WIRE NAME = " + t.getWireName(wire) + " NODE = " + sink.getConnectedNode().toString());
 			}
 			
 			q.clear();
 			visitedRoutable.clear();
-			pathNodes.clear();
+			List<Node> pathNodes = new ArrayList<>();
 			
 			Node node = new Node(t,wire); // same as sink.getConnectedNode()
-			RoutableNode sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.SINKRR, this.base_cost_fac);
+			RoutableNode sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.SINKRR, this.base_cost_fac, currNet.getType());
 			sinkRNode.type = RoutableType.SINKRR;
 			sinkRNode.rnodeData.setPrev(null);
 			
@@ -330,27 +346,29 @@ public class RoutableNodeRouter{
 				if(debug) System.out.println("DEQUEUE:" + n);
 				if(debug) System.out.println(", PREV = " + n.rnodeData.getPrev() == null ? " null" : n.rnodeData.getPrev());
 				
-				if(success = this.isThisOurStaticSource(n, netType, debug)){
-					n.type = RoutableType.SOURCERR;//set as a VCC source
+				if(success = this.isThisOurStaticSource(n, netType, usedRoutable, debug)){
+					n.type = RoutableType.SOURCERR;//set as a source
 					//trace back for a complete path
 					if(debug){
+						System.out.println("SINK: TILE = " + t.getName() + " WIRE NAME = " + t.getWireName(wire) + " NODE = " + sink.getConnectedNode().toString());
 						System.out.println("SOURCE " + n.toString() + " found");
 					}
 					
 					while(n != null){
+						usedRoutable.add(n);// use routed RNodes as the source
 						pathNodes.add(n.getNode());
-						if(debug) System.out.println(n.toString());
+						
+						if(debug) System.out.println("  " + n.toString());
 						n = (RoutableNode) n.rnodeData.getPrev();
 					}
 					Collections.reverse(pathNodes);
 					sinkPathNodes.put(sink, pathNodes);
-//					Collections.reverse(pathNodes);
+					
 					if(debug){
 						for(Node pathNode:pathNodes){
 							System.out.println(pathNode.toString());
 						}
 					}
-//					netPIPs.addAll(RouterHelper.conPIPs(pathNodes));
 					break;
 				}
 				
@@ -359,9 +377,12 @@ public class RoutableNodeRouter{
 				}
 				for(Node uphillNode : n.getNode().getAllUphillNodes()){
 					if(this.routethruHelper.isRouteThru(uphillNode, n.getNode())) continue;
-					RoutableNode nParent = this.createRoutableNodeAndAdd(this.rrgNodeId, uphillNode, RoutableType.INTERRR, this.base_cost_fac);
-					nParent.rnodeData.setPrev(n);
-					if(!this.pruneNode(nParent, unavailableNodes, visitedRoutable)) q.add(nParent);
+					RoutableNode nParent = this.createRoutableNodeAndAdd(this.rrgNodeId, uphillNode, RoutableType.INTERRR, this.base_cost_fac, currNet.getType());
+					
+					if(!this.pruneNode(nParent, unavailableNodes, visitedRoutable)) {
+						nParent.rnodeData.setPrev(n);
+						q.add(nParent);
+					}
 				}
 				watchdog--;
 				if(watchdog < 0) {
@@ -408,8 +429,14 @@ public class RoutableNodeRouter{
 	 * @param type The net type to designate the static source type
 	 * @return true if this sources is usable, false otherwise. 
 	 */
-	private boolean isThisOurStaticSource(RoutableNode rnode, NetType type, boolean debug){
-		return this.isNodeUsableStaticSource(rnode, type);
+	private boolean isThisOurStaticSource(RoutableNode rnode, NetType type, Set<RoutableNode> usedRoutable, boolean debug){
+		if(type == NetType.VCC){
+			return this.isNodeUsableStaticSource(rnode, type);
+		}else{
+			if(usedRoutable != null && usedRoutable.contains(rnode))
+				return true;
+			return this.isNodeUsableStaticSource(rnode, type);// || usedRoutable == null? false : usedRoutable.contains(rnode));
+		}
 	}
 	
 	/**
@@ -466,7 +493,7 @@ public class RoutableNodeRouter{
 		this.inetToBeRouted++;
 		
 		SitePinInst source = n.getSource();
-		RoutableNode sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source.getConnectedNode(), RoutableType.SOURCERR, this.base_cost_fac);
+		RoutableNode sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source.getConnectedNode(), RoutableType.SOURCERR, this.base_cost_fac, n.getType());
 		
 		for(SitePinInst sink:n.getSinkPins()){
 			
@@ -477,7 +504,7 @@ public class RoutableNodeRouter{
 					throw new IllegalArgumentException(errMsg);
 				}
 				
-				sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source.getConnectedNode(), RoutableType.SOURCERR, this.base_cost_fac);		
+				sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source.getConnectedNode(), RoutableType.SOURCERR, this.base_cost_fac, n.getType());		
 			}
 			
 			Connection c = new Connection(this.iconToBeRouted, source, sink);	
@@ -487,7 +514,7 @@ public class RoutableNodeRouter{
 			if(sink.getConnectedNode().toString().equals("INT_X17Y542/BYPASS_W8") || sink.getConnectedNode().toString().equals("INT_X14Y512/BYPASS_W8")){
 				System.out.println("target node connected to " + sink.toString() + ", " + n.toStringFull());
 			}
-			RoutableNode sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink.getConnectedNode(), RoutableType.SINKRR, this.base_cost_fac);
+			RoutableNode sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink.getConnectedNode(), RoutableType.SINKRR, this.base_cost_fac, n.getType());
 			
 			c.setSinkRNode(sinkRNode);
 			
@@ -503,10 +530,10 @@ public class RoutableNodeRouter{
 	public void reservePipsOfNet(Net n){
 		for(PIP pip:n.getPIPs()){
 			Node nodeStart = pip.getStartNode();
-			this.createRoutableNodeAndAdd(this.rrgNodeId, nodeStart, RoutableType.RESERVED, Float.MAX_VALUE - 1);
+			this.createRoutableNodeAndAdd(this.rrgNodeId, nodeStart, RoutableType.RESERVED, Float.MAX_VALUE - 1, n.getType());
 			
 			Node nodeEnd = pip.getEndNode();
-			this.createRoutableNodeAndAdd(this.rrgNodeId, nodeEnd, RoutableType.RESERVED, Float.MAX_VALUE - 1);
+			this.createRoutableNodeAndAdd(this.rrgNodeId, nodeEnd, RoutableType.RESERVED, Float.MAX_VALUE - 1, n.getType());
 		
 			this.reservedNodes.add(nodeStart);
 			this.reservedNodes.add(nodeEnd);
@@ -516,13 +543,13 @@ public class RoutableNodeRouter{
 	public void reserveConnectedNodesOfNetPins(Net n){
 		for(SitePinInst pin:n.getPins()){
 			Node node = pin.getConnectedNode();
-			this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.RESERVED, Float.MAX_VALUE - 1);			
+			this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.RESERVED, Float.MAX_VALUE - 1, n.getType());			
 			
 			this.reservedNodes.add(node);
 		}
 	}
 	
-	public RoutableNode createRoutableNodeAndAdd(int globalIndex, Node node, RoutableType type, float base_cost_fac){
+	public RoutableNode createRoutableNodeAndAdd(int globalIndex, Node node, RoutableType type, float base_cost_fac, NetType netType){
 		RoutableNode rrgNode;
 		if(!this.rnodesCreated.containsKey(node)){
 			rrgNode = new RoutableNode(globalIndex, node, type);
@@ -531,7 +558,7 @@ public class RoutableNodeRouter{
 			this.rrgNodeId++;
 		}else{
 			rrgNode = this.rnodesCreated.get(node);
-			if(rrgNode.type == type && type == RoutableType.SINKRR) System.err.println("routing resource conflicts: site pin");
+			if(rrgNode.type == type && type == RoutableType.SINKRR && netType == NetType.WIRE) System.err.println("routing resource conflicts: sink site pin");
 		}
 		
 		return rrgNode;
@@ -551,7 +578,7 @@ public class RoutableNodeRouter{
 		
 		Node node = new Node(tile,wire);
 		System.out.println(node.toString() + " " + con.sink.getConnectedNode().toString());
-		return this.findInputPinFeed(node);
+		return this.findInputPinFeed(node, con.getNet().getType());
 	}
 	
 	public List<Routable> findINTNodeOfOutputPin(){
@@ -559,7 +586,7 @@ public class RoutableNodeRouter{
 		List<Routable> rns = new ArrayList<>();
 		for(Netplus netp:this.sortedListOfNetplus){
 			
-			rns = this.findOutoutPinINTNode(netp.getNet().getSource());
+			rns = this.findOutoutPinINTNode(netp.getNet().getSource(), netp.getNet());
 			System.out.println(netp.getNet().toString() + ", " + rns.size());
 			for(Routable rn:rns){
 				System.out.println(rn.toString());
@@ -569,10 +596,10 @@ public class RoutableNodeRouter{
 		return rns;
 	}
 	
-	public List<Routable> findOutoutPinINTNode(SitePinInst source){
+	public List<Routable> findOutoutPinINTNode(SitePinInst source, Net n){
 		List<Routable> partialPath = new ArrayList<>();
 		Node sourceNode = source.getConnectedNode();
-		RoutableNode rnode = this.createRoutableNodeAndAdd(this.rrgNodeId, sourceNode, RoutableType.SOURCERR, this.base_cost_fac);
+		RoutableNode rnode = this.createRoutableNodeAndAdd(this.rrgNodeId, sourceNode, RoutableType.SOURCERR, this.base_cost_fac, n.getType());
 		rnode.rnodeData.setPrev(null);
 		Queue<RoutableNode> q = new LinkedList<>();
 		q.add(rnode);
@@ -592,7 +619,7 @@ public class RoutableNodeRouter{
 				Tile tile = pip.getStartWire().getTile();
 				Wire tmpWire = new Wire(tile, pip.getEndWireIndex());
 				Node newNode = new Node(tmpWire.getTile(),tmpWire.getWireIndex());
-				RoutableNode rnewNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newNode, RoutableType.INTERRR, this.base_cost_fac);
+				RoutableNode rnewNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newNode, RoutableType.INTERRR, this.base_cost_fac, n.getType());
 				rnewNode.rnodeData.setPrev(rnode);
 				q.add(rnewNode);
 				
@@ -600,7 +627,7 @@ public class RoutableNodeRouter{
 				Wire newNodeHead = tmpWire.getStartWire();
 				if(!newNodeHead.equals(tmpWire)){
 					Node newHeadNode = new Node(newNodeHead.getTile(), newNodeHead.getWireIndex());
-					RoutableNode rnewHeadNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newHeadNode, RoutableType.INTERRR, this.base_cost_fac);
+					RoutableNode rnewHeadNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newHeadNode, RoutableType.INTERRR, this.base_cost_fac, n.getType());
 					rnewHeadNode.rnodeData.setPrev(rnode);
 					q.add(rnewHeadNode);
 				}
@@ -612,11 +639,11 @@ public class RoutableNodeRouter{
 	}
 	
 	//TODO use this for INT-based routing
-	public List<Routable> findInputPinFeed(Node node){
+	public List<Routable> findInputPinFeed(Node node, NetType netType){
 		List<Routable> partialPath = new ArrayList<>();
 		
 		//this should be handled well, otherwise it will impact the routing functionality, e.g. con target unreachable
-		RoutableNode rnode = this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.SINKRR, this.base_cost_fac);
+		RoutableNode rnode = this.createRoutableNodeAndAdd(this.rrgNodeId, node, RoutableType.SINKRR, this.base_cost_fac, netType);
 		rnode.rnodeData.setPrev(null);
 		
 		Queue<RoutableNode> q = new LinkedList<>();
@@ -638,7 +665,7 @@ public class RoutableNodeRouter{
 			for(PIP pip:tmpNode.getTile().getBackwardPIPs(tmpNode.getWire())){
 				Wire tmpWire = new Wire(tmpNode.getTile(),pip.getStartWireIndex());
 				Node newNode = new Node(tmpWire.getTile(),tmpWire.getWireIndex());
-				RoutableNode rnewNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newNode, RoutableType.INTERRR, this.base_cost_fac);
+				RoutableNode rnewNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newNode, RoutableType.INTERRR, this.base_cost_fac, netType);
 				rnewNode.rnodeData.setPrev(rnode);
 				q.add(rnewNode);
 				
@@ -647,7 +674,7 @@ public class RoutableNodeRouter{
 				if(!newNodeHead.equals(tmpWire)){
 //					System.out.println("----many----");//what does this mean? it is the same case for the existing rw router
 					Node newHeadNode = new Node(newNodeHead.getTile(), newNodeHead.getWireIndex());
-					RoutableNode rnewHeadNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newHeadNode, RoutableType.INTERRR, this.base_cost_fac);
+					RoutableNode rnewHeadNode = this.createRoutableNodeAndAdd(this.rrgNodeId, newHeadNode, RoutableType.INTERRR, this.base_cost_fac, netType);
 					rnewHeadNode.rnodeData.setPrev(rnode);
 					q.add(rnewHeadNode);
 				}
@@ -670,7 +697,7 @@ public class RoutableNodeRouter{
 				for(int i = 0; i< pinCount; i++){
 					Node node = site.getConnectedNode(i);
 					if(node != null){
-						List<Routable> path = this.findInputPinFeed(node);//check INT nodes of a single site
+						List<Routable> path = this.findInputPinFeed(node, NetType.UNKNOWN);//check INT nodes of a single site
 						System.out.println("path length = " + path.size() + " " + path.get(0).toString());
 					}
 				}
@@ -692,7 +719,7 @@ public class RoutableNodeRouter{
 			SitePinInst sitePinInst = con.sink;
 			TileTypeEnum type = sitePinInst.getTile().getTileTypeEnum();
 			Node sinkPinNode = ((RoutableNode)(con.getSinkRNode())).getNode();
-			List<Routable> path = this.findInputPinFeed(sinkPinNode);
+			List<Routable> path = this.findInputPinFeed(sinkPinNode, con.getNet().getType());
 			if(path != null){
 				map.get(type).add(path.size());
 				if(type.equals(TileTypeEnum.BRAM) || type.equals(TileTypeEnum.XIPHY_L)){
@@ -1352,7 +1379,12 @@ public class RoutableNodeRouter{
 	}
 
 	public void routeACon(Connection con){
+		this.routerTimer.prepareRouting.start();
 		this.prepareForRoutingACon(con);
+		this.routerTimer.prepareRouting.finish();
+		
+		this.routerTimer.prepareRoutingDummy.start();
+		this.routerTimer.prepareRoutingDummy.finish();
 		
 		while(!this.targetReached(con)){
 			
@@ -1390,12 +1422,22 @@ public class RoutableNodeRouter{
 	
 	public void finishRoutingACon(Connection con){
 		//save routing in connection class
+		this.routerTimer.saveRouting.start();
 		this.saveRouting(con);
+		this.routerTimer.saveRouting.finish();
+		
+		this.routerTimer.resetPath.start();
 		((RoutableNode)con.getSinkRNode()).target = false;
 		// Reset path cost
 		this.resetPathCost();
+		this.routerTimer.resetPath.finish();
 		
+		this.routerTimer.addRouting.start();
 		this.add(con);
+		this.routerTimer.addRouting.finish();
+		
+		this.routerTimer.saveRoutingDummy.start();
+		this.routerTimer.saveRoutingDummy.finish();
 	}
 	
 	public void saveRouting(Connection con){
