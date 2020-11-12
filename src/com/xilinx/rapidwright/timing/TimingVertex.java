@@ -131,8 +131,37 @@ public class TimingVertex {
         this.slack = requiredTime - arrivalTime;
     }
     
-    public void setRequiredTimeOnly(float requiredTime){
-    	this.requiredTime = requiredTime;
+    //------------------------------ methods added for timing-driven routing ------------------------
+    public void setMinRequiredTime(float requiredTime){
+    	if(this.requiredTime == null){
+    		this.requiredTime = requiredTime;
+    	}else{
+    		if(this.requiredTime < requiredTime){
+    			this.requiredTime = requiredTime;
+    		}
+    	}
+    	
+    }
+    
+    /**
+     * Sets the arrival time stored at this vertex WHEN the new arrival time is larger than the current.
+     * @param arrivalTime Arrival time in picoseconds.  This is the sum of delay edges leading to 
+     * this vertex 
+     */
+    public void setMaxArrivalTime(float arrivalTime){
+    	if(this.arrivalTime == null){
+    		this.arrivalTime = arrivalTime;
+    	}else if(this.arrivalTime < arrivalTime){
+    		this.arrivalTime = arrivalTime;
+    	}
+    }
+    
+    public void resetRequiredTime(){
+    	this.requiredTime = null;
+    }
+    
+    public void resetArrivalTime(){
+    	this.arrivalTime = null;
     }
     
     /**
@@ -141,10 +170,11 @@ public class TimingVertex {
      * this vertex.
      */
     public void setArrivalTime(float arrivalTime) {
-        //System.out.println("Setting arrival time for "+this+" to:"+arrivalTime);
         this.arrivalTime = arrivalTime;
     }
-
+    
+    //-------------------------------------------------------------------------------------------------
+    
     /**
      * Gets the slack stored at this vertex.
      * @return Slack value in picoseconds.
