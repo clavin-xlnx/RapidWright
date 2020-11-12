@@ -91,13 +91,13 @@ public class ImmutableTimingGroup {
     
     @Override
     public String toString(){
-    	String s = "ImmuTg = ( ";
+    	String s = "Nodes = ( ";
     	if(entryNode != null)
     		s += entryNode.toString();
     	else 
     		s += "exit only";
     	s += ", " + exitNode.toString() + " )";
-    	return s;
+    	return String.format("%-90s delay = %5d ps", s, this.groupDelay);
     }
     // ------------------------------------   private ----------------------------------------
 
