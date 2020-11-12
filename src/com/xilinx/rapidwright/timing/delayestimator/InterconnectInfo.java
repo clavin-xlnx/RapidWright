@@ -287,6 +287,10 @@ public class InterconnectInfo implements java.io.Serializable {
         return faninInterconnectHier.get(toTimingGroup);
     }
 
+    public Map<String,String> getNodeToSitePin() {
+        return nodeToSitePin;
+    }
+
     public List<TimingGroup> prvTimingGroups(TimingGroup toTimingGroup,
                                               Predicate<? super TimingGroup> filter) {
 
@@ -309,10 +313,146 @@ public class InterconnectInfo implements java.io.Serializable {
     private Map<TimingGroup, Short> minDetourMapFrTg;
     private Map<TimingGroup, Short> minDetourMapToTg;
 
+    private Map<String,String> nodeToSitePin;
+
     InterconnectInfo() {
         buildInterconnectHier();
+        buildNodeToSitePin();
     }
 
+    private void buildNodeToSitePin() {
+        // TODO: consider 1) load from file and 2) build it from RW device model.
+        nodeToSitePin = new HashMap<>();
+        nodeToSitePin.put("IMUX_E10"           ,"A1"                );
+        nodeToSitePin.put("IMUX_E8"            ,"A2"                );
+        nodeToSitePin.put("IMUX_E24"           ,"A3"                );
+        nodeToSitePin.put("IMUX_E22"           ,"A4"                );
+        nodeToSitePin.put("IMUX_E26"           ,"A5"                );
+        nodeToSitePin.put("IMUX_E18"           ,"A6"                );
+        nodeToSitePin.put("BOUNCE_E_0_FT1"     ,"AX"                );
+        nodeToSitePin.put("BYPASS_E4"          ,"A_I"               );
+        nodeToSitePin.put("IMUX_E11"           ,"B1"                );
+        nodeToSitePin.put("IMUX_E9"            ,"B2"                );
+        nodeToSitePin.put("IMUX_E25"           ,"B3"                );
+        nodeToSitePin.put("IMUX_E23"           ,"B4"                );
+        nodeToSitePin.put("IMUX_E27"           ,"B5"                );
+        nodeToSitePin.put("IMUX_E19"           ,"B6"                );
+        nodeToSitePin.put("BYPASS_E1"          ,"BX"                );
+        nodeToSitePin.put("BYPASS_E5"          ,"B_I"               );
+        nodeToSitePin.put("IMUX_E6"            ,"C1"                );
+        nodeToSitePin.put("IMUX_E12"           ,"C2"                );
+        nodeToSitePin.put("IMUX_E16"           ,"C3"                );
+        nodeToSitePin.put("IMUX_E28"           ,"C4"                );
+        nodeToSitePin.put("IMUX_E30"           ,"C5"                );
+        nodeToSitePin.put("IMUX_E20"           ,"C6"                );
+        nodeToSitePin.put("BOUNCE_E_2_FT1"     ,"CX"                );
+        nodeToSitePin.put("BYPASS_E6"          ,"C_I"               );
+        nodeToSitePin.put("IMUX_E7"            ,"D1"                );
+        nodeToSitePin.put("IMUX_E13"           ,"D2"                );
+        nodeToSitePin.put("IMUX_E17"           ,"D3"                );
+        nodeToSitePin.put("IMUX_E29"           ,"D4"                );
+        nodeToSitePin.put("IMUX_E31"           ,"D5"                );
+        nodeToSitePin.put("IMUX_E21"           ,"D6"                );
+        nodeToSitePin.put("BYPASS_E3"          ,"DX"                );
+        nodeToSitePin.put("BYPASS_E7"          ,"D_I"               );
+        nodeToSitePin.put("IMUX_E2"            ,"E1"                );
+        nodeToSitePin.put("IMUX_E4"            ,"E2"                );
+        nodeToSitePin.put("IMUX_E40"           ,"E3"                );
+        nodeToSitePin.put("IMUX_E44"           ,"E4"                );
+        nodeToSitePin.put("IMUX_E42"           ,"E5"                );
+        nodeToSitePin.put("IMUX_E34"           ,"E6"                );
+        nodeToSitePin.put("BYPASS_E8"          ,"EX"                );
+        nodeToSitePin.put("BYPASS_E12"         ,"E_I"               );
+        nodeToSitePin.put("IMUX_E3"            ,"F1"                );
+        nodeToSitePin.put("IMUX_E5"            ,"F2"                );
+        nodeToSitePin.put("IMUX_E41"           ,"F3"                );
+        nodeToSitePin.put("IMUX_E45"           ,"F4"                );
+        nodeToSitePin.put("IMUX_E43"           ,"F5"                );
+        nodeToSitePin.put("IMUX_E35"           ,"F6"                );
+        nodeToSitePin.put("BYPASS_E9"          ,"FX"                );
+        nodeToSitePin.put("BOUNCE_E_13_FT0"    ,"F_I"               );
+        nodeToSitePin.put("IMUX_E0"            ,"G1"                );
+        nodeToSitePin.put("IMUX_E14"           ,"G2"                );
+        nodeToSitePin.put("IMUX_E32"           ,"G3"                );
+        nodeToSitePin.put("IMUX_E36"           ,"G4"                );
+        nodeToSitePin.put("IMUX_E38"           ,"G5"                );
+        nodeToSitePin.put("IMUX_E46"           ,"G6"                );
+        nodeToSitePin.put("BYPASS_E10"         ,"GX"                );
+        nodeToSitePin.put("BYPASS_E14"         ,"G_I"               );
+        nodeToSitePin.put("IMUX_E1"            ,"H1"                );
+        nodeToSitePin.put("IMUX_E15"           ,"H2"                );
+        nodeToSitePin.put("IMUX_E33"           ,"H3"                );
+        nodeToSitePin.put("IMUX_E37"           ,"H4"                );
+        nodeToSitePin.put("IMUX_E39"           ,"H5"                );
+        nodeToSitePin.put("IMUX_E47"           ,"H6"                );
+        nodeToSitePin.put("BYPASS_E11"         ,"HX"                );
+        nodeToSitePin.put("BOUNCE_E_15_FT0"    ,"H_I"               );
+
+        nodeToSitePin.put("IMUX_W10"           ,"A1"                );
+        nodeToSitePin.put("IMUX_W8"            ,"A2"                );
+        nodeToSitePin.put("IMUX_W24"           ,"A3"                );
+        nodeToSitePin.put("IMUX_W22"           ,"A4"                );
+        nodeToSitePin.put("IMUX_W26"           ,"A5"                );
+        nodeToSitePin.put("IMUX_W18"           ,"A6"                );
+        nodeToSitePin.put("BOUNCE_W_0_FT1"     ,"AX"                );
+        nodeToSitePin.put("BYPASS_W4"          ,"A_I"               );
+        nodeToSitePin.put("IMUX_W11"           ,"B1"                );
+        nodeToSitePin.put("IMUX_W9"            ,"B2"                );
+        nodeToSitePin.put("IMUX_W25"           ,"B3"                );
+        nodeToSitePin.put("IMUX_W23"           ,"B4"                );
+        nodeToSitePin.put("IMUX_W27"           ,"B5"                );
+        nodeToSitePin.put("IMUX_W19"           ,"B6"                );
+        nodeToSitePin.put("BYPASS_W1"          ,"BX"                );
+        nodeToSitePin.put("BYPASS_W5"          ,"B_I"               );
+        nodeToSitePin.put("IMUX_W6"            ,"C1"                );
+        nodeToSitePin.put("IMUX_W12"           ,"C2"                );
+        nodeToSitePin.put("IMUX_W16"           ,"C3"                );
+        nodeToSitePin.put("IMUX_W28"           ,"C4"                );
+        nodeToSitePin.put("IMUX_W30"           ,"C5"                );
+        nodeToSitePin.put("IMUX_W20"           ,"C6"                );
+        nodeToSitePin.put("BOUNCE_W_2_FT1"     ,"CX"                );
+        nodeToSitePin.put("BYPASS_W6"          ,"C_I"               );
+        nodeToSitePin.put("IMUX_W7"            ,"D1"                );
+        nodeToSitePin.put("IMUX_W13"           ,"D2"                );
+        nodeToSitePin.put("IMUX_W17"           ,"D3"                );
+        nodeToSitePin.put("IMUX_W29"           ,"D4"                );
+        nodeToSitePin.put("IMUX_W31"           ,"D5"                );
+        nodeToSitePin.put("IMUX_W21"           ,"D6"                );
+        nodeToSitePin.put("BYPASS_W3"          ,"DX"                );
+        nodeToSitePin.put("BYPASS_W7"          ,"D_I"               );
+        nodeToSitePin.put("IMUX_W2"            ,"E1"                );
+        nodeToSitePin.put("IMUX_W4"            ,"E2"                );
+        nodeToSitePin.put("IMUX_W40"           ,"E3"                );
+        nodeToSitePin.put("IMUX_W44"           ,"E4"                );
+        nodeToSitePin.put("IMUX_W42"           ,"E5"                );
+        nodeToSitePin.put("IMUX_W34"           ,"E6"                );
+        nodeToSitePin.put("BYPASS_W8"          ,"EX"                );
+        nodeToSitePin.put("BYPASS_W12"         ,"E_I"               );
+        nodeToSitePin.put("IMUX_W3"            ,"F1"                );
+        nodeToSitePin.put("IMUX_W5"            ,"F2"                );
+        nodeToSitePin.put("IMUX_W41"           ,"F3"                );
+        nodeToSitePin.put("IMUX_W45"           ,"F4"                );
+        nodeToSitePin.put("IMUX_W43"           ,"F5"                );
+        nodeToSitePin.put("IMUX_W35"           ,"F6"                );
+        nodeToSitePin.put("BYPASS_W9"          ,"FX"                );
+        nodeToSitePin.put("BOUNCE_W_13_FT0"    ,"F_I"               );
+        nodeToSitePin.put("IMUX_W0"            ,"G1"                );
+        nodeToSitePin.put("IMUX_W14"           ,"G2"                );
+        nodeToSitePin.put("IMUX_W32"           ,"G3"                );
+        nodeToSitePin.put("IMUX_W36"           ,"G4"                );
+        nodeToSitePin.put("IMUX_W38"           ,"G5"                );
+        nodeToSitePin.put("IMUX_W46"           ,"G6"                );
+        nodeToSitePin.put("BYPASS_W10"         ,"GX"                );
+        nodeToSitePin.put("BYPASS_W14"         ,"G_I"               );
+        nodeToSitePin.put("IMUX_W1"            ,"H1"                );
+        nodeToSitePin.put("IMUX_W15"           ,"H2"                );
+        nodeToSitePin.put("IMUX_W33"           ,"H3"                );
+        nodeToSitePin.put("IMUX_W37"           ,"H4"                );
+        nodeToSitePin.put("IMUX_W39"           ,"H5"                );
+        nodeToSitePin.put("IMUX_W47"           ,"H6"                );
+        nodeToSitePin.put("BYPASS_W11"         ,"HX"                );
+        nodeToSitePin.put("BOUNCE_W_15_FT0"    ,"H_I"               );
+    }
     private void buildInterconnectHier() {
 
 

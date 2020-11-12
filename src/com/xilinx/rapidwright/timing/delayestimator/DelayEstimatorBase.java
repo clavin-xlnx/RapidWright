@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -70,6 +71,8 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     protected Map<T.Direction,Map<GroupDelayType, Float>> K2;
     protected Map<T.Direction,Map<GroupDelayType, Short>> L;
 
+    protected Map<String, Short>  inputSitePinDelay;
+
     protected T     ictInfo;
 
     protected int   verbose;
@@ -92,6 +95,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         TimingModel timingModel = new TimingModel(device);
         timingModel.build();
         buildDistanceArrays(timingModel);
+        loadInputSitePinDelay(timingModel);
     }
 
     DelayEstimatorBase(Device device, T ictInfo) {
@@ -101,6 +105,13 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 
     public short getDelayOf(ImmutableTimingGroup tg) {
         RoutingNode node = getTermInfo(tg);
+        // don't put this in calcTimingGroupDelay is called many times to estimate delay.
+        if (node.tg == T.TimingGroup.CLE_IN) {
+            // figure out which node
+
+            String inode = tg.exitNode().toString().split("/")[1];
+            return inputSitePinDelay.getOrDefault(inode, (short) -1);
+        }
 
         Double delay = calcTimingGroupDelay(node.tg, node.begin(), node.end(), 0d);
         return delay.shortValue();
@@ -391,15 +402,18 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         List<T> apply(List<T> l);
     }
 
-    /**
-     * Constructor from a part name.
-     * @param partName string specifying a valid part, ie., "xcvu3p-ffvc1517"
-     * Package scope to disable creating DelayEstimatorBase by a user.
-     * Create one using DelayEstimatorBuilder instead.
-     */
-//    DelayEstimatorBase(String partName) {
-//        this(Device.getDevice(partName));
-//    }
+
+
+    private void loadInputSitePinDelay(TimingModel tm) {
+        inputSitePinDelay = new HashMap<>();
+
+        // A1, short
+        Map<String, Short> sitePinDelay = tm.getInputSitePinDelay();
+        for (Map.Entry<String,String> nodeSitePin : ictInfo.getNodeToSitePin().entrySet()) {
+            // IMUX_E10, A1
+            inputSitePinDelay.put(nodeSitePin.getKey(), sitePinDelay.get(nodeSitePin.getValue()));
+        }
+    };
 
     /**
      * DistanceArray in TimingModel is using INT tile coordinate.
