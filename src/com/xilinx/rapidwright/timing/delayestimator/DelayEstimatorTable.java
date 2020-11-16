@@ -2256,7 +2256,11 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        System.out.println("delay " + getDelayOf(createTG("INT_X17Y110/BYPASS_E12" ,  device)));
 //        // GX 65
 //        System.out.println("delay " + getDelayOf(createTG("INT_X17Y110/BYPASS_E10" ,  device)));
-        System.out.println("delay " + getDelayOf(createTG("INT_X14Y111/INT_INT_SDQ_60_INT_OUT1", "INT_X14Y111/INT_NODE_SDQ_59_INT_OUT1" ,  device)));
+//        System.out.println("delay " + getDelayOf(createTG("INT_X14Y111/INT_INT_SDQ_60_INT_OUT1", "INT_X14Y111/INT_NODE_SDQ_59_INT_OUT1" ,  device)));
+        System.out.println("delay " + getDelayOf(createTG("INT_X14Y106/WW12_BEG6",  device)));
+
+
+
         return;
     }
 
@@ -2387,36 +2391,36 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 //        est.testBounceToSink();
 //        est.testSpecialCase(device);
-//        est.testGetDelayOf(device);
+        est.testGetDelayOf(device);
 
 
-        long endBuildTime = System.nanoTime();
-        long elapsedBuildTime = endBuildTime - startTime;
-        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-
-        int count = 0;
-
-        long startLookupTime = System.nanoTime();
-        // diagonal in table
-        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
-        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
-        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
-        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
-
-        //  out of table
-        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
-        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
-        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
-        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
-
-        long endLookupTime = System.nanoTime();
-        long elapsedLookupTime = endLookupTime - startLookupTime;
-
-
-        System.out.println();
-        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
-        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
-        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
+//        long endBuildTime = System.nanoTime();
+//        long elapsedBuildTime = endBuildTime - startTime;
+//        System.out.print("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+//
+//        int count = 0;
+//
+//        long startLookupTime = System.nanoTime();
+//        // diagonal in table
+//        count += est.testCases("est_dly_ref_44_53_121_139_E_E.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_E_W.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_W_E.txt");
+//        count += est.testCases("est_dly_ref_44_53_121_139_W_W.txt");
+//
+//        //  out of table
+//        count += est.testCases("est_dly_ref_37_71_60_239_E_E.txt");
+//        count += est.testCases("est_dly_ref_37_71_60_239_E_W.txt");
+//        count += est.testCases("est_dly_ref_37_71_60_239_W_E.txt");
+//        count += est.testCases("est_dly_ref_37_71_60_239_W_W.txt");
+//
+//        long endLookupTime = System.nanoTime();
+//        long elapsedLookupTime = endLookupTime - startLookupTime;
+//
+//
+//        System.out.println();
+//        System.out.println("Table build time is " + elapsedBuildTime / 1000000 + " ms.");
+//        System.out.print("Execution time of " + count + " lookups is " + elapsedLookupTime / 1000000 + " ms.");
+//        System.out.println(" (" +  1.0*elapsedLookupTime / (count * 1000) + " us. per lookup.)");
 
 //        est.testOne(37, 37, 60, 120, "E", "E");
 ////        est.testOne(37, 53, 60, 90, "E", "E");

@@ -424,10 +424,13 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         // TODO: somehow I cannot use Function<T,R>. I get "target method is generic" error.
         BuildAccumulativeList<Short> buildAccumulativeList = (list) ->
         {
-            Short acc = 0;
+            // list[i] := d between int tile 1-1 and tile i
+            // res [i] := d between int tile 0   and tile i
+            short acc = 0;
             List<Short> res = new ArrayList<>();
             for (Short val : list) {
-                res.add((short) (acc + val));
+                acc += val;
+                res.add(acc);
             }
             return res;
         };
