@@ -268,54 +268,6 @@ public class Main {
 						router.timingInfo();
 					
 					
-					}else{
-						RoutableGroupRouterWithVirtualMode router = new RoutableGroupRouterWithVirtualMode(this.design, 
-								this.toWriteDCPfileName,
-								this.nrOfTrials,
-								this.t,
-								(short) this.bbRange,
-								this.mdWeight,
-								this.hopWeight,
-								this.initial_pres_fac,
-								this.pres_fac_mult,
-								this.acc_fac,
-								this.base_cost_fac,
-								this.timingDriven);
-						router.designInfo();
-						this.routerConfigurationInfo();
-						
-						this.t.start("Route Design");
-						routingRuntime = router.routingRuntime();
-						this.t.stop();
-						
-						router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
-						
-						router.getAllHopsAndManhattanD();
-						router.checkAverageNumWires();
-						
-						this.rnodesInfo(router.manhattanD,
-								router.hops,
-								router.firstIterRNodes,
-								router.rrgNodeId,
-								router.getUsedRNodes(),
-								router.averWire,
-								router.averNodePerImmuTg,
-								router.averImmuTgPerSiblings,
-								router.averNodePerSiblings,
-								router.averFanoutRNodes);
-						
-						this.runtimeInfoPrinting(routingRuntime, 
-								router.firstRouting,
-								router.firtRnodeT,
-								router.itry, 
-								router.connectionsRouted,
-								router.sortedListOfConnection.size(),
-								router.nodesExpanded,
-								router.nodesExpandedFirstIter,
-								router.nodesPopedFromQueue,
-								router.nodesPopedFromQueueFirstIter,
-								router.routerTimer,
-								router.callingOfGetNextRoutable);
 					}
 				
 			}		
