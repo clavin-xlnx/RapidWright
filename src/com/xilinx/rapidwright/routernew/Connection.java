@@ -2,6 +2,7 @@ package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -50,7 +51,7 @@ public class Connection{
 		
 		this.source = source;
 		this.sink = sink;
-		this.criticality = 0;
+		this.criticality = 0.0f;
 		
 		this.boundingBox = this.calculateBoundingBox();
 		
@@ -128,9 +129,6 @@ public class Connection{
 //		if(slackCon != slack) System.out.println("slack con = " + slackCon + ", sink TV slack = " + slack + ", " + this.timingEdge.getDelay());
 		float tempCriticality  = (1 - slackCon / maxDelay);//TODO check up on criticality values
     	tempCriticality = (float) (Math.pow(tempCriticality, criticalityExponent) * maxCriticality);
-    	
-//    	if(tempCriticality > 1)
-//    		System.out.println("required = " + this.sinkTimingVertex.getRequiredTime() + ", arrival = " + this.sourceTimingVertex.getArrivalTime() + ", delay = " + this.timingEdge.getDelay());
     	
     	if(tempCriticality > this.criticality) 
     		this.setCriticality(tempCriticality);
@@ -328,6 +326,10 @@ public class Connection{
 		for(ImmutableTimingGroup tg : this.timingGroups){//TODO per siblings
 			routeDelay += tg.getDelay();
 		}
+		this.timingEdge.setRouteDelay(routeDelay);
+	}
+	
+	public void setTimingEdgeRouteDelay(float routeDelay){
 		this.timingEdge.setRouteDelay(routeDelay);
 	}
 	
