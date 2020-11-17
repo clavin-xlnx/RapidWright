@@ -24,7 +24,7 @@ import com.xilinx.rapidwright.util.Pair;
 public class RoutableTimingGroup implements Routable{
 	public int index;
 	private SiblingsTimingGroup sibTimingGroups;
-	public GroupDelayType groupType;
+//	public GroupDelayType groupType;
 	public RoutableType type;
 	private ImmutableTimingGroup thruImmuTg;//could be removed? use index of the childrenImmuTG objects, ArrayList.indexOf()?
 	
@@ -66,8 +66,7 @@ public class RoutableTimingGroup implements Routable{
 		this.index = index;
 		this.type = type;
 		
-		this.sibTimingGroups = new SiblingsTimingGroup(sitePinInst);
-		this.groupType = this.sibTimingGroups.type();		
+		this.sibTimingGroups = new SiblingsTimingGroup(sitePinInst);		
 		this.rnodeData = new RoutableData(this.index);
 		this.target = false;
 		this.childrenSet = false;
@@ -85,7 +84,6 @@ public class RoutableTimingGroup implements Routable{
 		this.index = index;
 		this.type = RoutableType.INTERRR;
 		this.sibTimingGroups = sTimingGroups;
-		this.groupType = this.sibTimingGroups.type();
 		this.rnodeData = new RoutableData(this.index);
 		this.target= false;
 		this.childrenSet = false;	
@@ -131,6 +129,7 @@ public class RoutableTimingGroup implements Routable{
 				if(delay == -3)
 					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 				if(delay < 0){
+					System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 					delay = 0;
 				}
 				thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
@@ -151,6 +150,7 @@ public class RoutableTimingGroup implements Routable{
 				if(delay == -3)
 					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 				if(delay < 0){
+					System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 					delay = 0;
 				}
 				thruImmuTg.setDelay(delay);
@@ -460,6 +460,10 @@ public class RoutableTimingGroup implements Routable{
 	public boolean isBounce() {
 		
 		return false;
+	}
+	
+	public GroupDelayType getGroupDelayType(){
+		return this.sibTimingGroups.type();
 	}
 	
 	@Override
