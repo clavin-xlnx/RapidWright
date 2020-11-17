@@ -77,10 +77,12 @@ import java.util.regex.Pattern;
  *
  */
 public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstimatorBase<T> implements java.io.Serializable {
-
+	public String BOUNCE_SITEPIN_FILE;
+	public String CLE_OUT_INTABLE_FILE;
+	
     public DelayEstimatorTable(Device device, T ictInfo) {
         this(device, ictInfo, true);
-    }
+     }
 
     DelayEstimatorTable(Device device, T ictInfo, boolean fastMode) {
 //        this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), fastMode, "", 0);
@@ -126,8 +128,15 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         } else {
             tgsToSrcDstNodeMapper = this::getSrcDstTermInfo;
         }
-
-        build(loadFrom);
+        
+        //============ Yun added ==========
+        String series = device.getSeries().name().toLowerCase();
+        String DELAY_DATA_FOLDER  = FileTools.DATA_FOLDER_NAME + File.separator + "timing" + File.separator + series;
+        this.BOUNCE_SITEPIN_FILE = DELAY_DATA_FOLDER + File.separator + "bounce_sitepin.txt";
+        this.CLE_OUT_INTABLE_FILE = DELAY_DATA_FOLDER + File.separator + "cle_out_intable.ser";
+//        this.CLE_OUT_INTABLE_FILE = "RapidWright/data/timing/ultrascaleplus/cle_out_intable.ser";
+        
+        build(this.CLE_OUT_INTABLE_FILE);
     }
 
 //    DelayEstimatorTable(Device device, T ictInfo, int verbose) {
@@ -171,13 +180,15 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         if (timingGroup.delayType() == GroupDelayType.PIN_BOUNCE) {
             NodePair np = new NodePair(timingGroup, sinkPin);
             Short dly = delayFrBounceToSink.get(np);
+            
             if (dly == null)
-                return Short.MAX_VALUE;
-            else
+                return Short.MAX_VALUE/2;
+            else{
                 // add input sitepin delay
                 return (short) (dly + K0.get(T.Direction.INPUT).get(GroupDelayType.PINFEED));
+            }
         } else if (timingGroup.delayType() == GroupDelayType.PINFEED) {
-            return Short.MAX_VALUE;
+            return Short.MAX_VALUE/2;
         } else {
             Pair<RoutingNode,RoutingNode> srcDst = tgsToSrcDstNodeMapper.apply(timingGroup, sinkPin);
             return getMinDelayToSinkPin(srcDst.getFirst(), srcDst.getSecond()).getFirst();
@@ -353,7 +364,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        initTables();
 //        trimTables();
 //        cleanup();
-        loadBounceDelay("bounce_sitepin.txt");
+        loadBounceDelay(this.BOUNCE_SITEPIN_FILE);
     }
 
 
@@ -364,7 +375,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         // add an entry to represent unreachable
         NodePair unreachable = new NodePair();
-        delayFrBounceToSink.put(unreachable,Short.MAX_VALUE);
+        delayFrBounceToSink.put(unreachable,(short) (Short.MAX_VALUE/2));
 
         // bounce is considered a horizontal single with d 0
         float k0 = K0.get(T.Direction.HORIZONTAL).get(GroupDelayType.SINGLE);
@@ -958,6 +969,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             nodeMan = null;
             try {
                 byte[] data = HessianUtil.readByte(fileName);
+                if(data == null){
+                	System.out.println("data from readByte is null");
+                }
                 nodeMan = HessianUtil.deserialize(data);
                 System.out.println("deserializeFrom " + fileName);
                 System.out.println("num nodes : " + nodeMan.getGraph().vertexSet().size());
