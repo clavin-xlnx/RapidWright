@@ -112,6 +112,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 	            String inode = tg.exitNode().toString().split("/")[1];
 	            return inputSitePinDelay.getOrDefault(inode, (short) -1);
 	        }
+	        delay = calcTimingGroupDelay(node.tg, node.begin(), node.end(), 0d);
 		}catch(Exception e){
         	System.out.println(tg.toString());
 		}
