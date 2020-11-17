@@ -29,7 +29,9 @@ import org.jgrapht.GraphPath;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.routernew.Connection;
+import com.xilinx.rapidwright.routernew.Netplus;
 import com.xilinx.rapidwright.routernew.RoutableTimingGroupRouter;
 import com.xilinx.rapidwright.util.Pair;
 
@@ -82,6 +84,18 @@ public class TimingManager {
     		c.updateRouteDelay();
     	}
     }
+    
+    public void updateIllegalNetsDelays(List<Netplus> illegalNets, Map<Node, Float> nodesDelays){
+    	 for(Netplus n:illegalNets){
+    		 for(Connection c:n.getConnection()){
+    			 float netDelay = 0;
+    			 for(Node node:c.nodes){
+    				 netDelay += nodesDelays.get(node);
+    			 }
+    			 c.setTimingEdgeRouteDelay(netDelay);
+    		 }
+    	 }
+    }
       
     //dealing with required time: set to the max delay, i.e. max arrival time
     public Pair<Float, TimingVertex> calculateArrivalRequireAndSlack(){
@@ -89,17 +103,22 @@ public class TimingManager {
     	this.timingGraph.computeArrivalTimesTopologicalOrder();
     	Pair<Float, TimingVertex> maxs = this.timingGraph.getMaxDelay();
     	
-    	this.timingGraph.setTimingRequirementOnly(maxs.getFirst());//setTimingRequirementTopologicalOrder(maxDelay);//.
-    	this.timingGraph.computeSlacks();//if slackCon does not use sinkTimingVertex's slack, not necessary to compute?
+    	this.timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());//setTimingRequirementTopologicalOrder(maxDelay);//.
+//    	this.timingGraph.computeSlacks();//if slackCon does not use sinkTimingVertex's slack, not necessary to compute?
     	//or could be used to report worst slack?
     	
     	return maxs;
     }
     
-    public void getCriticalPathInfo(RoutableTimingGroupRouter router, TimingVertex maxV){
+    public void getCriticalPathInfo(RoutableTimingGroupRouter router){
+    	TimingVertex maxV = router.maxDelayAndTimingVertex.getSecond();
+    	float maxDelay = router.maxDelayAndTimingVertex.getFirst();
+    	System.out.println("Max delay: " + maxDelay);
     	
+    	// get critical connections on the critical path based on the timing vertices
     	Map<TimingVertex, Connection> sinkTimingVrtexAndConMap = router.sinkTimingVertexAndConMap;
     	List<TimingVertex> criticalVertices = this.timingGraph.getCriticalVerticesInOrder(maxV);
+    	System.out.println(String.format("%-32s %s", "Critical TimingVertices:", criticalVertices));
     	
     	List<Connection> criticalConnections = new ArrayList<>();
     	for(TimingVertex v : criticalVertices){
@@ -108,27 +127,33 @@ public class TimingManager {
     		}
     	}
     	
+    	// print out string for timing vertex of inputs only
+    	StringBuilder s = new StringBuilder();
+    	s.append(String.format("%-33s", "of which critical inputs:"));
+    	s.append("{");
+    	int i = 0;
+    	for(TimingVertex v:criticalVertices){
+    		if(i%2 == 1){
+    			s.append(v.getName());
+    			s.append(" ");
+    		}
+    		i++;
+    	}
+    	s.replace(s.length() - 1, s.length(), "");
+    	s.append("}");
+    	System.out.println(s);
+    	
+    	// timing groups for each critical connections
+    	System.out.println("Critical connections:");
     	for(Connection c:criticalConnections){
     		System.out.println(c.toStringTiming());
     		for(ImmutableTimingGroup group : c.timingGroups){
     			System.out.println("\t " + group);
     		}
-    		
     	}
-    	/*
-    	for(Connection c:criticalConnections){
-    		if(c != null){
-    			System.out.println(c.sourceTimingVertex.getName() + " -> " + c.sinkTimingVertex.toString());
-    			System.out.println(c.timingGroups);
-    		}
-    		
-    	}*/
-//    	List<Connection>
-//    	List<TimingEdge> timingEdge -> connection
-//    	List<Node>
     }
     
-    public void calculateCriticality(List<Connection> cons, 
+    public float calculateCriticality(List<Connection> cons, 
     		float maxCriticality, float criticalityExponent, float maxDelay){
     	for(Connection c:cons){
     		c.resetCriticality();
@@ -140,7 +165,7 @@ public class TimingManager {
     		if(c.criticality > 0)
     			maxCriti = c.criticality;
     	}
-    	System.out.println(maxCriti);
+    	return maxCriti;
     }
     
     public boolean comparableFloat(Float a, float b){
