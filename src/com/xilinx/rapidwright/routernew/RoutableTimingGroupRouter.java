@@ -16,6 +16,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
@@ -47,9 +48,11 @@ public class RoutableTimingGroupRouter{
 	public TimingGraph timingGraph;
 	private static final float MAX_CRITICALITY = 0.99f;
 	private static final float CRITICALITY_EXPONENT = 1;
-	private float MIN_REROUTE_CRITICALITY = 0.55f, REROUTE_CRITICALITY;
+	private float MIN_REROUTE_CRITICALITY = 0.75f, REROUTE_CRITICALITY;
 	private int MAX_PERCENTAGE_CRITICAL_CONNECTIONS = 3;
 	private List<Connection> criticalConnections;
+	public Pair<Float, TimingVertex> maxDelayAndTimingVertex;
+	public Map<Node, Float> nodesDelays;
 	
 	public List<Netplus> nets;
 	public List<Connection> connections;
@@ -198,6 +201,7 @@ public class RoutableTimingGroupRouter{
 		
 		this.connectionEntryNodes = new HashMap<>();
 		this.criticalConnections = new ArrayList<>();
+		this.nodesDelays = new HashMap<>();
 		
 		this.reservedNodes = new HashSet<>();
 		this.rnodesCreated = new HashMap<>();
@@ -416,8 +420,8 @@ public class RoutableTimingGroupRouter{
 		this.itry = 1;
 		this.pres_fac = this.initial_pres_fac;
 		
-		System.out.printf("--------------------------------------------------------------------------------------------------------------------------------------- --------------------\n");
-        System.out.printf("%9s  %11s  %12s  %12s  %15s  %11s  %7s  %8s  %15s  %17s  %19s \n", 
+		System.out.printf("-----------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
+        System.out.printf("%9s  %11s  %12s  %12s  %15s  %11s  %7s  %8s  %15s  %17s  %19s  %9s\n", 
         		"Iteration", 
         		"Conn routed", 
         		"Run Time (s)", 
@@ -428,8 +432,9 @@ public class RoutableTimingGroupRouter{
         		"Overused", 
         		"Used EntryNodes",
         		"OverUsedEntryNode",
-        		"MultiFaninEntryNode");
-        System.out.printf("---------  -----------  ------------  ------------  ---------------  -----------  -------  --------  ---------------  -----------------  -------------------\n");
+        		"MultiFaninEntryNode",
+        		"Max delay");
+        System.out.printf("---------  -----------  ------------  ------------  ---------------  -----------  -------  --------  ---------------  -----------------  -------------------  ---------\n");
 	}
 	
 	public int overUsedEntryNodes(){
@@ -574,7 +579,10 @@ public class RoutableTimingGroupRouter{
 			if(printRoutingSteps) this.printInfo("check if routing is valid");
 			validRouting = this.isValidRouting() && this.validEntryNodesRouting();
 			
+			
+			
 			//fix illegal routing trees if any
+			List<Netplus> illegalTrees = null;
 			if(validRouting){
 				this.routerTimer.rerouteIllegal.start();
 //				System.out.println("entry nodes used: " + RoutableTimingGroup.entryNodeSources.size());
@@ -593,28 +601,27 @@ public class RoutableTimingGroupRouter{
 				}
 				
 				//TODO fixIllegalTree deal with RoutableTimingGroup? 
-				this.fixIllegalTree(sortedListOfConnection);
+				illegalTrees = this.fixIllegalTree(sortedListOfConnection);
+				
 				this.routerTimer.rerouteIllegal.finish();
-			}
+			}	
 			
 			//update timing and criticalities of connections
 			//TODO final timing would be influenced by fixIllegalTree
 			if(this.timingDriven) {
-				String maxDelayString = String.format("%9s", "---");
-				if(printRoutingSteps) this.printInfo("update route delays");
-				this.timingManager.updateRouteDelays(this.sortedListOfConnection);
+				if(illegalTrees == null){
+					this.timingManager.updateRouteDelays(this.sortedListOfConnection);
 				
-				if(printRoutingSteps) this.printInfo("calculate arrival required and slack");
-				Pair<Float, TimingVertex> maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
-				
-				if(printRoutingSteps) this.printInfo("calculate criticality");
-				this.timingManager.calculateCriticality(this.sortedListOfConnection, 
-						MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
-				
-				maxDelayString = String.format("%9.2f", maxDelayAndTimingVertex.getFirst());//printed out in the statistic info
-				System.out.println("max delay: " + maxDelayString);
-				
-				this.timingManager.getCriticalPathInfo(this, maxDelayAndTimingVertex.getSecond());
+					this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
+					
+					float maxCriticality = this.timingManager.calculateCriticality(this.sortedListOfConnection, 
+							MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
+					System.out.println(String.format("           max criticality: %3.2f", maxCriticality));
+				}else{
+					this.timingManager.updateIllegalNetsDelays(illegalTrees, this.nodesDelays);
+					this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
+				}
+//				this.timingManager.getCriticalPathInfo(this);
 			}
 			
 			this.iterationEnd = System.nanoTime();
@@ -743,7 +750,7 @@ public class RoutableTimingGroupRouter{
 		int overUsed = this.overUsedRNodes.size();
 		int illegal = this.illegalRNodes.size();
 //		double overUsePercentage = 100.0 * (double)this.overUsedRNodes.size() / numRNodesCreated;
-		System.out.printf("%9d  %11d  %12.2f  %12d  %15.2f  %11d  %7d  %8d  %15d  %17d  %19d\n", 
+		System.out.printf("%9d  %11d  %12.2f  %12d  %15.2f  %11d  %7d  %8d  %15d  %17d  %19d  %9.1f\n", 
 				this.itry,
 				this.connectionsRoutedIteration,
 				(iterEnd - iterStart)*1e-9,
@@ -754,7 +761,8 @@ public class RoutableTimingGroupRouter{
 				overUsed,
 				this.usedEntryNodes.size(),
 				this.overUsedEntryNodes(),
-				this.multiFaninEntryNodes());
+				this.multiFaninEntryNodes(),
+				this.maxDelayAndTimingVertex.getFirst());
 	}
 	
 	public void updateCostFactors(){
@@ -781,7 +789,6 @@ public class RoutableTimingGroupRouter{
 		}
 		
 		//update costs of entry nodes
-//		System.out.println("iteration = " + this.itry);
 		RoutableTimingGroup.updateEntryNodesCosts(pres_fac, acc_fac);
 	}
 	
@@ -859,14 +866,15 @@ public class RoutableTimingGroupRouter{
 		return illegal.size();	
 	}
 	
-	public void fixIllegalTree(List<Connection> cons){
+	public List<Netplus> fixIllegalTree(List<Connection> cons){
 //		this.printInfo("checking if there is any illegal node");	
+		List<Netplus> illegalTrees = new ArrayList<>();
 		int numIllegal = this.getIllegalNumRNodes(cons);
 		GraphHelper graphHelper = new GraphHelper();
 		if(numIllegal > 0){
 //			this.printInfo("There are " + numIllegal + " illegal routing tree nodes");
 			
-			List<Netplus> illegalTrees = new ArrayList<>();
+			
 			for(Netplus net : this.nets) {
 				boolean illegal = false;
 				for(Connection con : net.getConnection()) {
@@ -876,6 +884,7 @@ public class RoutableTimingGroupRouter{
 				}
 				if(illegal) {
 					illegalTrees.add(net);
+					this.addNodesDelays(net);
 				}
 			}
 			
@@ -896,6 +905,41 @@ public class RoutableTimingGroupRouter{
 				}
 			}
 		}
+		return illegalTrees;
+	}
+	
+	public void addNodesDelays(Netplus n){	
+		for(Connection c:n.getConnection()){
+			for(ImmutableTimingGroup group : c.timingGroups){
+				if(group.entryNode() != null){
+					nodesDelays.put(group.entryNode(), 0f);
+				}
+				nodesDelays.put(group.exitNode(), (float) group.getDelay());
+			}
+		}
+	}
+	
+	public Map<Node, Float> getNodesCriticalities(Netplus n){
+		Map<Node, Float> nodeCriticalities = new HashMap<>();
+		for(Connection c:n.getConnection()){
+			for(ImmutableTimingGroup group : c.timingGroups){
+				Node entry = group.entryNode();
+				Node exit = group.exitNode();
+				if(entry != null){
+					if(!nodeCriticalities.containsKey(entry)){
+						nodeCriticalities.put(entry, c.getCriticality());
+					}else if(nodeCriticalities.get(entry) < c.getCriticality()){
+						nodeCriticalities.put(entry, c.getCriticality());
+					}
+				}
+				if(!nodeCriticalities.containsKey(exit)){
+					nodeCriticalities.put(exit, c.getCriticality());
+				}else if(nodeCriticalities.get(exit) < c.getCriticality()){
+					nodeCriticalities.put(exit, c.getCriticality());
+				}	
+			}
+		}
+		return nodeCriticalities;
 	}
 	
 	public boolean illegalConOnEntryNode(Connection con){
@@ -909,7 +953,6 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public Node getIllegalEntryNode(Netplus illegalTree){
-		
 		for(Connection con:illegalTree.getConnection()){
 			for(NodeWithFaninInfo entry:this.connectionEntryNodes.get(con)){
 				if(entry != null && entry.hasMultiFanin()){
@@ -956,8 +999,7 @@ public class RoutableTimingGroupRouter{
 	
 	public void fixIllegalCons(Set<Connection> illegalCons, Node illegalNode, List<Node> nodesFromIllegalToSink){
 		for(Connection illegalConnection : illegalCons) {
-			this.ripup(illegalConnection);
-			
+			this.ripup(illegalConnection);	
 			//Remove illegal path from routing tree
 			while(!illegalConnection.nodes.remove(illegalConnection.nodes.size() - 1).equals(illegalNode));
 			
@@ -965,8 +1007,7 @@ public class RoutableTimingGroupRouter{
 			
 			for(Node newRouteNode : nodesFromIllegalToSink) {
 				illegalConnection.addNode(newRouteNode);				
-			}
-			
+			}	
 //			this.add(illegalConnection);
 		}
 	}
@@ -1003,15 +1044,6 @@ public class RoutableTimingGroupRouter{
 					}
 				}
 			}
-			
-			//fixing the illegal trees, since there is no criticality info, use the hops info
-			//Find the illegal connection with maximum number of RNodes (hops)
-			/*Connection maxCriticalConnection = (Connection) illegalCons.toArray()[0];
-			for(Connection illegalConnection : illegalCons) {
-				if(illegalConnection.rnodes.size() > maxCriticalConnection.rnodes.size()) {
-					maxCriticalConnection = illegalConnection;
-				}
-			}*/
 			
 			Connection maxCriticalConnection = (Connection) illegalCons.toArray()[0];
 			if(!this.timingDriven){
@@ -1068,7 +1100,6 @@ public class RoutableTimingGroupRouter{
 					this.connectionEntryNodes.get(illegalConnection).add(entryNodes.get(ien));
 					ien++;
 				}
-				
 				this.add(illegalConnection);//to update rnodes and entry nodes status, i.e. sources and parents
 			}
 			
@@ -1186,28 +1217,13 @@ public class RoutableTimingGroupRouter{
 	
 	public void pipsAssignment(){
 		for(Netplus np:this.sortedListOfNetplus){
-			Set<PIP> netPIPs = new HashSet<>();
-			
+			Set<PIP> netPIPs = new HashSet<>();	
 			for(Connection c:np.getConnection()){
 				netPIPs.addAll(RouterHelper.conPIPs(c.nodes));
 			}
 			np.getNet().setPIPs(netPIPs);
 		}
-		
 		this.checkPIPsUsage();
-//		this.debugRoutingCon = true;
-//		this.printWrittenPIPs();
-//		System.out.println("net opr[51]: ");
-//		this.checkPIPsOfInvalidlyRoutedNet("opr[51]");
-//			
-//		System.out.println("\nn62b: ");
-//		this.checkPIPsOfInvalidlyRoutedNet("n62b");
-		
-//		System.out.println("\nnet opr[1]: ");
-//		this.checkPIPsOfInvalidlyRoutedNet("opr[1]");
-//		
-//		System.out.println("\nnet opr[46]: ");
-//		this.checkPIPsOfInvalidlyRoutedNet("opr[46]");
 	}
 	
 	public void printWrittenPIPs(){
@@ -1475,38 +1491,47 @@ public class RoutableTimingGroupRouter{
 	public void exploringAndExpansion(RoutableTimingGroup rnode, Connection con){
 		this.nodesPopedFromQueue++;
 		
-//		if(this.debugExpansion && this.targetCon(con)){
-//			this.printInfo("\t" + " exploring rnode " + rnode.toString());
-//		}
-//		if(this.debugExpansion && this.targetCon(con)) 
-//			this.printInfo("\t starting  queue size: " + this.queue.size());
-		
 		for(Pair<RoutableTimingGroup, ImmutableTimingGroup> childRNode : rnode.childrenImmuTG){
-//			if(this.debugExpansion && this.targetCon(con)) this.printInfo("run here and check RNode " + childRNode.toString());
 			RoutableTimingGroup child = childRNode.getFirst();
 			ImmutableTimingGroup thruImmu = childRNode.getSecond();
 			
 			if(child.isTarget()){	
-//				if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t childRNode is the target");
-//				if(thruImmu.entryNode() == null) System.err.println("null thruImmu at target STG");
 				this.addNodeToQueue(rnode, child, thruImmu, con);
 				this.nodesExpanded++;
 				
 			}else if(child.type == RoutableType.INTERRR){// && child.getSiblingsTimingGroup().getExitNode().getAllWiresInNode()[0].getIntentCode() != IntentCode.NODE_PINFEED){//.toString().contains("IMUX")){
 				//TODO the second condition makes the router obviously slower: 2x
 				if(child.isInBoundingBoxLimit(con)){
-//					if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t" + " add node to the queue");
+					//PIN_BOUNCE
+//					if(child.getNode().getAllWiresInNode()[0].getIntentCode() == IntentCode.NODE_PINBOUNCE){//getSiblingsTimingGroup().type() == GroupDelayType.PIN_BOUNCE){
+					if(thruImmu.delayType() == GroupDelayType.PIN_BOUNCE){//TODO SiblingsTG's group delay type not complete, won't work
+						if(!this.usablePINBounce(child, con.getSinkRNode())){
+							continue;
+						}
+					}
 					
-//					if(child.getSiblingsTimingGroup().getSiblings().length > 1){
-//						if(thruImmu.entryNode() == null) System.err.println("null thruImmu at INTERR STG");
-//					}
 					this.addNodeToQueue(rnode, child, thruImmu, con);
 					this.nodesExpanded++;
 					
-//					if(this.debugExpansion && this.targetCon(con)) this.printInfo("");
 				}	
 			}
 		}
+	}
+	
+	private boolean usablePINBounce(RoutableTimingGroup childGroup, Routable sinkPinTG){
+		// TODO not accurate, would cause the target unreachable
+		// probably due to the column & row info
+		// which part of the node should be used to define the column and row? base INT tile? ending INT tile?
+		
+		int columnChild = childGroup.getNode().getTile().getColumn();
+		int rowChild = childGroup.getNode().getTile().getRow();
+		int columnSink = sinkPinTG.getNode().getTile().getColumn();//TODO use tile coordinate of entry node (which one of the siblings?)
+		int rowSink = sinkPinTG.getNode().getTile().getRow();
+		if(columnChild == columnSink && Math.abs(rowChild - rowSink) <= 1){
+			return true;
+		}
+		
+		return false;
 	}
 	
 	private boolean hasNodePinFeed(RoutableTimingGroup child){//TODO this takes time, should be avoided
@@ -1517,114 +1542,90 @@ public class RoutableTimingGroupRouter{
 		return hasNodePinFeed;
 	}
 	
-	private boolean targetCon(Connection con){
-//		return con.id == 4027 || con.id == 2244;
-		return true;
-	}
-	
 	private void addNodeToQueue(RoutableTimingGroup rnode, RoutableTimingGroup childRNode, ImmutableTimingGroup thruImmuTg, Connection con) {
-//		this.routerTimer.addRNodeToQueueEvaluation.start();
 		RoutableData data = childRNode.rnodeData;
-		int countSourceUses = data.countSourceUses(con.source);
-		
-//		if(this.debugExpansion && this.targetCon(con)){
-//			this.printInfo("\t\t childRNode " + childRNode.toString());
-//		}
-		
-		float partial_path_cost = rnode.rnodeData.getPartialPathCost();//upstream path cost
-		
-//		this.routerTimer.getRouteNodeCost.start();
-		float rnodeCost = this.getRouteNodeCost(childRNode, thruImmuTg, con, countSourceUses);
-//		this.routerTimer.getRouteNodeCost.finish();
-		
+		int countSourceUses = data.countSourceUses(con.source);		
+		float partial_path_cost = rnode.rnodeData.getPartialPathCost();//upstream path cost		
+		float rnodeCost = this.getRouteNodeCost(childRNode, thruImmuTg, con, countSourceUses);	
 		float new_partial_path_cost;
 		int childLevel = rnode.rnodeData.getLevel() + 1;
 		if(!this.timingDriven){
 			new_partial_path_cost = partial_path_cost + rnodeCost;
 		}else{
 //			System.out.println(thruImmuTg.toString() + ", \t\t delay = " + thruImmuTg.getDelay());
-			new_partial_path_cost = partial_path_cost + rnodeCost + this.hopWeight * childLevel + con.criticality * thruImmuTg.getDelay()/20f;//upstream path cost + cost of node under consideration
+			new_partial_path_cost = partial_path_cost + (1 - con.getCriticality()) * rnodeCost +  con.criticality * thruImmuTg.getDelay()/20f;//upstream path cost + cost of node under consideration
+			//+ this.hopWeight * childLevel
 		}
-		
 		float new_lower_bound_total_path_cost;
 		float expected_distance_cost = 0;
 		float expected_wire_cost;
 		short delay = 0;
 		if(childRNode.type == RoutableType.INTERRR){
-			
-//			if(this.debugExpansion) this.printInfo("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
 			expected_distance_cost = this.expectMahatD(childRNode, con);
-			
 			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
-//			new_lower_bound_total_path_cost = (float) (new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * childLevel);
 			
-			new_lower_bound_total_path_cost = (float) (new_partial_path_cost + (1 - con.getCriticality() > 1?0.99:con.getCriticality()) * this.mdWeight * expected_wire_cost);
-			
-			
-			if(this.timingDriven){
+			if(!this.timingDriven){
+				new_lower_bound_total_path_cost = (float) (new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * childLevel);
+			}else{
 				ImmutableTimingGroup immuTG = thruImmuTg;
-				
-				if(childRNode.groupType != GroupDelayType.GLOBAL) {
+//				if(childRNode.getGroupDelayType() != GroupDelayType.GLOBAL ) {
 					try{
 						delay = this.estimator.getMinDelayToSinkPin(immuTG, this.sinkPinTG);
+						/*if(delay < 0){
+							if(immuTG.entryNode() != null)
+								System.out.printf("delay = "+ delay + ", from ImmuTimingGroup ( " + immuTG.entryNode().toString() + " -> " + immuTG.exitNode().toString() + " )");
+							else 
+								System.out.printf("delay = "+ delay + ", from ImmuTimingGroup exit node only ( " + immuTG.exitNode().toString() + " )");
+						
+							if(this.sinkPinTG.entryNode() != null) 
+								System.out.println(" to ( " + this.sinkPinTG.entryNode().toString() + " -> " + this.sinkPinTG.exitNode().toString() + " )");
+							else
+								System.out.println(" to ( " + this.sinkPinTG.exitNode().toString() + " )");
+						}*/
 					}catch(Exception e){
 						if(immuTG.entryNode() != null)
 							System.out.printf("Get min delay from ImmuTimingGroup ( " + immuTG.entryNode().toString() + " -> " + immuTG.exitNode().toString() + " )");
 						else 
 							System.out.printf("Get min delay from ImmuTimingGroup exit node only ( " + immuTG.exitNode().toString() + " )");
-					
 						if(this.sinkPinTG.entryNode() != null) 
 							System.out.println(" to ( " + this.sinkPinTG.entryNode().toString() + " -> " + this.sinkPinTG.exitNode().toString() + " )");
 						else
 							System.out.println(" to ( " + this.sinkPinTG.exitNode().toString() + " )");
 						e.printStackTrace();
 					}
-				}
-				if(debugTiming) System.out.println(" delay = " + delay);
-				
-				new_lower_bound_total_path_cost +=  delay/20f;
+//				}
+//				if(debugTiming) System.out.println(" delay = " + delay);
+				new_lower_bound_total_path_cost = (float) (new_partial_path_cost + (1 - con.getCriticality()) * this.mdWeight * expected_wire_cost + this.hopWeight * con.getCriticality() * delay/20f);
 			}
 			
 		}else{//lut input pin (sink)
 			new_lower_bound_total_path_cost = new_partial_path_cost;
-		}
+		}	
+		/*if(this.debugExpansion){
+			System.out.println("\t\t partial_path_cost = " + partial_path_cost 
+								+ ", \n \t\t rnodeCost = " + rnodeCost
+								+ ", \n \t\t countSourceUses = " + countSourceUses
+								+ ", \n \t\t expected_distance_cost = " + expected_distance_cost
+								+ ", \n \t\t new_lower_bound_total_path_cost = " + new_lower_bound_total_path_cost);
+		}*/
 		
-//		if(this.debugExpansion && this.targetCon(con)){
-//			System.out.println("\t\t partial_path_cost = " + partial_path_cost 
-//								+ ", \n \t\t rnodeCost = " + rnodeCost
-//								+ ", \n \t\t countSourceUses = " + countSourceUses
-//								+ ", \n \t\t expected_distance_cost = " + expected_distance_cost
-//								+ ", \n \t\t new_lower_bound_total_path_cost = " + new_lower_bound_total_path_cost);
-//		}
-		
-//		this.routerTimer.addRNodeToQueueEvaluation.finish();
-		
-//		this.routerTimer.addRNodeDummy.start();
-//		this.routerTimer.addRNodeDummy.finish();
-		
-//		this.routerTimer.addRNodeToQueuePushing.start();
 		this.addRNodeToQueueSetting(con, childRNode, rnode, thruImmuTg, childLevel, new_partial_path_cost, new_lower_bound_total_path_cost);
-//		this.routerTimer.addRNodeToQueuePushing.finish();
 	}
 	
 	private void addRNodeToQueueSetting(Connection con, RoutableTimingGroup childRNode, RoutableTimingGroup rnode, ImmutableTimingGroup thruImmuTg, int level, float new_partial_path_cost, float new_lower_bound_total_path_cost) {
 		RoutableData data = childRNode.rnodeData;
 		
 		if(!data.isTouched()) {
-//			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t not touched");
 			this.rnodesTouched.add(data);
-//			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t touched node size = "+this.rnodesTouched.size());
 			data.setLowerBoundTotalPathCost(new_lower_bound_total_path_cost);
 			data.setPartialPathCost(new_partial_path_cost);
 			data.setPrev(rnode);
 			childRNode.setThruImmuTg(thruImmuTg);
 			if(rnode != null) data.setLevel(level);
 			this.queue.add(new QueueElement(childRNode, new_lower_bound_total_path_cost));
-//			if(this.debugExpansion&& this.targetCon(con) ) this.printInfo("\t\t node added, queue size = " + this.queue.size());
 			
 		} else if (data.updateLowerBoundTotalPathCost(new_lower_bound_total_path_cost)) {
 			//queue is sorted by lower bound total cost
-//			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t touched previously");
 			data.setPartialPathCost(new_partial_path_cost);
 			data.setPrev(rnode);
 			childRNode.setThruImmuTg(thruImmuTg);
@@ -1638,27 +1639,20 @@ public class RoutableTimingGroupRouter{
 		float pres_cost = this.getPresentCongestionCost(countSourceUses, rnode.getOccupancy(), rnode.getPres_cost());
 		float acc_cost = rnode.getAcc_cost();
 		//Bias cost
-		/*float bias_cost = 0;
+		float bias_cost = 0;
 		if(rnode.type == RoutableType.INTERRR) {
 			Netplus net = con.getNet();
 			bias_cost = 0.5f * rnode.base_cost / net.fanout * 
 					(Math.abs(rnode.getCenterX() - net.x_geo) + Math.abs(rnode.getCenterY() - net.y_geo)) / net.hpwl;
-		}*/
+		}
 		
 		//add entry node cost to the Siblings
-		NodeWithFaninInfo entry = thruImmuTg.entryNode();
-		
+		NodeWithFaninInfo entry = thruImmuTg.entryNode();	
 		if(entry != null){
 			pres_cost += this.getPresentCongestionCost(entry.countSourceUses(con.source), entry.getOcc(), entry.getPresCost());	
 			acc_cost += entry.getAccCost();	
-		}
-		
-		
-		
-//		if(this.debugExpansion && this.targetCon(con))
-//			this.printInfo("\t\t rnode cost = b(n)*h(n)*p(n)/(1+sourceUsage) = " + rnode.base_cost + " * " + rnode.getAcc_cost()+ " * " + pres_cost + " / (1 + " + countSourceUses + ") + " + bias_cost);
-		
-		return rnode.base_cost * acc_cost * pres_cost / (1 + countSourceUses);// + bias_cost;
+		}	
+		return rnode.base_cost * acc_cost * pres_cost / (1 + countSourceUses) + bias_cost;
 	}
 	
 	private float getPresentCongestionCost(int countSourceUses, int occupancy, float nodePresCost){
@@ -1760,6 +1754,11 @@ public class RoutableTimingGroupRouter{
 	
 	public int getUsedRNodes(){
 		return this.usedRNodes.size();
+	}
+	
+	public void timingInfo(){
+		this.timingManager.getCriticalPathInfo(this);
+		System.out.printf("==========================================================================================================================================\n");
 	}
 
 	public void designInfo(){
