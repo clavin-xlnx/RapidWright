@@ -96,6 +96,7 @@ public class RoutableTimingGroup implements Routable{
 			Map<NodeWithFaninInfo, RoutableTimingGroup> createdRoutable, 
 			Set<Node> reservedNodes,
 			RouteThruHelper helper,
+			boolean timingDriven,
 			DelayEstimatorTable estimator,
 			RouterTimer timer,
 			long callingOfGetNextRoutable){
@@ -125,14 +126,16 @@ public class RoutableTimingGroup implements Routable{
 							
 				thruImmuTg = stGroups.getThruImmuTg(this.sibTimingGroups.getExitNode());
 				
-				delay = estimator.getDelayOf(thruImmuTg);
-				if(delay == -3)
-					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-				if(delay < 0){
-					System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-					delay = 0;
+				if(timingDriven){
+					delay = estimator.getDelayOf(thruImmuTg);
+					if(delay == -3)
+						System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+					if(delay < 0){
+						System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+						delay = 0;
+					}
+					thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
 				}
-				thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
 				
 				childThruImmuTg = new Pair<>(childRNode, thruImmuTg);
 				
@@ -145,16 +148,16 @@ public class RoutableTimingGroup implements Routable{
 				
 				
 				thruImmuTg = childRNode.getSiblingsTimingGroup().getThruImmuTg(this.sibTimingGroups.getExitNode());//RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key))
-				
-				delay = estimator.getDelayOf(thruImmuTg);
-				if(delay == -3)
-					System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-				if(delay < 0){
-					System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-					delay = 0;
+				if(timingDriven){
+					delay = estimator.getDelayOf(thruImmuTg);
+					if(delay == -3)
+						System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+					if(delay < 0){
+						System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
+						delay = 0;
+					}
+					thruImmuTg.setDelay(delay);
 				}
-				thruImmuTg.setDelay(delay);
-				
 				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
 			}
 			
