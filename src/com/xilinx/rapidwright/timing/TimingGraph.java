@@ -298,7 +298,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     		criticalVertices.add(timingVertex);
     	}
     	Collections.reverse(criticalVertices);
-    	System.out.println(criticalVertices);
     	return criticalVertices;
     }
     
