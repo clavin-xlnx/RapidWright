@@ -27,8 +27,6 @@ public class GraphHelper{
 		
 		this.buildGraph(netp);
 		
-//		if(netp.getNet().getName().equals("ipr[9]"))this.debug = true;
-		
 		return this.isCyclic(this.vertices, this.nodeEdges, this.visited, this.stack);
 	}
 	public void buildGraph(Netplus netp){
