@@ -762,7 +762,7 @@ public class RoutableTimingGroupRouter{
 				this.usedEntryNodes.size(),
 				this.overUsedEntryNodes(),
 				this.multiFaninEntryNodes(),
-				this.maxDelayAndTimingVertex.getFirst());
+				this.timingDriven?this.maxDelayAndTimingVertex.getFirst():null);
 	}
 	
 	public void updateCostFactors(){
@@ -1418,7 +1418,7 @@ public class RoutableTimingGroupRouter{
 			if(!rnode.childrenSet){
 //				if(this.debugRoutingCon)System.out.println(rnode.toString() + " 's setChildren: ");
 				Pair<Integer, Long> countPair = rnode.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, 
-						this.reservedNodes, this.rthHelper, this.estimator, this.routerTimer, this.callingOfGetNextRoutable);
+						this.reservedNodes, this.rthHelper, this.timingDriven, this.estimator, this.routerTimer, this.callingOfGetNextRoutable);
 				this.rrgNodeId = countPair.getFirst();
 				this.callingOfGetNextRoutable = countPair.getSecond();
 			}
