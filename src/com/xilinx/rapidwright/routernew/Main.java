@@ -264,8 +264,12 @@ public class Main {
 							router.routerTimer,
 							router.callingOfGetNextRoutable);
 					
+					if(this.timingDriven)
+						router.timingInfo();
+					
+					
 					}else{
-						/*RoutableGroupRouterWithVirtualMode router = new RoutableGroupRouterWithVirtualMode(this.design, 
+						RoutableGroupRouterWithVirtualMode router = new RoutableGroupRouterWithVirtualMode(this.design, 
 								this.toWriteDCPfileName,
 								this.nrOfTrials,
 								this.t,
@@ -311,7 +315,7 @@ public class Main {
 								router.nodesPopedFromQueue,
 								router.nodesPopedFromQueueFirstIter,
 								router.routerTimer,
-								router.callingOfGetNextRoutable);*/
+								router.callingOfGetNextRoutable);
 					}
 				
 			}		
@@ -419,7 +423,7 @@ public class Main {
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.print(timer);
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
-		System.out.printf("====================================================================================================================\n\n");
+		System.out.printf("==========================================================================================================================================\n");
 	}
 	
 }
