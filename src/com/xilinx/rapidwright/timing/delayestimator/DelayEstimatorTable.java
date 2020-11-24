@@ -80,13 +80,13 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 	public String BOUNCE_SITEPIN_FILE;
 	public String CLE_OUT_INTABLE_FILE;
 	
-    public DelayEstimatorTable(Device device, T ictInfo) {
-        this(device, ictInfo, true);
+    public DelayEstimatorTable(Device device, T ictInfo, boolean hpcRun) {
+        this(device, ictInfo, true, hpcRun);
      }
 
-    DelayEstimatorTable(Device device, T ictInfo, boolean fastMode) {
+    DelayEstimatorTable(Device device, T ictInfo, boolean fastMode, boolean hpcRun) {
 //        this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), fastMode, "", 0);
-        this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), fastMode, "cle_out_intable.ser", 0);
+        this(device, ictInfo, ictInfo.minTableWidth(), ictInfo.minTableHeight(), fastMode, "cle_out_intable.ser", 0, hpcRun);
 //        String inFileName = "cle_out_intable.ser";
 //        String inFileName = "onexwithdetour.ser";
 //        String inFileName = "onex_merge.ser";
@@ -101,7 +101,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @param width   Width of delay tables.
      * @param height  Height of delay tables.
      */
-    DelayEstimatorTable(Device device, T ictInfo, short width, short height, boolean fastMode, String loadFrom, int verbose) {
+    DelayEstimatorTable(Device device, T ictInfo, short width, short height, boolean fastMode, String loadFrom, int verbose, boolean hpcRun) {
         super(device, ictInfo, verbose);
 
 //        assert width < ictInfo.minTableWidth() :
@@ -134,7 +134,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         String DELAY_DATA_FOLDER  = FileTools.DATA_FOLDER_NAME + File.separator + "timing" + File.separator + series;
         this.BOUNCE_SITEPIN_FILE = DELAY_DATA_FOLDER + File.separator + "bounce_sitepin.txt";
         this.CLE_OUT_INTABLE_FILE = DELAY_DATA_FOLDER + File.separator + "cle_out_intable.ser";
-//        this.CLE_OUT_INTABLE_FILE = "RapidWright/data/timing/ultrascaleplus/cle_out_intable.ser";
+        if(hpcRun)
+        	this.CLE_OUT_INTABLE_FILE = "RapidWright/data/timing/ultrascaleplus/cle_out_intable.ser";
         
         build(this.CLE_OUT_INTABLE_FILE);
     }
@@ -2308,7 +2309,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, 0);
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 2, (short) 2, 6);
 //        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, (short) 10, (short) 19, true, "", 0);
-        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo);
+        DelayEstimatorTable est = new DelayEstimatorTable(device,ictInfo, false);
 
         short yCoor = 60;
 
