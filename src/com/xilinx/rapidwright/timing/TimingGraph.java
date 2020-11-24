@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.routernew.RoutableTimingGroupRouter;
 import com.xilinx.rapidwright.util.Pair;
 
 import org.jgrapht.GraphPath;
@@ -90,8 +91,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     
     //========================= for router =================================================
     Map<SitePinInst, TimingVertex> spiAndTimingVertices = new HashMap<>();
-    Map<Pair<SitePinInst, SitePinInst>, TimingEdge> spiPairsAndTimingEdges = new HashMap<>();
-    Map<TimingVertex, SitePinInst> timingVertexSitePinInsts = new HashMap<>();
+    Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> spiPairsAndTimingEdges = new HashMap<>();
+//    Map<TimingVertex, SitePinInst> timingVertexSitePinInsts = new HashMap<>();
     //========================= for router =================================================
 
     static {
@@ -287,13 +288,26 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     	return reversedOrderedTimingVertices;
     }
     
+    public List<TimingEdge> getCriticalTimingEdgesInOrder(TimingVertex maxV){
+    	List<TimingEdge> criticalTimingEdges = new ArrayList<>();
+    	TimingVertex timingVertex = maxV;
+    	
+    	while(incomingEdgesOf(timingVertex).size() != 0){
+    		TimingEdge e = this.getCriticalSourceTimingVertex(timingVertex);
+    		timingVertex = e.getSrc();
+    		criticalTimingEdges.add(e);
+    	}
+    	Collections.reverse(criticalTimingEdges);
+    	return criticalTimingEdges;
+    }
+    
     public List<TimingVertex> getCriticalVerticesInOrder(TimingVertex maxV){
     	List<TimingVertex> criticalVertices = new ArrayList<>();
     	
     	TimingVertex timingVertex = maxV;
     	criticalVertices.add(timingVertex);
     	while(incomingEdgesOf(timingVertex).size() != 0){
-    		timingVertex = this.getCriticalSourceTimingVertex(timingVertex);
+    		timingVertex = this.getCriticalSourceTimingVertex(timingVertex).getSrc();
     		if(routerDebugging) System.out.println(timingVertex);
     		criticalVertices.add(timingVertex);
     	}
@@ -301,7 +315,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     	return criticalVertices;
     }
     
-    public TimingVertex getCriticalSourceTimingVertex(TimingVertex sinkV){
+    public TimingEdge getCriticalSourceTimingVertex(TimingVertex sinkV){
     	Set<TimingEdge> incomingEdges = incomingEdgesOf(sinkV);
     	if(routerDebugging) System.out.println(sinkV + ", incoming edges size = " + incomingEdges.size());
     	for(TimingEdge e : incomingEdges){
@@ -309,7 +323,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     		if(this.comparableFloat(e.getSrc().getArrivalTime(), sinkV.getArrivalTime() - e.getDelay())){
 //    			if(this.spiPairsAndTimingEdges.values().contains(e)){ // not co
     				//return source TimingVertex if the edge is involved in the connections
-    				return e.getSrc();
+    				return e;
 //    			}
     		}
     	}
@@ -323,7 +337,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     /**
      * Return maps for the timing-driven router
      */
-    public Map<Pair<SitePinInst, SitePinInst>, TimingEdge> getSpiAndTimingEdges(){
+    public Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> getSpiAndTimingEdges(){
     	return this.spiPairsAndTimingEdges;
     }
     
@@ -331,11 +345,63 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     	return this.spiAndTimingVertices;
     }
     
-    public Map<TimingVertex, SitePinInst> getTimingVertexandSpiMap(){
+    /*public Map<TimingVertex, SitePinInst> getTimingVertexandSpiMap(){
     	for(SitePinInst spi : this.spiAndTimingVertices.keySet()){
     		this.timingVertexSitePinInsts.putIfAbsent(this.spiAndTimingVertices.get(spi), spi);
     	}
     	return this.timingVertexSitePinInsts;
+    }*/
+    
+  //get delay from a given path, return null if path not found in the graph
+    public float getDelayOfPath(String s, RoutableTimingGroupRouter router){
+    	float delay = -1;
+    	s = s.replace("{", "");
+    	s = s.replace("}", "");
+    	String [] verticesNames = s.split(" ");
+    	List<TimingVertex> vertices = new ArrayList<>();
+    	for(String str : verticesNames){
+    		TimingVertex v = this.safeVertexCheck.get(str);
+    		if(v != null){
+    			vertices.add(v);
+    		}else{
+    			System.err.println("graph does not contain " + str);
+    		}
+    	}
+    	
+    	List<TimingEdge> edges = new ArrayList<>();
+    	for(int i = 0; i < vertices.size() - 2; i++){
+    		for(TimingEdge e : outgoingEdgesOf(vertices.get(i))){
+    			for(TimingEdge nexte : outgoingEdgesOf(e.getDst())){
+    				if(nexte.getDst().equals(vertices.get(i+1))){
+    					edges.add(e);
+    					edges.add(nexte);
+    				}
+    			}
+    		}
+    	}
+    	for(TimingEdge e : outgoingEdgesOf(vertices.get(vertices.size() - 2))){
+    		if(e.getDst().equals(vertices.get(vertices.size() - 1))){
+    			edges.add(e);
+    		}
+    	}
+    	
+    	for(TimingEdge e:edges){
+    		delay += e.getDelay();
+    		System.out.println(e.toString() + ", " + e.delaysInfo() + ", " + e.getNet().toString());
+    		if(router!= null && router.timingEdgeConnectionMap.containsKey(e)){
+    			System.out.println(router.timingEdgeConnectionMap.get(e));
+    			for(ImmutableTimingGroup group : router.timingEdgeConnectionMap.get(e).timingGroups){
+        			System.out.println("\t " + group);
+        		}
+    		}
+    		System.out.println();
+    	}
+    	
+    	
+    	System.out.println(delay);
+    	
+    	System.out.println(vertices);
+    	return delay;
     }
     
   //===================================================================================================================
@@ -686,7 +752,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             graphPathHashSet.add(path);
         }
         System.out.println("list path size = " + result.size());
-        System.out.println("path size = " + paths.size());
+        System.out.println("path set size = " + graphPathHashSet.size());
         System.out.println("source size = " + sources.size());
         System.out.println("sink size = " + sinks.size());
         return result;
@@ -701,7 +767,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             float arrival = 0;
             for (TimingEdge e : (List<TimingEdge>) p.getEdgeList()) {
                 arrival += e.getDelay();
-                e.getDst().setArrivalTime(arrival);
+                e.getDst().setMaxArrivalTime(arrival);//TODO should have a check on arrival time to set the max one
                 if (inDegreeOf(e.getSrc())==0) {
                     e.getSrc().setArrivalTime(0);
                 }
@@ -1394,7 +1460,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     continue;
                 }
                 
-                this.intraSiteDelay = Math.max(0f, tmpNetDelay);
+                this.intraSiteDelay = Math.max(0f, tmpNetDelay);//YZ - for intrasite net, intrasite delay is equal to net delay
                 
                 netDelay = Math.max(0f, tmpNetDelay);
                 forceUpdateEdge = true;
@@ -1445,15 +1511,25 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             safeAddEdge(vS, vD, e);
             setEdgeWeight(e, e.getDelay());
             
-            //========================== for the router ================================
+            //====================================== for the router ========================================================
             Pair<SitePinInst, SitePinInst> spiPair = new Pair<SitePinInst, SitePinInst>(local_spi_source, spi_sink);
             if(!this.spiPairsAndTimingEdges.containsKey(spiPair)){
-            	this.spiPairsAndTimingEdges.put(spiPair, e);
+            	List<TimingEdge> connectionEdges = new ArrayList<>();
+            	connectionEdges.add(e);
+            	this.spiPairsAndTimingEdges.put(spiPair, connectionEdges);//new ArrayList<TimingEdge>(){{add(e);}});// why not applicable?
+            }else{
+            	if(local_spi_source == null || spi_sink == null){//typically for a TimingEdge LUT_6_2_*/*O -> */D
+//            		System.out.println("null spi pair for TimingEdge " + e);
+            	}else{
+            		List<TimingEdge> connectionEdges = this.spiPairsAndTimingEdges.get(spiPair);
+            		connectionEdges.add(e);
+                	this.spiPairsAndTimingEdges.put(spiPair, connectionEdges);
+            	}
             }
             
             this.spiAndTimingVertices.putIfAbsent(local_spi_source, vS);
-            this.spiAndTimingVertices.putIfAbsent(spi_sink, vD);
-            //========================== for the router ================================
+            this.spiAndTimingVertices.putIfAbsent(spi_sink, vD);// multiple vD could be mapped to same spi_sink, but does not matter
+            //====================================== for the router ========================================================
         }
         return 1;
     }

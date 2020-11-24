@@ -24,6 +24,10 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import org.jgrapht.graph.DefaultEdge;
 
 /**
@@ -238,7 +242,7 @@ public class TimingEdge extends DefaultEdge {
         return delay;
     }
     
-    //=============================== methods added for routing and debugging ===============================
+    //=============================== methods added for routing and debugging ===============================  
     //added for timing-driven router
     public float getIntraSiteDelay() {
 		return intraSiteDelay;
@@ -253,7 +257,7 @@ public class TimingEdge extends DefaultEdge {
     }
     
     public String delaysInfo(){
-    	return "logic = " + this.logicDelay + ", intrasite = " + this.intraSiteDelay + ", net = " + this.netDelay;
+    	return "logic = " + this.logicDelay + ", intrasite = " + this.intraSiteDelay + ", net = " + this.netDelay + ", total = " + this.delay;
     }
     
     public void setRouteDelay(float routeDelay){

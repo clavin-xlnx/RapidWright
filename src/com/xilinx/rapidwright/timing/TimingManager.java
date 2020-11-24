@@ -79,18 +79,12 @@ public class TimingManager {
     
     //----------------------- methods added for timing-driven routing -------------------------------
     
-    public void updateRouteDelays(List<Connection> cons){
-    	for(Connection c: cons){
-    		c.updateRouteDelay();
-    	}
-    }
-    
     public void updateIllegalNetsDelays(List<Netplus> illegalNets, Map<Node, Float> nodesDelays){
     	 for(Netplus n:illegalNets){
     		 for(Connection c:n.getConnection()){
     			 float netDelay = 0;
     			 for(Node node:c.nodes){
-    				 netDelay += nodesDelays.get(node);
+    				 netDelay +=  nodesDelays.get(node);
     			 }
     			 c.setTimingEdgeRouteDelay(netDelay);
     		 }
@@ -115,27 +109,18 @@ public class TimingManager {
     	float maxDelay = router.maxDelayAndTimingVertex.getFirst();
     	System.out.println("Max delay: " + maxDelay);
     	
-    	// get critical connections on the critical path based on the timing vertices
-    	Map<TimingVertex, Connection> sinkTimingVrtexAndConMap = router.sinkTimingVertexAndConMap;
-    	List<TimingVertex> criticalVertices = this.timingGraph.getCriticalVerticesInOrder(maxV);
-    	System.out.println(String.format("%-32s %s", "Critical TimingVertices:", criticalVertices));
-    	
-    	List<Connection> criticalConnections = new ArrayList<>();
-    	for(TimingVertex v : criticalVertices){
-    		if(sinkTimingVrtexAndConMap.containsKey(v)){
-    			criticalConnections.add(sinkTimingVrtexAndConMap.get(v));
-    		}
-    	}
+    	List<TimingEdge> criticalEdges = this.timingGraph.getCriticalTimingEdgesInOrder(maxV);
+    	System.out.println(String.format("%-25s %s", "Critical TimingEdges:", criticalEdges));
     	
     	// print out string for timing vertex of inputs only
     	StringBuilder s = new StringBuilder();
-    	s.append(String.format("%-33s", "of which critical inputs:"));
+    	s.append(String.format("%-26s", "of which critical inputs:"));
     	s.append("{");
     	int i = 0;
-    	for(TimingVertex v:criticalVertices){
-    		if(i%2 == 1){
-    			s.append(v.getName());
-    			s.append(" ");
+    	for(TimingEdge v:criticalEdges){
+    		if(i % 2 == 0){
+	    		s.append(v.getDst().getName());
+	    		s.append(" ");
     		}
     		i++;
     	}
@@ -143,14 +128,19 @@ public class TimingManager {
     	s.append("}");
     	System.out.println(s);
     	
-    	// timing groups for each critical connections
-    	System.out.println("Critical connections:");
-    	for(Connection c:criticalConnections){
-    		System.out.println(c.toStringTiming());
-    		for(ImmutableTimingGroup group : c.timingGroups){
-    			System.out.println("\t " + group);
+    	Map<TimingEdge, Connection> timingEdgeConnctionMap = router.timingEdgeConnectionMap;
+    	
+    	System.out.println("Detail delays:");
+    	for(TimingEdge e : criticalEdges){
+    		System.out.println(e.toString() + ", " + e.delaysInfo());
+    		if(timingEdgeConnctionMap.containsKey(e)){
+    			System.out.println(timingEdgeConnctionMap.get(e));
+    			for(ImmutableTimingGroup group : timingEdgeConnctionMap.get(e).timingGroups){
+        			System.out.println("\t " + group);
+        		}
     		}
     	}
+    	
     }
     
     public float calculateCriticality(List<Connection> cons, 
@@ -172,6 +162,7 @@ public class TimingManager {
     	return Math.abs(a - b) < Math.pow(10, -9);
     }
     
+    
   //-----------------------------------------------------------------------------------------------
 
     /**
@@ -186,8 +177,8 @@ public class TimingManager {
 
     private boolean postBuild() {
         timingGraph.removeClockCrossingPaths();
-        timingGraph.buildGraphPaths(0);//BUILD_GRAPH_PATHS_DEFAULT_PARAM);//default, 0 to build all paths
-        timingGraph.computeArrivalTimesTopologicalOrder();//.computeArrivalTimes();
+        timingGraph.buildGraphPaths(0);//(BUILD_GRAPH_PATHS_DEFAULT_PARAM);//default, 0 to build all paths
+        timingGraph.computeArrivalTimes();//TopologicalOrder();//.computeArrivalTimes();
         timingGraph.computeSlacks();
         return true;
     }
