@@ -1,6 +1,7 @@
 package com.xilinx.rapidwright.examples;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -38,5 +39,33 @@ public class ReportTimingExample {
         System.out.println("\nCritical path: "+ ((int)criticalPath.getWeight())+ " ps");
         System.out.println("\nPath details:");
         System.out.println(criticalPath.toString().replace(",", ",\n")+"\n");
+        
+        //================= router debugging ====================
+        for(TimingEdge e : criticalPath.getEdgeList()){
+        	System.out.println(e.toString() + ", delay = " + e.delaysInfo() + ", " + e.getNet().toString());
+        	/*for(SitePinInst spi : e.getNet().getPins()){
+        		System.out.println(spi.toString());
+        	}*/
+        }
+        
+        StringBuilder s = new StringBuilder();
+    	s.append("\nCritical TimingEdges: ");
+    	s.append("{");
+    	int i = 0;
+    	for(TimingEdge v : criticalPath.getEdgeList()){
+    		if(i % 2 == 0){
+	    		s.append(v.getDst().getName());
+	    		s.append(" ");
+    		}
+    		i++;
+    	}
+    	s.replace(s.length() - 1, s.length(), "");
+    	s.append("}");  
+        
+        System.out.println(s);
+        
+        tim.getTimingGraph().getDelayOfPath("{FD_ibb/Q LUT6_0/O LUT6_133/O LUT6_2_30/LUT5/O FD_k/D}", null);
+//        tim.getTimingGraph().getDelayOfPath("{FD_mjn/Q LUT6_2_a5/LUT5/O LUT5_27a/O LUT6_5ea/O FD_kpd/D}", null);
+        //================= router debugging ====================
     }
 }
