@@ -32,6 +32,7 @@ public class RoutableTimingGroup implements Routable{
 	public short ylow, yhigh;
 	
 	public float base_cost;
+	public float delay;
 	
 	public final RoutableData rnodeData;//data for the siblings, that is for the exit nodes
 	
@@ -51,7 +52,7 @@ public class RoutableTimingGroup implements Routable{
 	public List<Pair<RoutableTimingGroup, ImmutableTimingGroup>> childrenImmuTG;
 	public boolean childrenSet;
 	
-	public boolean debug = false;
+	public boolean delaySet = false;
 	
 	static {
 		//Node - CountingSet maps are needed for per-connection routing
@@ -116,7 +117,6 @@ public class RoutableTimingGroup implements Routable{
 			RoutableTimingGroup childRNode;
 			ImmutableTimingGroup thruImmuTg;
 			Pair<RoutableTimingGroup,ImmutableTimingGroup> childThruImmuTg;
-			short delay = 0;
 			
 			NodeWithFaninInfo key = stGroups.getExitNode();//using node as the key is necessary, different nodes may have a same hasCode()
 			
@@ -127,14 +127,15 @@ public class RoutableTimingGroup implements Routable{
 				thruImmuTg = stGroups.getThruImmuTg(this.sibTimingGroups.getExitNode());
 				
 				if(timingDriven){
-					delay = estimator.getDelayOf(thruImmuTg);
+					short delay = estimator.getDelayOf(thruImmuTg);
 					if(delay == -3)
 						System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 					if(delay < 0){
 						System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 						delay = 0;
 					}
-					thruImmuTg.setDelay(delay);//TODO check //moved to delay of Siblings 
+					childRNode.setDelay(delay);//TODO check //moved to delay of Siblings 
+					thruImmuTg.setDelay(delay);
 				}
 				
 				childThruImmuTg = new Pair<>(childRNode, thruImmuTg);
@@ -149,13 +150,14 @@ public class RoutableTimingGroup implements Routable{
 				
 				thruImmuTg = childRNode.getSiblingsTimingGroup().getThruImmuTg(this.sibTimingGroups.getExitNode());//RouterHelper.findImmutableTimingGroup(this, createdRoutable.get(key))
 				if(timingDriven){
-					delay = estimator.getDelayOf(thruImmuTg);
+					short delay = estimator.getDelayOf(thruImmuTg);
 					if(delay == -3)
 						System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 					if(delay < 0){
 						System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 						delay = 0;
 					}
+					childRNode.setDelay(delay);
 					thruImmuTg.setDelay(delay);
 				}
 				this.childrenImmuTG.add(new Pair<>(childRNode, thruImmuTg));
@@ -173,6 +175,15 @@ public class RoutableTimingGroup implements Routable{
 //		timer.addChildren.finish();
 		
 		return new Pair(globalIndex, callingOfGetNextRoutable);
+	}
+	
+	public float getDelay(){
+		return this.delaySet ? this.delay : 0f;
+	}
+	
+	public void setDelay(short d){
+		this.delay = d;
+		this.delaySet = true;
 	}
 	
 	public static void putNewEntryNode(NodeWithFaninInfo entry){
@@ -341,8 +352,7 @@ public class RoutableTimingGroup implements Routable{
 		return (this.yhigh + this.ylow) / 2;
 	}
 	
-	@Override
-	public String toString(){
+	public String toStringFull(){
 		String coordinate = "";
 		if(this.xlow == this.xhigh && this.ylow == this.yhigh) {
 			coordinate = "(" + this.xlow + "," + this.ylow + ")";
@@ -360,11 +370,11 @@ public class RoutableTimingGroup implements Routable{
 		
 		return s.toString();
 	}
-	
-	public String toStringFull(){
+	@Override
+	public String toString(){
 		
 		StringBuilder s = new StringBuilder();
-		s.append(this.toString());
+		s.append(this.toStringEntriesAndExit());
 		s.append(", ");
 		s.append(String.format("occupation = %d", this.getOccupancy()));
 		s.append(", ");
