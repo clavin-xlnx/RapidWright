@@ -1,7 +1,11 @@
 package com.xilinx.rapidwright.routernew;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
@@ -30,6 +34,7 @@ public class Main {
 	private boolean timingDriven = false;
 	private boolean partialRouting = false;
 	private boolean virtualModeAvailable = false;
+	private boolean hpcRun = false;
 	
 	public Main(String[] arguments) {
 		if(arguments.length < 2){
@@ -92,6 +97,9 @@ public class Main {
 				
 			}else if(arguments[i].contains("virtualModeAvailable")){
 				this.virtualModeAvailable = true;
+				
+			}else if(arguments[i].contains("hpcRun")){
+				this.hpcRun = true;
 			}
 		}
 	}
@@ -227,7 +235,8 @@ public class Main {
 						this.pres_fac_mult,
 						this.acc_fac,
 						this.base_cost_fac,
-						this.timingDriven);
+						this.timingDriven,
+						this.hpcRun);
 					router.designInfo();
 					this.routerConfigurationInfo();
 					
@@ -264,11 +273,21 @@ public class Main {
 							router.routerTimer,
 							router.callingOfGetNextRoutable);
 					
-					if(this.timingDriven)
+					if(this.timingDriven){
 						router.timingInfo();
-					
-					
+						System.out.printf("==========================================================================================================================================\n");
 					}
+					
+					/*if(!hpcRun){Scanner sc= new Scanner(System.in);
+					System.out.println("Enter a list of string reported by Vivado in format\n {*Q *O ... *O *D}, of which ... only represent output");
+					
+					while(sc.hasNextLine()){
+						
+						router.timingGraph.getDelayOfPath(sc.nextLine(), router);
+						
+					}}*/
+					
+				}
 				
 			}		
 		}
@@ -377,5 +396,4 @@ public class Main {
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("==========================================================================================================================================\n");
 	}
-	
 }
