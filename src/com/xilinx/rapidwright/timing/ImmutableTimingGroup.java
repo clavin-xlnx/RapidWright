@@ -81,8 +81,9 @@ public class ImmutableTimingGroup {
         return entryNode;
     }
     
-    public void setDelay(short groupDelay){
-    	this.groupDelay = groupDelay;
+    public void setDelay(short delay){
+    	this.groupDelay = delay;
+    	this.delaySet = true;
     }
     
     public short getDelay(){
@@ -97,7 +98,7 @@ public class ImmutableTimingGroup {
     	else 
     		s += "exit only";
     	s += ", " + exitNode.toString() + " )";
-    	return String.format("%-90s delay = %5d ps", s, this.groupDelay);
+    	return String.format("%-90s delay = %5d ps", s, this.groupDelay) + ", " + this.groupDelayType;
     }
     // ------------------------------------   private ----------------------------------------
 
@@ -112,7 +113,7 @@ public class ImmutableTimingGroup {
     // used to lookup coefficients based on directions
     final private GroupWireDirection groupWireDir; // ver, hor
     private short groupDelay; //TODO Yun
-
+    public boolean delaySet; //TODO remove
 
     private GroupWireDirection getDirection (NodeWithFaninInfo node) {
         // TODO: is there a better than name checking ?
