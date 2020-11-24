@@ -120,7 +120,7 @@ public class RoutableData {
 		return level;
 	}
 	
-	public float getPres_cost() {//TODO would be better to add entry node pres cost here?
+	public float getPres_cost() {
 		return pres_cost;
 	}
 
