@@ -123,6 +123,13 @@ public class SiblingsTimingGroup {
         // I don't see pip is used in computeTypes or delay calculation. Thus, I don't populate it.
         for (Node nextNode : prevNode.getAllDownhillNodes()) {
             if (!reservedNodes.contains(nextNode)) {
+
+                // If this tile is next to RCLK SDQNODE will bleed over. This is likely to cause long delay.
+                // TODO: to exclude only next to RCLK
+                if (nextNode.toString().contains("/SDQNODE_"))
+                    continue;
+
+
                 IntentCode ic = nextNode.getAllWiresInNode()[0].getIntentCode();
 
                 // TODO: is there a better way then relying on name?
@@ -144,6 +151,11 @@ public class SiblingsTimingGroup {
                     result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
                                                                   GroupDelayType.OTHER, false));
                 } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
+                    // TODO: to exclude only next to RCLK
+                    if (       nextNode.toString().contains("/EE12_BEG0")  // bleed down
+                            || nextNode.toString().contains("/EE12_BEG7")) // bleed up
+                        continue;
+
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
                     result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
                                                                   GroupDelayType.LONG, false));
@@ -158,6 +170,13 @@ public class SiblingsTimingGroup {
 
                                 String[] int_node = nextPrvNode.toString().split("/");
                                 if (int_node[1].contains("VCC_WIRE"))
+                                    continue;
+
+                                // EE12_BEG0 bleed down, EE12_BEG7 bleed up
+                                // TODO: to exclude only next to RCLK
+                                if (     nextPrvNode.toString().contains("/WW1_W_BEG7") // bleed up
+                                      || nextPrvNode.toString().contains("/WW2_E_BEG0") // bleed down
+                                      || nextPrvNode.toString().contains("/WW2_W_BEG0"))// bleed down
                                     continue;
 
                                 // TODO: Currently the whole sibling is considered together as a whole.
