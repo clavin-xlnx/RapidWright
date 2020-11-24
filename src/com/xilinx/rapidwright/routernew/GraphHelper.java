@@ -5,75 +5,83 @@ import java.util.*;
 import com.xilinx.rapidwright.device.Node;
 
 public class GraphHelper{
-	private List<Node> vertices;
-	private Map<Node, Set<Node>> nodeEdges;
-	Map<Node, Boolean> visited;
-	Map<Node, Boolean> stack;
+	private List<NodeWithCriticality> vertices;
+	private Map<NodeWithCriticality, List<NodeWithCriticality>> nodeEdges;
+	private Map<Node, NodeWithCriticality> nodeMap;
 	
-	Node backEdgeStart;
-	Node backEdgeEnd;
+	NodeWithCriticality backEdgeStart;
+	NodeWithCriticality backEdgeEnd;
 
 	boolean debug = false;
 	
 	public GraphHelper(){
-		
+		this.vertices = new ArrayList<>();
+		this.nodeMap = new HashMap<>();
+		this.nodeEdges = new HashMap<>();
 	}
 		
 	public boolean isCyclic(Netplus netp){
-		this.vertices = new ArrayList<>();
-		this.nodeEdges = new HashMap<>();
-		this.visited = new HashMap<>();
-		this.stack = new HashMap<>();
 		
 		this.buildGraph(netp);
 		
-		return this.isCyclic(this.vertices, this.nodeEdges, this.visited, this.stack);
+		return this.isCyclic(this.vertices, this.nodeEdges);
 	}
-	public void buildGraph(Netplus netp){
+	public void buildGraph(Netplus netp){	
 		for(Connection c:netp.getConnection()){
-			this.addVertices(c);
 			int vertexSize = c.nodes.size();
 			for(int i = vertexSize - 1; i > 0; i--){
 				Node fisrt = c.nodes.get(i);
 				Node second = c.nodes.get(i - 1);
 				
-				if(!nodeEdges.containsKey(fisrt)){
-					Set<Node> redges = new HashSet<>();
-					redges.add(second);
-					this.nodeEdges.put(fisrt, redges);
+				NodeWithCriticality newFirst = this.nodeMap.containsKey(fisrt) ? this.nodeMap.get(fisrt) : new NodeWithCriticality(fisrt);
+				NodeWithCriticality newSecond = this.nodeMap.containsKey(second) ? this.nodeMap.get(second) : new NodeWithCriticality(second);
+				this.nodeMap.put(fisrt, newFirst);
+				this.nodeMap.put(second, newSecond);
+				newFirst.setCriticality(c.getCriticality());
+				newSecond.setCriticality(c.getCriticality());
+				
+				this.addVertices(newFirst);
+				this.addVertices(newSecond);
+				if(i == 1) newSecond.setSink(true);
+				
+				List<NodeWithCriticality> redges;
+				if(!this.nodeEdges.containsKey(newFirst)){
+					redges = new ArrayList<>();				
 				}else{
-					Set<Node> redges = this.nodeEdges.get(fisrt);
-					redges.add(second);
-					this.nodeEdges.put(fisrt, redges);
+					redges = this.nodeEdges.get(newFirst);
 				}
+				if(!redges.contains(newSecond))
+					redges.add(newSecond);
+				Collections.sort(redges, NodeWithCriticality);
+				this.nodeEdges.put(newFirst, redges);
 			}
+		}
+		
+//		for(NodeWithCriticality n:this.vertices){
+//			System.out.println(this.nodeEdges.get(n));
+//		}
+	}
+	
+	public void addVertices(NodeWithCriticality nc){
+		if(!this.vertices.contains(nc)){
+			this.vertices.add(nc);
 		}
 	}
 	
-	public void addVertices(Connection c){
-		for(int i = c.nodes.size() - 1; i >= 0; i-- ){
-			Node rn = c.nodes.get(i);
-			if(!this.vertices.contains(rn)){
-				this.vertices.add(rn);
-				this.visited.put(rn, false);
-				this.stack.put(rn, false);
-			}
-		}
-	}
-	
-	public boolean isCyclicKernel(Node rn, Map<Node, Boolean> visited, Map<Node, Boolean> stack){
-		if(stack.get(rn)){
+	public boolean isCyclicKernel(NodeWithCriticality rn){
+		if(rn.isStacked()){
 			if(this.debug) this.printlnInfo("rn stack true " + rn.toString());
 			return true;
 		}
-		if(visited.get(rn)){
+		if(rn.isVisited()){
 			return false;
 		}
-		visited.put(rn, true);
-		stack.put(rn, true);
+		
+		rn.setVisited(true);
+		rn.setStacked(true);
 		
 		if(this.nodeEdges.get(rn) != null){
-			for(Node child:this.nodeEdges.get(rn)){
+			for(NodeWithCriticality child:this.nodeEdges.get(rn)){
 				
 				if(this.debug) this.printlnInfo("rn " + rn.toString() + ",  child " + child.toString());
 				this.backEdgeStart = rn;
@@ -81,36 +89,33 @@ public class GraphHelper{
 				this.backEdgeEnd = child;
 				if(this.debug) this.printlnInfo("back edge end " + this.backEdgeEnd.toString());
 				
-				if(this.isCyclicKernel(child, visited, stack)){	
+				if(this.isCyclicKernel(child)){	
 					return true;
 				}
 			}
 		}
 		
-		stack.put(rn, false);
+		rn.setStacked(false);
 		return false;
 	}
 	
-	public boolean isCyclic(List<Node> vertices, 
-			Map<Node, Set<Node>> routableEdges,
-			Map<Node, Boolean> visited,
-			Map<Node, Boolean> stack){
+	public boolean isCyclic(List<NodeWithCriticality> vertices, 
+			Map<NodeWithCriticality, List<NodeWithCriticality>> routableEdges){
 		
-		for(Node rn:this.vertices){
+		for(NodeWithCriticality rn:this.vertices){
 			if(this.debug) this.printlnInfo("starting from rn " + rn.toString());
-			if(this.isCyclicKernel(rn, this.visited, this.stack))
+			if(this.isCyclicKernel(rn))
 				return true;
 			}
 		return false;
 	}
 	
-	public void cutOffCycles(Netplus netp){
-		boolean cycleExists = true;
+	public void cutOffIllegalEdges(Netplus netp, boolean isCyclic){
+		boolean cycleExists = isCyclic;
 		while(cycleExists){
-			//TODO to store info of the back edge
-//			System.out.println("start " + this.backEdgeStart.toString() + ", end" + this.backEdgeEnd.toString());
+			// to store info of the back edge
 			// remove the back edge by removing the end from the adj list of the start
-			for(Node rn:this.nodeEdges.keySet()){
+			for(NodeWithCriticality rn:this.nodeEdges.keySet()){
 				if(rn.equals(this.backEdgeStart)){
 					this.nodeEdges.get(rn).remove(backEdgeEnd);
 					break;
@@ -119,11 +124,9 @@ public class GraphHelper{
 			
 			// check if the start of the back edge has any fanouts
 			// if no, remove the redundant Node and remove edges related to it
-			if(this.nodeEdges.get(this.backEdgeStart).size() == 0){
-				
-				this.removeRedudantRoutable(this.backEdgeStart);
-				
-				for(Node rn:this.nodeEdges.keySet()){
+			if(this.nodeEdges.get(this.backEdgeStart).size() == 0){		
+				this.removeRedudantRoutable(this.backEdgeStart);			
+				for(NodeWithCriticality rn:this.nodeEdges.keySet()){
 					if(this.nodeEdges.get(rn).contains(this.backEdgeStart)){
 						this.nodeEdges.get(rn).remove(backEdgeStart);
 					}
@@ -133,87 +136,155 @@ public class GraphHelper{
 			// reset the info of visited and stack for each routable, preparing for the next check if the graph is cyclic
 			this.resetVistedAndStack();
 			this.debug = false;
-			cycleExists = this.isCyclic(this.vertices, this.nodeEdges, this.visited, this.stack);
+			cycleExists = this.isCyclic(this.vertices, this.nodeEdges);
 		}
 		
-		this.rebuildPathsOfNetCons(netp);
+		this.mergingMultiFaninPaths();
+		//to restore paths of connections
+		this.restoringConnectionPaths(netp);
 	}
 	
-	public void removeRedudantRoutable(Node backEdgeStart){
-		if(this.debug) System.out.println("before removing " + this.vertices.size() + ", " + this.nodeEdges.size() + ", " + this.visited.size() + ", " +this.stack.size());
+	public void restoringConnectionPaths(Netplus netp){
+		for(Connection c:netp.getConnection()){
+			c.nodes.clear();
+			NodeWithCriticality nc = this.nodeMap.get(c.getSinkRNode().getNode());
+			while(nc != null){
+				c.addNode(nc.getNode());
+				nc = nc.getDriver();
+			}
+		}
+	}
+	
+	public void mergingMultiFaninPaths(){
+		//by setting only one driver with the maximum criticality to each non-source node, the multiple fan-in problem will be solved
+		for(NodeWithCriticality n : this.vertices){
+			List<NodeWithCriticality> nextNCs = this.nodeEdges.get(n);
+			if(nextNCs != null){
+				for(NodeWithCriticality nextn : nextNCs){
+					nextn.setDriver(n);
+				}
+			}
+		}
+	}
+	
+	//removing redudant edges
+	public void removeRedudantRoutable(NodeWithCriticality backEdgeStart){
+		if(this.debug) System.out.println("before removing " + this.vertices.size() + ", " + this.nodeEdges.size());
 		this.vertices.remove(backEdgeStart);
 		this.nodeEdges.remove(backEdgeStart);
-		this.visited.remove(backEdgeStart);
-		this.stack.remove(backEdgeStart);
-		if(this.debug) System.out.println("after removing " + this.vertices.size() + ", " + this.nodeEdges.size() + ", " + this.visited.size() + ", " +this.stack.size());
+		if(this.debug) System.out.println("after removing " + this.vertices.size() + ", " + this.nodeEdges.size());
 		
 	}
 	
 	public void resetVistedAndStack(){
-		for(Node rn:this.vertices){
-			this.resetVisited(rn);
-			this.resetStack(rn);
+		for(NodeWithCriticality rn:this.vertices){
+			rn.setVisited(false);
+			rn.setStacked(false);
 		}
 	}
 	
-	public void resetVisited(Node rn){
-		this.visited.put(rn, false);
-	}
-	public void resetStack(Node rn){
-		this.stack.put(rn, false);
-	}
-	
-	public void rebuildPathsOfNetCons(Netplus netp){
-		// TODO identify connections that have been impacted
-		for(Connection c:netp.getConnection()){
-			List<Node> path = this.findPathBetweenTwoVertices(c.getSourceRNode().getNode(), c.getSinkRNode().getNode());
-			c.nodes.clear();
-			for(int i = 0; i < path.size(); i++){
-				c.nodes.add(path.get(i));
-				if(this.debug) this.printlnInfo(path.get(i).toString());
-			}
-		}
-	}
-	
-	public List<Node> findPathBetweenTwoVertices(Node source, Node sink){
-		List<Node> path = new ArrayList<>();
-		// set visited value of each vertex as false
-		for(Node rn:this.vertices){
-			this.resetVisited(rn);
-		}
-		if(this.debug) System.out.println("sink " + sink.toString());
-		Queue<Node> queue = new LinkedList<>();
-		Map<Node, Node> childParent = new HashMap<>();
-		this.visited.put(source, true);
-		queue.add(source);
-		while(!queue.isEmpty()){
-			Node rn = queue.poll();
-			if(rn.equals(sink)){
-				//TODO trace back to build the path
-				Node tmp = rn;
-				while(tmp != null){
-					path.add(tmp);
-					tmp = childParent.get(tmp);
-				}
-			}
-			if(this.debug) System.out.println(rn.toString());
-			if(this.debug) System.out.println(this.nodeEdges.containsKey(rn));
-			if(this.nodeEdges.containsKey(rn)){// SINKRR is not contained
-				for(Node child:this.nodeEdges.get(rn)){
-					if(!this.visited.get(child)){
-						this.visited.put(child, true);
-						childParent.put(child, rn);
-						queue.add(child);
-					}
-				}
-			}
-		}
-		
-		return path;
-	}
+	public static Comparator<NodeWithCriticality> NodeWithCriticality = new Comparator<NodeWithCriticality>() {
+    	@Override
+    	public int compare(NodeWithCriticality a, NodeWithCriticality b) {
+    		if(a.getCriticality() < b.getCriticality()){
+    			return 1;
+    		}else if(Math.abs(a.getCriticality() - b.getCriticality()) < 1e-6) {
+    			if(a.hashCode() > b.hashCode()){
+    				return 1;
+    			}else if(a.hashCode() < b.hashCode()){
+    				return -1;
+    			}else{
+    				if(a != b) System.out.println("Failure: Error while comparing 2 NodeWithCriticality. HashCode of Two Connections was identical");
+    				return 0;
+    			}
+    		}else{
+    			return -1;
+    		}
+    	}
+    };
 	
 	private void printlnInfo(String s){
 		System.out.println(s);
+	}
+	
+	class NodeWithCriticality{
+		private Node node;
+		private float criticality;
+		private boolean isSink;
+		private NodeWithCriticality driver;
+		private boolean visited;
+		private boolean stacked;
+		
+		public NodeWithCriticality(Node node){
+			this.node = node;
+			this.criticality = -1;//unset
+			this.isSink = false;
+			this.driver = null;
+			this.visited = false;
+			this.stacked = false;
+		}
+
+		public boolean isVisited() {
+			return visited;
+		}
+
+		public void setVisited(boolean visited) {
+			this.visited = visited;
+		}
+
+		public boolean isStacked() {
+			return stacked;
+		}
+
+		public void setStacked(boolean stacked) {
+			this.stacked = stacked;
+		}
+
+		public NodeWithCriticality getDriver() {
+			return this.driver;
+		}
+		
+		public void setDriver(NodeWithCriticality driver) {
+			if(this.driver == null){
+				this.driver = driver;
+			}else if(driver.getCriticality() > this.driver.getCriticality()){
+				this.driver = driver;
+			}
+		}
+		
+		public boolean isSink() {
+			return isSink;
+		}
+
+		public void setSink(boolean isSink) {
+			this.isSink = isSink;
+		}
+
+		public float getCriticality() {
+			return criticality;
+		}
+		
+		public Node getNode(){
+			return this.node;
+		}
+		
+		public void setCriticality(float criticality) {
+			if(Math.abs(this.criticality - (-1)) < 1e-6)
+				this.criticality = criticality;
+			else{
+				if(this.criticality < criticality) this.criticality = criticality;
+			}
+		}
+		
+		@Override
+		public int hashCode(){
+			return this.node.hashCode();
+		}
+		
+		@Override
+		public String toString(){
+			return this.node.toString() + ", criti = " + this.criticality + ", sink? " + this.isSink;
+		}
 	}
 	
 }
