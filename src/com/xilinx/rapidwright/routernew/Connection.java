@@ -23,25 +23,23 @@ public class Connection{
     public final short boundingBox;
 //    private short x_min_b, x_max_b, y_min_b, y_max_b;
 	
-    //TODO timing-driven
     public TimingVertex sourceTimingVertex;
     public TimingVertex sinkTimingVertex;
-    public TimingEdge timingEdge;//an intra site delay added
+    public List<TimingEdge> timingEdges;//FOR LUT_6_2_* SITEPININSTS
     public float criticality;
-//    public float intraSiteDelay;//TODO set
     
 	private Routable sourceRNode;
 	private Routable sinkRNode;
 	public List<Routable> rnodes;
-	public List<Routable> pathFromSinkToSwitchBox;
+//	public List<Routable> pathFromSinkToSwitchBox;
 	
 	public List<Node> nodes;
-	public List<ImmutableTimingGroup> timingGroups;
+	public List<ImmutableTimingGroup> timingGroups;//TODO could be removed when not needing for debugging
 	
 	public void newNodes(){
 		this.nodes = new ArrayList<>();
 	}
-		
+	
 	public void addNode(Node node){
 		this.nodes.add(node);
 	}
@@ -57,7 +55,6 @@ public class Connection{
 		
 		this.rnodes = new ArrayList<>();
 		this.timingGroups = new ArrayList<>();
-//		this.intraSiteDelay = -1;
 	}
 	
 	public short calculateBoundingBox() {
@@ -118,16 +115,13 @@ public class Connection{
 		this.sinkTimingVertex = sinkTimingVertex;
 	}
 
-	public TimingEdge getTimingEdge() {
-		return timingEdge;
+	public List<TimingEdge> getTimingEdge() {
+		return timingEdges;
 	}
 	
 	public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
-		float slackCon = this.sinkTimingVertex.getRequiredTime() - this.sourceTimingVertex.getArrivalTime() - this.timingEdge.getDelay();
-		// - this.timingEdge.getDelay();
-//		float slack = this.sinkTimingVertex.getSlack();//slaskCon = slack
-//		if(slackCon != slack) System.out.println("slack con = " + slackCon + ", sink TV slack = " + slack + ", " + this.timingEdge.getDelay());
-		float tempCriticality  = (1 - slackCon / maxDelay);//TODO check up on criticality values
+		float slackCon = this.sinkTimingVertex.getRequiredTime() - this.sourceTimingVertex.getArrivalTime() - this.timingEdges.get(0).getDelay();
+		float tempCriticality  = (1 - slackCon / maxDelay);
     	tempCriticality = (float) (Math.pow(tempCriticality, criticalityExponent) * maxCriticality);
     	
     	if(tempCriticality > this.criticality) 
@@ -146,13 +140,9 @@ public class Connection{
 		return this.criticality;
 	}
 	
-	//TODO debug - bugs due to the unmatched SitePinInst - TimingVertex
-	public void setTimingEdge(TimingGraph timingGraph, EDIFNet edifNet, Net n) {
-		this.timingEdge = new TimingEdge(timingGraph, this.sourceTimingVertex, this.sinkTimingVertex, edifNet, n);
-	}
-	
-	public void setTimingEdge(TimingEdge e){
-		this.timingEdge = e;
+	public void setTimingEdge(List<TimingEdge> e){
+		this.timingEdges = new ArrayList<>();
+		timingEdges = e;
 	}
 
 	public void printInfo(String s){
@@ -164,14 +154,14 @@ public class Connection{
 		this.timingGroups.clear();
 	}
 	
-	public void addPartialPath(Routable routable){
+	/*public void addPartialPath(Routable routable){
 		if(this.pathFromSinkToSwitchBox == null){
 			this.pathFromSinkToSwitchBox = new ArrayList<>();
 			this.pathFromSinkToSwitchBox.add(routable);
 		}else{
 			this.pathFromSinkToSwitchBox.add(routable);
 		}
-	}
+	}*/
 	
 	public Routable getSourceRNode() {
 		return sourceRNode;
@@ -198,7 +188,7 @@ public class Connection{
 		s.append(", ");
 		s.append(String.format("net fanout = %3s", this.net.fanout));
 		s.append(", TimingEdge = ");
-		s.append(this.timingEdge.toString() + ", " + this.timingEdge.delaysInfo());
+		s.append(this.timingEdges.get(0).toString() + ", " + this.timingEdges.get(0).delaysInfo());
 		
 		return s.toString();
 	}
@@ -225,7 +215,7 @@ public class Connection{
 		s.append(", ");
 		s.append("sink = " + this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName());
 		s.append(", ");
-		s.append(String.format("Manhattan d = %4d ", this.getManhattanDistance()));
+		s.append(String.format("criticality = %4.3f ", this.getCriticality()));
 		
 		return s.toString();
 		
@@ -322,20 +312,20 @@ public class Connection{
 	}
 	
 	public void updateRouteDelay(){
-		float routeDelay = 0;
-		for(ImmutableTimingGroup tg : this.timingGroups){//TODO per siblings
-			routeDelay += tg.getDelay();
-		}
-		this.timingEdge.setRouteDelay(routeDelay);
+		float routeDelay = this.getRouteDelay();
+		
+		this.setTimingEdgeRouteDelay(routeDelay);
 	}
 	
 	public void setTimingEdgeRouteDelay(float routeDelay){
-		this.timingEdge.setRouteDelay(routeDelay);
+		for(TimingEdge e : this.timingEdges){
+			e.setRouteDelay(routeDelay);
+		}
 	}
 	
 	public float getRouteDelay() {
 		float routeDelay = 0;
-		for(ImmutableTimingGroup tg : this.timingGroups){//TODO per siblings
+		for(Routable tg : this.rnodes){//delay per siblings
 			routeDelay += tg.getDelay();
 		}
 		return routeDelay;
