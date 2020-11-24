@@ -522,15 +522,17 @@ public class RoutableWireRouter{
 			//find the illegal connections and fix illegal trees
 			for(Netplus illegalTree:illegalTrees){
 				if(this.debugRoutingCon) System.out.println("Net " + illegalTree.getNet().getName() + " routing tree is cyclic? ");
-				
+				for(Connection c:illegalTree.getConnection()){
+					this.ripup(c);
+				}
 				boolean isCyclic = graphHelper.isCyclic(illegalTree);
 				if(isCyclic){
 					//remove cycles
 					System.out.println("cycle exists");
-					graphHelper.cutOffCycles(illegalTree);
+					graphHelper.cutOffIllegalEdges(illegalTree, true);
 				}else{
 					if(this.debugRoutingCon) this.printInfo("fixing net: " + illegalTree.hashCode());
-					this.handleNoCyclicIllegalRoutingTree(illegalTree);
+					graphHelper.cutOffIllegalEdges(illegalTree, false);
 				}
 //				
 			}
