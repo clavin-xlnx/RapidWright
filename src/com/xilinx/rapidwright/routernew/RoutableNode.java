@@ -338,5 +338,11 @@ public class RoutableNode implements Routable{
 	public void setAcc_cost(float acc_cost) {
 		this.rnodeData.setAcc_cost(acc_cost);	
 	}
+
+	@Override
+	public float getDelay() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 	
 }

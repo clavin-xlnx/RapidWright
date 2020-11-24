@@ -239,4 +239,10 @@ public class RoutableWire implements Routable{
 		// TODO Auto-generated method stub
 		return this.wire.getNode();
 	}
+
+	@Override
+	public float getDelay() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }
