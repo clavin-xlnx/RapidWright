@@ -36,4 +36,6 @@ public interface Routable {
 	public boolean isBounce();
 	public Node getNode();
 
+	public float getDelay();
+
 }
