@@ -22,20 +22,12 @@
 package com.xilinx.rapidwright.timing;
 
 import com.xilinx.rapidwright.design.PinType;
-import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import com.xilinx.rapidwright.util.Pair;
-
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -126,7 +118,14 @@ public class SiblingsTimingGroup {
         
         // I don't see pip is used in computeTypes or delay calculation. Thus, I don't populate it.
         for (Node nextNode : prevNode.getAllDownhillNodes()) {
-            if (!reservedNodes.contains(nextNode)){
+        	
+            if (!reservedNodes.contains(nextNode)) {
+
+                // If this tile is next to RCLK SDQNODE will bleed over. This is likely to cause long delay.
+                // TODO: to exclude only next to RCLK
+                if (nextNode.toString().contains("/SDQNODE_"))
+                    continue;
+                
                 IntentCode ic = nextNode.getAllWiresInNode()[0].getIntentCode();
                 //TODO check: only excluding NODE_CLE_OUTUT will cause an issue of non-thruImmuTg between two ITERRR in setChildren()
                 if(ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_CLE_OUTPUT){ 
@@ -154,6 +153,11 @@ public class SiblingsTimingGroup {
                                                                   GroupDelayType.OTHER));
 
                 } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
+                    // TODO: to exclude only next to RCLK
+                    if (       nextNode.toString().contains("/EE12_BEG0")  // bleed down
+                            || nextNode.toString().contains("/EE12_BEG7")) // bleed up
+                        continue;
+
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
                     result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}, 
                     									GroupDelayType.LONG));
@@ -172,6 +176,18 @@ public class SiblingsTimingGroup {
                             List<ImmutableTimingGroup> tgs = new ArrayList<>();
                             ImmutableTimingGroup throughTg = null;
                             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) { // need to get all downhill PIPs
+
+                                String[] int_node = nextPrvNode.toString().split("/");
+                                if (int_node[1].contains("VCC_WIRE"))
+                                    continue;
+
+                                // EE12_BEG0 bleed down, EE12_BEG7 bleed up
+                                // TODO: to exclude only next to RCLK
+                                if (     nextPrvNode.toString().contains("/WW1_W_BEG7") // bleed up
+                                      || nextPrvNode.toString().contains("/WW2_E_BEG0") // bleed down
+                                      || nextPrvNode.toString().contains("/WW2_W_BEG0"))// bleed down
+                                    continue;
+                                
                                 // TODO: Currently the whole sibling is considered together as a whole.
                                 // TODO: (need to revisit this if the assumption changes.)
                                 // TODO: Thus only check nodes that can be key nodes. nextPrvNode is not a key node.
