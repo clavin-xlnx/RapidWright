@@ -325,7 +325,7 @@ public class Connection{
 	
 	public float getRouteDelay() {
 		float routeDelay = 0;
-		for(Routable tg : this.rnodes){//delay per siblings
+		for(Routable tg : this.rnodes){
 			routeDelay += tg.getDelay();
 		}
 		return routeDelay;
