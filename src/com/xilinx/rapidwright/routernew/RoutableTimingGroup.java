@@ -76,6 +76,9 @@ public class RoutableTimingGroup implements Routable{
 		
 		if(this.type == RoutableType.SOURCERR){
 			this.virtualMode = false;
+			if(sitePinInst.toString().endsWith("MUX")){
+				this.setDelay((short)60);
+			}
 		}else{
 			this.virtualMode = true; // true or false does not matter to sinkrr, becase of the isTarget() check
 		}
