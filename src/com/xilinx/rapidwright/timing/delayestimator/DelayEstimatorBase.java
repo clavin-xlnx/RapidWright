@@ -24,6 +24,8 @@
 package com.xilinx.rapidwright.timing.delayestimator;
 
 
+import com.xilinx.rapidwright.design.PinType;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
@@ -102,6 +104,14 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         this(device, ictInfo, 0);
     }
 
+    // TODO: need to get the number from CN API.
+    public short getDelayOfSitePin(SitePinInst sitePin) {
+        if (sitePin.getPinType() == PinType.OUT && sitePin.toString().contains("MUX")) {
+            return (short) 60;
+        } else {
+            return 0;
+        }
+    }
 
     public short getDelayOf(ImmutableTimingGroup tg) {
         RoutingNode node = getTermInfo(tg);
