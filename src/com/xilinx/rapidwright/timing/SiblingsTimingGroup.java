@@ -205,7 +205,7 @@ public class SiblingsTimingGroup {
                                 
                             }
                             // TODO: find out the type if the type is needed. Don't do it to reduce runtime
-                            result.add(new SiblingsTimingGroup(tgs,GroupDelayType.OTHER));
+                            result.add(new SiblingsTimingGroup(tgs, tgs.get(0).delayType()));//GroupDelayType.OTHER));
                         }
                     }
                 }
