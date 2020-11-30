@@ -16,7 +16,6 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
@@ -630,7 +629,7 @@ public class RoutableTimingGroupRouter{
 					this.timingManager.updateIllegalNetsDelays(illegalTrees, this.nodesDelays);
 					this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
 				}
-				this.timingGraph.getDelayOfPath("{FD_ibb/Q LUT6_0/O LUT6_133/O LUT6_2_30/LUT5/O FD_k/D}", this);
+				this.timingGraph.getDelayOfPath("{{FD_fk/Q LUT6_117/O LUT4_8f/O LUT6_126/O LUT4_92/O FD_pg/D}}", this);
 			}
 			
 			this.iterationEnd = System.nanoTime();
@@ -818,13 +817,13 @@ public class RoutableTimingGroupRouter{
 		
 		this.hops = 0;
 		this.manhattanD = 0;
-		Set<RoutableTimingGroup> netRNodes = new HashSet<>();
+		Set<Routable> netRNodes = new HashSet<>();
 		for(Netplus net:this.nets){	
 			for(Connection c:net.getConnection()){
-				netRNodes.addAll((Collection<? extends RoutableTimingGroup>) c.rnodes);
+				netRNodes.addAll(c.rnodes);
 				this.hops += c.nodes.size() - 1;//hops counted using the number of nodes for all sinks
 			}
-			for(RoutableTimingGroup rnode:netRNodes){
+			for(Routable rnode:netRNodes){
 				this.manhattanD += rnode.getManhattanD();
 			}
 			netRNodes.clear();
