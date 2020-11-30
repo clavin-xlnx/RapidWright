@@ -448,13 +448,13 @@ public class RoutableWireRouter{
 		
 		this.hops = 0;
 		this.manhattanD = 0;
-		Set<RoutableWire> netRNodes = new HashSet<>();
+		Set<Routable> netRNodes = new HashSet<>();
 		for(Netplus net:this.nets){	
 			for(Connection c:net.getConnection()){
-				netRNodes.addAll((Collection<? extends RoutableWire>) c.rnodes);
+				netRNodes.addAll(c.rnodes);
 				this.hops += c.rnodes.size() - 1;//hops for all sinks
 			}
-			for(RoutableWire rnode:netRNodes){
+			for(Routable rnode:netRNodes){
 				this.manhattanD += rnode.getManhattanD();
 			}
 			netRNodes.clear();

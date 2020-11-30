@@ -443,7 +443,7 @@ public class RoutableNodeRouter{
 	 * This method handles queries during the static source routing process. 
 	 * It determines if the node in question can be used as a source for the current
 	 * NetType.
-	 * @param n The node in question
+	 * @param rnode The node in question
 	 * @param type The NetType to indicate what kind of static source we need (GND/VCC)
 	 * @return True if the pin is a hard source or an unused LUT output that can be repurposed as a source
 	 */
@@ -1023,13 +1023,13 @@ public class RoutableNodeRouter{
 		this.hops = 0;
 		this.manhattanD = 0;
 		
-		Set<RoutableNode> netRNodes = new HashSet<>();
+		Set<Routable> netRNodes = new HashSet<>();
 		for(Netplus net:this.nets){	
 			for(Connection c:net.getConnection()){
-				netRNodes.addAll((Collection<? extends RoutableNode>) c.rnodes);
+				netRNodes.addAll(c.rnodes);
 				this.hops += c.rnodes.size() - 1;//hops for all sinks
 			}
-			for(RoutableNode rnode:netRNodes){
+			for(Routable rnode:netRNodes){
 				this.manhattanD += rnode.getManhattanD();
 			}
 			netRNodes.clear();
