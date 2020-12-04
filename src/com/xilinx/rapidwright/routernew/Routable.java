@@ -15,6 +15,10 @@ public interface Routable {
 	public void setXY();
 	public float getCenterX();
 	public float getCenterY();
+	public short getXmax();
+	public short getXmin();
+	public short getYmax();
+	public short getYmin();
 	
 	public boolean isTarget();
 	public void setTarget(boolean isTarget);
