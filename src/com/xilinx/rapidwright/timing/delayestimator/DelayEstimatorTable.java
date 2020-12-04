@@ -23,9 +23,12 @@
 
 package com.xilinx.rapidwright.timing.delayestimator;
 
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.GroupDelayType;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
@@ -2271,11 +2274,23 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        // GX 65
 //        System.out.println("delay " + getDelayOf(createTG("INT_X17Y110/BYPASS_E10" ,  device)));
 //        System.out.println("delay " + getDelayOf(createTG("INT_X14Y111/INT_INT_SDQ_60_INT_OUT1", "INT_X14Y111/INT_NODE_SDQ_59_INT_OUT1" ,  device)));
-        System.out.println("delay " + getDelayOf(createTG("INT_X14Y106/WW12_BEG6",  device)));
+//        System.out.println("delay " + getDelayOf(createTG("INT_X14Y106/WW12_BEG6",  device)));
+        System.out.println("delay " + getDelayOf(createTG("INT_X17Y107/BOUNCE_W_15_FT0",  device)));
 
 
 
         return;
+    }
+
+    void testGetDealyOfSitePin(Device device) {
+        String siteName = "SLICE_X0Y0";
+        SiteInst siteInst = new SiteInst(siteName, SiteTypeEnum.SLICEL);
+        siteInst.place(device.getSite(siteName));
+        SitePinInst pin = new SitePinInst("AQ", siteInst);
+
+        System.out.println(pin + " " + getDelayOfSitePin(pin));
+        pin = new SitePinInst("AMUX", siteInst);
+        System.out.println(pin + " " + getDelayOfSitePin(pin));
     }
 
     void testSpecialCase(Device device) {
@@ -2405,7 +2420,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 //        est.testBounceToSink();
 //        est.testSpecialCase(device);
-        est.testGetDelayOf(device);
+//        est.testGetDelayOf(device);
+        est.testGetDealyOfSitePin(device);
 
 
 //        long endBuildTime = System.nanoTime();
