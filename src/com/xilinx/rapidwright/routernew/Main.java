@@ -160,7 +160,7 @@ public class Main {
 						router.usedRNodes.size(),
 						router.checkAverageNumWires(),
 						1, 0, 0,
-						router.averFanoutRNodes);
+						router.averFanoutRNodes, 0, 0);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.firstRouting,
@@ -206,7 +206,7 @@ public class Main {
 						router.usedRNodes.size(),
 						1,
 						0, 0, 0,
-						router.averFanoutRNodes);
+						router.averFanoutRNodes, 0, 0);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.firstIterRouting,
@@ -258,7 +258,9 @@ public class Main {
 							router.averNodePerImmuTg,
 							router.averImmuTgPerSiblings,
 							router.averNodePerSiblings,
-							router.averFanoutRNodes);
+							router.averFanoutRNodes,
+							router.estimator.intableQuery,
+							router.estimator.outOfTableQuery);
 					
 					this.runtimeInfoPrinting(routingRuntime, 
 							router.firstRouting,
@@ -345,7 +347,7 @@ public class Main {
 	}
 	
 	public void rnodesInfo(float sumMD, long hops, int firstIterRNodes, int totalRNodes, int totalUsage, float averWire, float averNode,
-			float averImmuTgSiblings, float averNodeSiblings, float averChildren){
+			float averImmuTgSiblings, float averNodeSiblings, float averChildren, long intableQ, long outOfTableQ){
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Total Manhattan distance: %10.2f\n", sumMD);
 		System.out.printf("Total hops: %d\n", hops);
@@ -361,6 +363,9 @@ public class Main {
 			System.out.printf("Average #TG per siblings: %5.2f\n", averImmuTgSiblings);
 			System.out.printf("Average #node per siblings: %5.2f\n", averNodeSiblings);
 			System.out.printf("Average #children per siblings: %5.2f\n", averChildren);
+			System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");	
+			System.out.println("Queries of intable delay: " + intableQ);
+			System.out.println("Queries of out-of-table delay: " + outOfTableQ);
 		}
 	}
 	
