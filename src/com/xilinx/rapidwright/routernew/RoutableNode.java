@@ -344,5 +344,24 @@ public class RoutableNode implements Routable{
 		// TODO Auto-generated method stub
 		return 0;
 	}
+	@Override
+	public short getXmax() {
+		return this.xhigh;
+	}
+
+	@Override
+	public short getXmin() {
+		return this.xlow;
+	}
+
+	@Override
+	public short getYmax() {
+		return this.yhigh;
+	}
+
+	@Override
+	public short getYmin() {
+		return this.ylow;
+	}
 	
 }
