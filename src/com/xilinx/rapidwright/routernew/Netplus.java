@@ -19,19 +19,17 @@ public class Netplus{
 	public short y_min_b, y_max_b;
 	public float x_geo, y_geo;
 	public short hpwl;
-	public short bbRange;
 	public short fanout;
 	
 	public Netplus(int id, short bbRange, Net net){
 		this.id = id;
-		this.bbRange = bbRange;
 		this.net = net;
 		this.connections = new ArrayList<>();
 		this.fanout = (short) this.net.getSinkPins().size();
-		this.getBoundingXYs(net);
+		this.getBoundingXYs(net, bbRange);
 	}
 	
-	public void getBoundingXYs(Net net){
+	public void getBoundingXYs(Net net, short bbRange){
 		short x_min = 1<<10;
 		short x_max = 0;
 		short y_min = 1<<10;
@@ -79,10 +77,10 @@ public class Netplus{
 		this.x_geo = x_geo_sum / numPins;
 		this.y_geo = y_geo_sum / numPins;
 		
-		this.x_min_b = (short) (x_min - this.bbRange);
-		this.x_max_b = (short) (x_max + this.bbRange);
-		this.y_min_b = (short) (y_min - this.bbRange);
-		this.y_max_b = (short) (y_max + this.bbRange);
+		this.x_min_b = (short) (x_min - bbRange);
+		this.x_max_b = (short) (x_max + bbRange);
+		this.y_min_b = (short) (y_min - bbRange);
+		this.y_max_b = (short) (y_max + bbRange);
 		
 	}
 	
