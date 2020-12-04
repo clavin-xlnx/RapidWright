@@ -135,9 +135,10 @@ public class TimingManager {
     		System.out.println(e.toString() + ", " + e.delaysInfo());
     		if(timingEdgeConnctionMap.containsKey(e)){
     			System.out.println(timingEdgeConnctionMap.get(e));
-    			for(ImmutableTimingGroup group : timingEdgeConnctionMap.get(e).timingGroups){
-        			System.out.println("\t " + group);
-        		}
+    			List<ImmutableTimingGroup> groups = timingEdgeConnctionMap.get(e).timingGroups;
+    			for(int iGroup = groups.size() -1; iGroup >= 0; iGroup--) {
+    				System.out.println("\t " + groups.get(iGroup));
+    			}
     		}
     	}
     	
@@ -152,7 +153,7 @@ public class TimingManager {
     	float maxCriti = 0;
     	for(Connection c : cons){
     		c.calculateCriticality(maxDelay, maxCriticality, criticalityExponent);
-    		if(c.criticality > 0)
+    		if(c.criticality > maxCriti)
     			maxCriti = c.criticality;
     	}
     	return maxCriti;
