@@ -82,6 +82,8 @@ import java.util.regex.Pattern;
 public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstimatorBase<T> implements java.io.Serializable {
 	public String BOUNCE_SITEPIN_FILE;
 	public String CLE_OUT_INTABLE_FILE;
+	public long intableQuery = 0;
+	public long outOfTableQuery = 0;
 	
     public DelayEstimatorTable(Device device, T ictInfo, boolean hpcRun) {
         this(device, ictInfo, true, hpcRun);
@@ -1514,12 +1516,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             //    TODO: consider transpose the route so that the source is on bottom-left and sink on top-right.
 
             ConnectionInfo info = getConnectionInfo(begX, begY, endX, endY, begTg, endTg, begSide, endSide, begOrientation, endOrientation);
-
+            
+            intableQuery++;
 
 //            result = lookupDelay(g, info.sourceNode(), info.sinkNode(), info.sourceX(), info.sourceY());
             result = lookupDelay(rgBuilder.getGraph(), info.sourceNode(), info.sinkNode(), begX, begY);
         } else {
-
+        	//TODO counter added for long distance query
+        	outOfTableQuery++;
             boolean oneway = true;
 
             // TODO: consider shuffleing segments within one or both directions.
