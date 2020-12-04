@@ -21,7 +21,7 @@ public class Connection{
 	
 	public Netplus net;
     public final short boundingBox;
-//    private short x_min_b, x_max_b, y_min_b, y_max_b;
+    private short x_min_b, x_max_b, y_min_b, y_max_b;
 	
     public TimingVertex sourceTimingVertex;
     public TimingVertex sinkTimingVertex;
@@ -58,38 +58,96 @@ public class Connection{
 	}
 	
 	public short calculateBoundingBox() {
-		short min_x, max_x, min_y, max_y;
+		short x_min, x_max, y_min, y_max;
 		
 		short sourceX = (short) this.source.getTile().getColumn();
 		short sinkX = (short) this.sink.getTile().getColumn();
 		if(sourceX < sinkX) {
-			min_x = sourceX;
-			max_x = sinkX;
+			x_min = sourceX;
+			x_max = sinkX;
 		} else {
-			min_x = sinkX;
-			max_x = sourceX;
+			x_min = sinkX;
+			x_max = sourceX;
 		}
 		
 		short sourceY = (short) this.source.getTile().getRow();
 		short sinkY = (short) this.sink.getTile().getRow();
 		if(sourceY < sinkY) {
-			min_y = sourceY;
-			max_y = sinkY;
+			y_min = sourceY;
+			y_max = sinkY;
 		} else {
-			min_y = sinkY;
-			max_y = sourceY;
+			y_min = sinkY;
+			y_max = sourceY;
 		}
 		
-		return (short) ((max_x - min_x + 1) + (max_y - min_y + 1));
+		return (short) ((x_max - x_min + 1) + (y_max - y_min + 1));
 	}
 	
-	/*public float getIntraSiteDelay() {
-		return intraSiteDelay;
+	public void calculateGeoConBoundingBox(short bbRange) {
+		short x_min, x_max, y_min, y_max;
+		short x_geo = (short) Math.ceil(this.net.x_geo);
+		short y_geo = (short) Math.ceil(this.net.y_geo);
+		x_max = this.maxOfThree(this.sourceRNode.getXmax(), this.sinkRNode.getXmax(), x_geo);
+		x_min = this.minOfThree(this.sourceRNode.getXmin(), this.sinkRNode.getXmin(), x_geo);
+		y_max = this.maxOfThree(this.sourceRNode.getYmax(), this.sinkRNode.getYmax(), y_geo);
+		y_min = this.minOfThree(this.sourceRNode.getYmin(), this.sinkRNode.getYmin(), y_geo);
+		this.x_max_b = (short) (x_max + bbRange);
+		this.x_min_b = (short) (x_min - bbRange);
+		this.y_max_b = (short) (y_max + bbRange);
+		this.y_min_b = (short) (y_min - bbRange);
+	}
+	
+	public short maxOfThree(short var1, short var2, short var3) {
+		if(var1 >= var2 && var1 >= var3) {
+			return var1;
+		}else if(var2 >= var1 && var2 >= var3) {
+			return var2;
+		}else {
+			return var3;
+		}
+	}
+	
+	public short minOfThree(short var1, short var2, short var3) {
+		if(var1 <= var2 && var1 <= var3) {
+			return var1;
+		}else if(var2 <= var1 && var2 <= var3) {
+			return var2;
+		}else {
+			return var3;
+		}
 	}
 
-	public void setIntraSiteDelay(float intraSiteDelay) {
-		this.intraSiteDelay = intraSiteDelay;
-	}*/
+	public short getX_min_b() {
+		return x_min_b;
+	}
+
+	public void setX_min_b(short x_min_b) {
+		this.x_min_b = x_min_b;
+	}
+
+	public short getX_max_b() {
+		return x_max_b;
+	}
+
+	public void setX_max_b(short x_max_b) {
+		this.x_max_b = x_max_b;
+	}
+
+	public short getY_min_b() {
+		return y_min_b;
+	}
+
+	public void setY_min_b(short y_min_b) {
+		this.y_min_b = y_min_b;
+	}
+
+	public short getY_max_b() {
+		return y_max_b;
+	}
+
+	public void setY_max_b(short y_max_b) {
+		this.y_max_b = y_max_b;
+	}
 
 	public void setNet(Netplus net){
 		this.net = net;
@@ -199,8 +257,8 @@ public class Connection{
 			
 //		String coordinate = "(" + this.source.getTile().getColumn() + "," + this.source.getTile().getRow() + ") to (" 
 //							+ this.sink.getTile().getColumn() + "," + this.sink.getTile().getRow() + ")";
-		String coordinate = "(" + this.net.x_min_b + ", " + this.net.y_min_b + ") to (" 
-				+ this.net.x_max_b + ", " + this.net.y_max_b + ")";
+		String coordinate = "(" + this.x_min_b + ", " + this.y_min_b + ") to (" 
+				+ this.x_max_b + ", " + this.y_max_b + ")";
 		
 		s.append("Con ");
 		s.append(String.format("%6s", this.id));
