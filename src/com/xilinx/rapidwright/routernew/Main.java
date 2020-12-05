@@ -22,7 +22,7 @@ public class Main {
 	private RoutingGranularityOpt opt = RoutingGranularityOpt.NODE;
 	
 	//allowed number of routing iterations
-	private int nrOfTrials = 100;
+	private int nrOfTrials = 60;
 	private int bbRange = 5;
 	private boolean isINTtileRange = false;//TODO
 	private float mdWeight = 1.5f;
