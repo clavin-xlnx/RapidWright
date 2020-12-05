@@ -41,11 +41,7 @@ public class RoutableTimingGroup implements Routable{
 	* false: after being popped out from the queue, cost should be calculated
 	*/
 	public boolean virtualMode;
-	
-//	static Map<Node, CountingSet<SitePinInst>> entryNodeSources;
-//	static Map<Node, CountingSet<Routable>> entryNodeParents;
-//	static Map<Node, Pair<Float, Float>> entryNodePresHistCosts;//lazy adding approach: creating a pair of costs when meet an entry node
-	
+		
 	static Set<NodeWithFaninInfo> entryNodesExpanded;
 	
 	public boolean target;
@@ -55,15 +51,10 @@ public class RoutableTimingGroup implements Routable{
 	public boolean delaySet = false;
 	
 	static {
-		//Node - CountingSet maps are needed for per-connection routing
-		//retaining per-connection routing is needed for future connection-aware parallelization
-//		entryNodeSources = new HashMap<>();
-//		entryNodeParents  = new HashMap<>();
-//		entryNodePresHistCosts = new HashMap<>();
 		entryNodesExpanded = new HashSet<>();
 	}
 	
-	public RoutableTimingGroup(int index, SitePinInst sitePinInst, RoutableType type, TimingModel tmodel){
+	public RoutableTimingGroup(int index, SitePinInst sitePinInst, RoutableType type, DelayEstimatorTable estimator){
 		this.index = index;
 		this.type = type;
 		
@@ -73,12 +64,10 @@ public class RoutableTimingGroup implements Routable{
 		this.childrenSet = false;
 		this.setXY();
 		this.thruImmuTg = null;
-		
+		this.setDelay(estimator.getDelayOfSitePin(sitePinInst));
+		this.sibTimingGroups.getSiblings()[0].setDelay((short)this.delay);
 		if(this.type == RoutableType.SOURCERR){
 			this.virtualMode = false;
-			if(sitePinInst.toString().endsWith("MUX")){
-				this.setDelay((short)60);
-			}
 		}else{
 			this.virtualMode = true; // true or false does not matter to sinkrr, becase of the isTarget() check
 		}
@@ -133,7 +122,7 @@ public class RoutableTimingGroup implements Routable{
 					short delay = estimator.getDelayOf(thruImmuTg);
 					if(delay == -3)
 						System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-					if(delay < 0){
+					if(delay <= 0){
 						System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 						delay = 0;
 					}
@@ -156,7 +145,7 @@ public class RoutableTimingGroup implements Routable{
 					short delay = estimator.getDelayOf(thruImmuTg);
 					if(delay == -3)
 						System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-					if(delay < 0){
+					if(delay <= 0){
 						System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
 						delay = 0;
 					}
@@ -167,11 +156,8 @@ public class RoutableTimingGroup implements Routable{
 			}
 			
 			//store entry nodes and initialize the costs of entry nodes
-			//in consistent with the initialization of each routable
-//			timer.putEntryNodes.start();
 			NodeWithFaninInfo entry = thruImmuTg.entryNode();
 			putNewEntryNode(entry);//better to be here than to be in the expansion
-//			timer.putEntryNodes.finish();
 		}
 		
 		this.childrenSet = true;
@@ -213,15 +199,16 @@ public class RoutableTimingGroup implements Routable{
 		this.base_cost *= fac;//(this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
 	}
 	
+	//TODO ADJUST (1 1 0.95 orginal)
 	public void setBaseCost(){
 		if(this.type == RoutableType.SOURCERR){
-			base_cost = 1;
+			base_cost = 1f;
 			
 		}else if(this.type == RoutableType.INTERRR){
 			//aver cost around 4 when using deltaX + deltaY +1 
 			//(most (deltaX + deltaY +1 ) values range from 1 to 90+, maximum can be 176)
 			//(deltaX + deltaY +1 ) normalized to the maximum , does not work
-			base_cost = 1;
+			base_cost = 1f;
 			
 		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
 			base_cost = 0.95f;//virtually the same to the logic block input pin, since no alternative ipins are considered
@@ -384,8 +371,6 @@ public class RoutableTimingGroup implements Routable{
 		s.append(String.format("num_unique_sources = %d", this.rnodeData.numUniqueSources()));
 		s.append(", ");
 		s.append(String.format("num_unique_parents = %d", this.rnodeData.numUniqueParents()));
-//		s.append(", ");
-//		s.append(String.format("level = %d", this.rnodeData.getLevel()));
 		s.append(",");
 		s.append(this.sibTimingGroups.getSiblings()[0].exitNode().toString());
 		s.append(", ");
@@ -444,10 +429,13 @@ public class RoutableTimingGroup implements Routable{
 
 	
 	public boolean isInBoundingBoxLimit(Connection con) {		
-//		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
 		return this.xlow > con.net.x_min_b && this.xhigh < con.net.x_max_b && this.ylow > con.net.y_min_b && this.yhigh < con.net.y_max_b;
 	}
-
+	
+	public boolean isInConBoundingBoxLimit(Connection con) {		
+		return this.xlow > con.getX_min_b() && this.xhigh < con.getX_max_b() && this.ylow > con.getY_min_b() && this.yhigh < con.getY_max_b();
+	}
+	
 	public SiblingsTimingGroup getSiblingsTimingGroup() {
 		return this.sibTimingGroups;
 	}
@@ -505,5 +493,25 @@ public class RoutableTimingGroup implements Routable{
 	@Override
 	public Node getNode() {
 		return this.sibTimingGroups.getExitNode();
+	}
+
+	@Override
+	public short getXmax() {
+		return this.xhigh;
+	}
+
+	@Override
+	public short getXmin() {
+		return this.xlow;
+	}
+
+	@Override
+	public short getYmax() {
+		return this.yhigh;
+	}
+
+	@Override
+	public short getYmin() {
+		return this.ylow;
 	}	
 }
