@@ -26,6 +26,10 @@ public class CountingSet<E> implements Collection<E> {
 	public int size() {
 		return this.size;
 	}
+	
+	public Map<E,Integer> getMap(){
+		return this.map;
+	}
 
 	@Override
 	public boolean isEmpty() {
@@ -84,6 +88,19 @@ public class CountingSet<E> implements Collection<E> {
 		}
 		
 		return false;
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder s = new StringBuilder();
+		s.append("# unique delays: " + this.uniqueSize() + "\n");
+		for(E e : this.map.keySet()) {
+			s.append("  # of ");
+			s.append(String.format("%-5s", e));
+			s.append(" = ");
+			s.append(String.format("%10s", this.map.get(e)) + "\n");
+		}
+		return s.toString();
 	}
 
 	@Override
