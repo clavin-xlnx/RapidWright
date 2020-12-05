@@ -82,11 +82,13 @@ import java.util.regex.Pattern;
 public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstimatorBase<T> implements java.io.Serializable {
 	public String BOUNCE_SITEPIN_FILE;
 	public String CLE_OUT_INTABLE_FILE;
-	public long intableQuery = 0;
-	public long outOfTableQuery = 0;
+	public long intableQuery;
+	public long outOfTableQuery;
 	
     public DelayEstimatorTable(Device device, T ictInfo, boolean hpcRun) {
         this(device, ictInfo, true, hpcRun);
+        this.intableQuery = 0;
+        this.outOfTableQuery = 0;
      }
 
     DelayEstimatorTable(Device device, T ictInfo, boolean fastMode, boolean hpcRun) {
