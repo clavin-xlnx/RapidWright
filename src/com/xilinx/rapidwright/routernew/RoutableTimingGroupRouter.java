@@ -47,7 +47,7 @@ public class RoutableTimingGroupRouter{
 	public TimingGraph timingGraph;
 	private static final float MAX_CRITICALITY = 0.99f;
 	private static final float CRITICALITY_EXPONENT = 1;
-	private float MIN_REROUTE_CRITICALITY = 0.75f, REROUTE_CRITICALITY;
+	private float MIN_REROUTE_CRITICALITY = 0.85f, REROUTE_CRITICALITY;
 	private int MAX_PERCENTAGE_CRITICAL_CONNECTIONS = 3;
 	private List<Connection> criticalConnections;
 	public Pair<Float, TimingVertex> maxDelayAndTimingVertex;
@@ -254,6 +254,11 @@ public class RoutableTimingGroupRouter{
 				System.out.println("UNKNOWN type net: " + n.toString());
 			}
 		}
+		
+		for(Connection c:this.connections) {
+			c.calculateGeoConBoundingBox(bbRange);
+		}
+		
 		return rrgNodeId;
 	}
 	
@@ -398,7 +403,7 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public RoutableTimingGroup createRoutableNodeAndAdd(int index, SitePinInst sitePinInst, RoutableType type, TimingModel model, float base_cost_fac){
-		RoutableTimingGroup routableTG = new RoutableTimingGroup(index, sitePinInst, type, model);
+		RoutableTimingGroup routableTG = new RoutableTimingGroup(index, sitePinInst, type, this.estimator);
 		routableTG.setBaseCost(base_cost_fac);
 		this.rnodesCreated.put(routableTG.getSiblingsTimingGroup().getSiblings()[0].exitNode(), routableTG);
 		this.rrgNodeId++;
@@ -629,7 +634,7 @@ public class RoutableTimingGroupRouter{
 					this.timingManager.updateIllegalNetsDelays(illegalTrees, this.nodesDelays);
 					this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
 				}
-				this.timingGraph.getDelayOfPath("{{FD_fk/Q LUT6_117/O LUT4_8f/O LUT6_126/O LUT4_92/O FD_pg/D}}", this);
+//				this.timingGraph.getDelayOfPath("{{FD_fk/Q LUT6_117/O LUT4_8f/O LUT6_126/O LUT4_92/O FD_pg/D}}", this);
 			}
 			
 			this.iterationEnd = System.nanoTime();
@@ -1524,17 +1529,11 @@ public class RoutableTimingGroupRouter{
 			RoutableTimingGroup child = childRNode.getFirst();
 			ImmutableTimingGroup thruImmu = childRNode.getSecond();
 			
-			if(child.isTarget()){	
-				this.rnodesExpanded.add(thruImmu);
-				this.addNodeToQueue(rnode, child, thruImmu, con);
-				this.nodesExpanded++;
-				
-			}else if(child.type == RoutableType.INTERRR){// && child.getSiblingsTimingGroup().getExitNode().getAllWiresInNode()[0].getIntentCode() != IntentCode.NODE_PINFEED){//.toString().contains("IMUX")){
+			if(child.type == RoutableType.INTERRR){// && child.getSiblingsTimingGroup().getExitNode().getAllWiresInNode()[0].getIntentCode() != IntentCode.NODE_PINFEED){//.toString().contains("IMUX")){
 				//TODO the second condition makes the router obviously slower: 2x
-				if(child.isInBoundingBoxLimit(con)){
+				if(child.isInConBoundingBoxLimit(con)){
 					//PIN_BOUNCE
-//					if(child.getNode().getAllWiresInNode()[0].getIntentCode() == IntentCode.NODE_PINBOUNCE){//getSiblingsTimingGroup().type() == GroupDelayType.PIN_BOUNCE){
-					if(thruImmu.delayType() == GroupDelayType.PIN_BOUNCE){//TODO SiblingsTG's group delay type not complete, won't work
+					if(thruImmu.delayType() == GroupDelayType.PIN_BOUNCE){
 						if(!this.usablePINBounce(child, con.getSinkRNode())){
 							continue;
 						}
@@ -1543,7 +1542,12 @@ public class RoutableTimingGroupRouter{
 					this.addNodeToQueue(rnode, child, thruImmu, con);
 					this.nodesExpanded++;
 					
-				}	
+				}
+			}else if(child.isTarget()){	
+				this.rnodesExpanded.add(thruImmu);
+				this.addNodeToQueue(rnode, child, thruImmu, con);
+				this.nodesExpanded++;
+				
 			}
 		}
 	}
@@ -1791,34 +1795,39 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public void getNodeGroupTypeAndDelayMap(){
-		Map<GroupDelayType, Set<Float>> typeDelays = new HashMap<>();
+		Map<GroupDelayType, CountingSet<Float>> typeDelays = new HashMap<>();
 		for(RoutableTimingGroup rtg:this.rnodesCreated.values()){
 			GroupDelayType type = rtg.getSiblingsTimingGroup().type();
 			float delay = rtg.getDelay();
 			if(!typeDelays.containsKey(type)){
-				Set<Float> delays = new HashSet<>();
+				CountingSet<Float> delays = new CountingSet<>();
 				delays.add(delay);
 				typeDelays.put(type, delays);
 			}else{
-				Set<Float> delays = typeDelays.get(type);
+				CountingSet<Float> delays = typeDelays.get(type);
 				delays.add(delay);
 				typeDelays.put(type, delays);
 			}
 			
 		}
 		
-		for(RoutableTimingGroup rtg:this.rnodesCreated.values()){
-			Set<Float> delays = new HashSet<>();
-			
-			float delay =  rtg.getDelay();
-			if(delay != 0f)
-				delays.add(delay);
-		}
-			
 		for(GroupDelayType type : typeDelays.keySet()){
-			System.out.println(type + "\t" + typeDelays.get(type));
+			System.out.println(type + "  " + typeDelays.get(type));
+			System.out.println(type + " weighted average = " + getWeightedAverage(typeDelays.get(type)) + "\n");
 		}
 		
+	}
+	
+	public float getWeightedAverage(CountingSet<Float> delays) {
+		float average = 0;
+		float sumOfProduct = 0;
+		int numOfDelays = 0;
+		for(Float delay : delays.getMap().keySet()) {
+			sumOfProduct += delay *delays.count(delay);
+			numOfDelays += delays.count(delay);
+		}
+		average = sumOfProduct / numOfDelays;
+		return average;
 	}
 	
 	public void designInfo(){
