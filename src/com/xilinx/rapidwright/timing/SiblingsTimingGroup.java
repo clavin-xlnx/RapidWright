@@ -109,20 +109,20 @@ public class SiblingsTimingGroup {
         HashSet<String> excludeAboveRclk = new HashSet<String>() {{
             add("SDQNODE_E_0_FT1");
             add("SDQNODE_E_2_FT1");
-            add("SDQNODE_W_91_FT0");
-            add("SDQNODE_W_93_FT0");
-            add("SDQNODE_W_95_FT0");
+            add("SDQNODE_W_0_FT1");
+            add("SDQNODE_W_2_FT1");
             add("EE12_BEG0");
             add("WW2_E_BEG0");
             add("WW2_W_BEG0");
         }};
         // these nodes are bleeding up
         HashSet<String> excludeBelowRclk = new HashSet<String>() {{
-            add("SDQNODE_W_0_FT1");
-            add("SDQNODE_W_2_FT1");
             add("SDQNODE_E_91_FT0");
             add("SDQNODE_E_93_FT0");
             add("SDQNODE_E_95_FT0");
+            add("SDQNODE_W_91_FT0");
+            add("SDQNODE_W_93_FT0");
+            add("SDQNODE_W_95_FT0");
             add("EE12_BEG7");
             add("WW1_W_BEG7");
         }};
@@ -217,8 +217,8 @@ public class SiblingsTimingGroup {
                     // TODO: to exclude only next to RCLK
 //                    if (       nextNode.toString().contains("/EE12_BEG0")  // bleed down
 //                            || nextNode.toString().contains("/EE12_BEG7")) // bleed up
-                      if (isExcluded(nextNode))
-                          continue;
+//                      if (isExcluded(nextNode))
+//                          continue;
 
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
                     result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}, 
@@ -227,11 +227,9 @@ public class SiblingsTimingGroup {
                 } else {
                     // for other TGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
-                    	//TODO check - wrong - will cause non-thruImmuTg issue for other siblings
-                    	/*IntentCode code = nextNextNode.getAllWiresInNode()[0].getIntentCode();
-                        if(code == IntentCode.NODE_CLE_OUTPUT){//code == IntentCode.NODE_PINFEED){
-                        	continue;
-                        }*/
+
+                        if (isExcluded(nextNextNode))
+                            continue;
                         
                         if (!reservedNodes.contains(nextNextNode)) {
                             IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
@@ -240,15 +238,15 @@ public class SiblingsTimingGroup {
                             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) { // need to get all downhill PIPs
 
                                 String[] int_node = nextPrvNode.toString().split("/");
-                                if (int_node[1].contains("VCC_WIRE"))
-                                    continue;
+//                                if (int_node[1].contains("VCC_WIRE"))
+//                                    continue;
 
                                 // EE12_BEG0 bleed down, EE12_BEG7 bleed up
                                 // TODO: to exclude only next to RCLK
 //                                if (     nextPrvNode.toString().contains("/WW1_W_BEG7") // bleed up
 //                                      || nextPrvNode.toString().contains("/WW2_E_BEG0") // bleed down
 //                                      || nextPrvNode.toString().contains("/WW2_W_BEG0"))// bleed down
-                                if (isExcluded(nextNode))
+                                if (isExcluded(nextPrvNode) || int_node[1].contains("VCC_WIRE"))
                                     continue;
                                 
                                 // TODO: Currently the whole sibling is considered together as a whole.
@@ -349,147 +347,7 @@ public class SiblingsTimingGroup {
     	
     }
 
-    /*public void testExclude(String nodeName, boolean should, Device device) {
-        Node node  = new Node(nodeName, device);
-        boolean res = isExcluded(node);
-        String error = "";
-        if (res != should)
-            error = " *ERROR*";
-        if (res)
-            System.out.println(error + " " + node + " is excluded");
-        else
-            System.out.println(error + " " + node + " is NOT excluded");
 
-        System.out.println("\ndon't exclude");
-        // bleed down
-        s.testExclude("INT_X0Y29/SDQNODE_E_0_FT1",false,device);
-        s.testExclude("INT_X0Y29/SDQNODE_E_2_FT1",false,device);
-        s.testExclude("INT_X0Y29/SDQNODE_W_91_FT0",false,device);
-        s.testExclude("INT_X0Y29/SDQNODE_W_93_FT0",false,device);
-        s.testExclude("INT_X0Y29/SDQNODE_W_95_FT0",false,device);
-        s.testExclude("INT_X0Y29/EE12_BEG0",false,device);
-        s.testExclude("INT_X0Y29/WW2_E_BEG0",false,device);
-        s.testExclude("INT_X0Y29/WW2_W_BEG0",false,device);
-
-        System.out.println("\nexclude");
-        // bleed up
-        s.testExclude("INT_X0Y29/SDQNODE_W_0_FT1",true,device);
-        s.testExclude("INT_X0Y29/SDQNODE_W_2_FT1",true,device);
-        s.testExclude("INT_X0Y29/SDQNODE_E_91_FT0",true,device);
-        s.testExclude("INT_X0Y29/SDQNODE_E_93_FT0",true,device);
-        s.testExclude("INT_X0Y29/SDQNODE_E_95_FT0",true,device);
-        s.testExclude("INT_X0Y29/EE12_BEG7",true,device);
-        s.testExclude("INT_X0Y29/WW1_W_BEG7",true,device);
-
-
-        System.out.println("\nexclude");
-        // bleed down
-        s.testExclude("INT_X0Y30/SDQNODE_E_0_FT1",true,device);
-        s.testExclude("INT_X0Y30/SDQNODE_E_2_FT1",true,device);
-        s.testExclude("INT_X0Y30/SDQNODE_W_91_FT0",true,device);
-        s.testExclude("INT_X0Y30/SDQNODE_W_93_FT0",true,device);
-        s.testExclude("INT_X0Y30/SDQNODE_W_95_FT0",true,device);
-        s.testExclude("INT_X0Y30/EE12_BEG0",true,device);
-        s.testExclude("INT_X0Y30/WW2_E_BEG0",true,device);
-        s.testExclude("INT_X0Y30/WW2_W_BEG0",true,device);
-
-        System.out.println("\ndon't exclude");
-        // bleed up
-        s.testExclude("INT_X0Y30/SDQNODE_W_0_FT1",false,device);
-        s.testExclude("INT_X0Y30/SDQNODE_W_2_FT1",false,device);
-        s.testExclude("INT_X0Y30/SDQNODE_E_91_FT0",false,device);
-        s.testExclude("INT_X0Y30/SDQNODE_E_93_FT0",false,device);
-        s.testExclude("INT_X0Y30/SDQNODE_E_95_FT0",false,device);
-        s.testExclude("INT_X0Y30/EE12_BEG7",false,device);
-        s.testExclude("INT_X0Y30/WW1_W_BEG7",false,device);
-
-
-
-
-        System.out.println("\ndon't exclude");
-        // bleed down
-        s.testExclude("INT_X0Y89/SDQNODE_E_0_FT1",false,device);
-        s.testExclude("INT_X0Y89/SDQNODE_E_2_FT1",false,device);
-        s.testExclude("INT_X0Y89/SDQNODE_W_91_FT0",false,device);
-        s.testExclude("INT_X0Y89/SDQNODE_W_93_FT0",false,device);
-        s.testExclude("INT_X0Y89/SDQNODE_W_95_FT0",false,device);
-        s.testExclude("INT_X0Y89/EE12_BEG0",false,device);
-        s.testExclude("INT_X0Y89/WW2_E_BEG0",false,device);
-        s.testExclude("INT_X0Y89/WW2_W_BEG0",false,device);
-
-        System.out.println("\nexclude");
-        // bleed up
-        s.testExclude("INT_X0Y89/SDQNODE_W_0_FT1",true,device);
-        s.testExclude("INT_X0Y89/SDQNODE_W_2_FT1",true,device);
-        s.testExclude("INT_X0Y89/SDQNODE_E_91_FT0",true,device);
-        s.testExclude("INT_X0Y89/SDQNODE_E_93_FT0",true,device);
-        s.testExclude("INT_X0Y89/SDQNODE_E_95_FT0",true,device);
-        s.testExclude("INT_X0Y89/EE12_BEG7",true,device);
-        s.testExclude("INT_X0Y89/WW1_W_BEG7",true,device);
-
-
-        System.out.println("\nexclude");
-        // bleed down
-        s.testExclude("INT_X0Y90/SDQNODE_E_0_FT1",true,device);
-        s.testExclude("INT_X0Y90/SDQNODE_E_2_FT1",true,device);
-        s.testExclude("INT_X0Y90/SDQNODE_W_91_FT0",true,device);
-        s.testExclude("INT_X0Y90/SDQNODE_W_93_FT0",true,device);
-        s.testExclude("INT_X0Y90/SDQNODE_W_95_FT0",true,device);
-        s.testExclude("INT_X0Y90/EE12_BEG0",true,device);
-        s.testExclude("INT_X0Y90/WW2_E_BEG0",true,device);
-        s.testExclude("INT_X0Y90/WW2_W_BEG0",true,device);
-
-        System.out.println("\ndon't exclude");
-        // bleed up
-        s.testExclude("INT_X0Y90/SDQNODE_W_0_FT1",false,device);
-        s.testExclude("INT_X0Y90/SDQNODE_W_2_FT1",false,device);
-        s.testExclude("INT_X0Y90/SDQNODE_E_91_FT0",false,device);
-        s.testExclude("INT_X0Y90/SDQNODE_E_93_FT0",false,device);
-        s.testExclude("INT_X0Y90/SDQNODE_E_95_FT0",false,device);
-        s.testExclude("INT_X0Y90/EE12_BEG7",false,device);
-        s.testExclude("INT_X0Y90/WW1_W_BEG7",false,device);
-
-
-        System.out.println("\ndon't exclude");
-        // bleed down
-        s.testExclude("INT_X0Y99/SDQNODE_E_0_FT1",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_E_2_FT1",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_W_91_FT0",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_W_93_FT0",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_W_95_FT0",false,device);
-        s.testExclude("INT_X0Y99/EE12_BEG0",false,device);
-        s.testExclude("INT_X0Y99/WW2_E_BEG0",false,device);
-        s.testExclude("INT_X0Y99/WW2_W_BEG0",false,device);
-
-        // bleed up
-        s.testExclude("INT_X0Y99/SDQNODE_W_0_FT1",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_W_2_FT1",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_E_91_FT0",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_E_93_FT0",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_E_95_FT0",false,device);
-        s.testExclude("INT_X0Y99/EE12_BEG7",false,device);
-        s.testExclude("INT_X0Y99/WW1_W_BEG7",false,device);
-
-
-        // bleed down
-        s.testExclude("INT_X0Y99/SDQNODE_E_0_FT1",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_E_2_FT1",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_W_91_FT0",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_W_93_FT0",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_W_95_FT0",false,device);
-        s.testExclude("INT_X0Y99/EE12_BEG0",false,device);
-        s.testExclude("INT_X0Y99/WW2_E_BEG0",false,device);
-        s.testExclude("INT_X0Y99/WW2_W_BEG0",false,device);
-
-        // bleed up
-        s.testExclude("INT_X0Y99/SDQNODE_W_0_FT1",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_W_2_FT1",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_E_91_FT0",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_E_93_FT0",false,device);
-        s.testExclude("INT_X0Y99/SDQNODE_E_95_FT0",false,device);
-        s.testExclude("INT_X0Y99/EE12_BEG7",false,device);
-        s.testExclude("INT_X0Y99/WW1_W_BEG7",false,device);
-    }*/
 }
 
 
