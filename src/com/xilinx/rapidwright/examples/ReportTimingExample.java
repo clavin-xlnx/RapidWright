@@ -42,7 +42,8 @@ public class ReportTimingExample {
         
         //================= router debugging ====================
         for(TimingEdge e : criticalPath.getEdgeList()){
-        	System.out.println(e.toString() + ", delay = " + e.delaysInfo() + ", " + e.getNet().toString());
+        	System.out.println(e.toString() + ", delay = " + e.delaysInfo() 
+        	+ ", srcReq = " + e.getSrc().getRequiredTime() + ", srcArr = " + e.getSrc().getArrivalTime());
         	/*for(SitePinInst spi : e.getNet().getPins()){
         		System.out.println(spi.toString());
         	}*/
