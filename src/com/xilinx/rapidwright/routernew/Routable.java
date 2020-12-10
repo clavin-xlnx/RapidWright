@@ -26,6 +26,7 @@ public interface Routable {
 	public int getOccupancy();
 	
 	public void updatePresentCongestionPenalty(float pres_fac);
+	public float getBase_cost();
 	public float getPres_cost();
 	public void setPres_cost(float pres_cost);
 	public float getAcc_cost();

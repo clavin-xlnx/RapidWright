@@ -363,5 +363,10 @@ public class RoutableNode implements Routable{
 	public short getYmin() {
 		return this.ylow;
 	}
+
+	@Override
+	public float getBase_cost() {
+		return this.base_cost;
+	}
 	
 }

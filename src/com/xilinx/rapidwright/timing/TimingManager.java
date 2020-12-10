@@ -86,7 +86,7 @@ public class TimingManager {
     			 for(Node node:c.nodes){
     				 netDelay +=  nodesDelays.get(node);
     			 }
-    			 c.setTimingEdgeRouteDelay(netDelay);
+    			 c.setTimingEdgeDelay(netDelay);
     		 }
     	 }
     }
@@ -96,9 +96,8 @@ public class TimingManager {
     	this.timingGraph.resetRequiredAndArrivalTime();
     	this.timingGraph.computeArrivalTimesTopologicalOrder();
     	Pair<Float, TimingVertex> maxs = this.timingGraph.getMaxDelay();
-    	
-    	this.timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());//setTimingRequirementTopologicalOrder(maxDelay);//.
-//    	this.timingGraph.computeSlacks();//if slackCon does not use sinkTimingVertex's slack, not necessary to compute?
+    	this.timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());
+//    	this.timingGraph.computeSlacks();//if slackCon does not use sinkTimingVertex's slack, not necessary to compute
     	//or could be used to report worst slack?
     	
     	return maxs;
@@ -132,7 +131,8 @@ public class TimingManager {
     	
     	System.out.println("Detail delays:");
     	for(TimingEdge e : criticalEdges){
-    		System.out.println(e.toString() + ", " + e.delaysInfo());
+    		System.out.println(e.toString() + ", " + e.delaysInfo() + ", eSrcReq = " + e.getSrc().getRequiredTime() + ", eSrcArr = " + e.getSrc().getArrivalTime()
+    				+ ", dstReq = " + e.getDst().getRequiredTime() + ", dstArr = " + e.getDst().getArrivalTime());
     		if(timingEdgeConnctionMap.containsKey(e)){
     			System.out.println(timingEdgeConnctionMap.get(e));
     			List<ImmutableTimingGroup> groups = timingEdgeConnctionMap.get(e).timingGroups;

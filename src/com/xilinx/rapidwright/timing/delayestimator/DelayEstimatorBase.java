@@ -837,6 +837,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         int size = (tg.direction() == T.Direction.HORIZONTAL) ? numCol : numRow;
         if (endLoc < 0 || endLoc >= size || begLoc < 0 || begLoc >= size)
             return -1.0;
+//        	return Double.MAX_VALUE/2;
 
         float k0 = K0.get(tg.direction()).get(tg.type());
         float k1 = K1.get(tg.direction()).get(tg.type());

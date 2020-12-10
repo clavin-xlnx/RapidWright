@@ -23,8 +23,6 @@ public class Connection{
     public final short boundingBox;
     private short x_min_b, x_max_b, y_min_b, y_max_b;
 	
-    public TimingVertex sourceTimingVertex;
-    public TimingVertex sinkTimingVertex;
     public List<TimingEdge> timingEdges;//FOR LUT_6_2_* SITEPININSTS
     public float criticality;
     
@@ -34,7 +32,7 @@ public class Connection{
 //	public List<Routable> pathFromSinkToSwitchBox;
 	
 	public List<Node> nodes;
-	public List<ImmutableTimingGroup> timingGroups;//TODO could be removed when not needing for debugging
+	public List<ImmutableTimingGroup> timingGroups;//TODO could be removed when not needed for debugging
 	
 	public void newNodes(){
 		this.nodes = new ArrayList<>();
@@ -156,29 +154,14 @@ public class Connection{
 	public Netplus getNet(){
 		return this.net;
 	}
-	
-	public TimingVertex getSourceTimingVertex() {
-		return sourceTimingVertex;
-	}
-
-	public void setSourceTimingVertex(TimingVertex sourceTimingVertex) {
-		this.sourceTimingVertex = sourceTimingVertex;
-	}
-
-	public TimingVertex getSinkTimingVertex() {
-		return sinkTimingVertex;
-	}
-
-	public void setSinkTimingVertex(TimingVertex sinkTimingVertex) {
-		this.sinkTimingVertex = sinkTimingVertex;
-	}
 
 	public List<TimingEdge> getTimingEdge() {
 		return timingEdges;
 	}
 	
 	public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
-		float slackCon = this.sinkTimingVertex.getRequiredTime() - this.sourceTimingVertex.getArrivalTime() - this.timingEdges.get(0).getDelay();
+		TimingVertex source = this.timingEdges.get(0).getSrc();
+		float slackCon = source.getRequiredTime() - source.getArrivalTime();
 		float tempCriticality  = (1 - slackCon / maxDelay);
     	tempCriticality = (float) (Math.pow(tempCriticality, criticalityExponent) * maxCriticality);
     	
@@ -211,15 +194,6 @@ public class Connection{
 		this.rnodes.clear();
 		this.timingGroups.clear();
 	}
-	
-	/*public void addPartialPath(Routable routable){
-		if(this.pathFromSinkToSwitchBox == null){
-			this.pathFromSinkToSwitchBox = new ArrayList<>();
-			this.pathFromSinkToSwitchBox.add(routable);
-		}else{
-			this.pathFromSinkToSwitchBox.add(routable);
-		}
-	}*/
 	
 	public Routable getSourceRNode() {
 		return sourceRNode;
@@ -254,24 +228,26 @@ public class Connection{
 	public String toString() {
 		
 		StringBuilder s = new StringBuilder();
-			
-//		String coordinate = "(" + this.source.getTile().getColumn() + "," + this.source.getTile().getRow() + ") to (" 
-//							+ this.sink.getTile().getColumn() + "," + this.sink.getTile().getRow() + ")";
-		String coordinate = "(" + this.x_min_b + ", " + this.y_min_b + ") to (" 
-				+ this.x_max_b + ", " + this.y_max_b + ")";
-		
 		s.append("Con ");
 		s.append(String.format("%6s", this.id));
 		s.append(", ");
-		s.append(String.format("%22s", coordinate));
+		s.append("bb = " + this.boundingBox);
 		s.append(", ");
 		s.append("net = " + this.net.getNet().getName());
 		s.append(", ");
 		s.append(String.format("net fanout = %3s", this.net.fanout));
+//		s.append(", ");
+//		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getConnectedNode().toString()));
+//		s.append(", ");
+//		s.append("sink = " + this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName());
 		s.append(", ");
-		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getConnectedNode().toString()));
+		s.append("sourceReq = " + this.timingEdges.get(0).getSrc().getRequiredTime());
 		s.append(", ");
-		s.append("sink = " + this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName());
+		s.append("sourceArr = " + this.timingEdges.get(0).getSrc().getArrivalTime());
+		s.append(", ");
+		s.append("sinkReq = " + this.timingEdges.get(0).getDst().getRequiredTime());
+		s.append(", ");
+		s.append("sinkArr = " + this.timingEdges.get(0).getDst().getArrivalTime());
 		s.append(", ");
 		s.append(String.format("criticality = %4.3f ", this.getCriticality()));
 		
@@ -372,10 +348,10 @@ public class Connection{
 	public void updateRouteDelay(){
 		float routeDelay = this.getRouteDelay();
 		
-		this.setTimingEdgeRouteDelay(routeDelay);
+		this.setTimingEdgeDelay(routeDelay);
 	}
 	
-	public void setTimingEdgeRouteDelay(float routeDelay){
+	public void setTimingEdgeDelay(float routeDelay){
 		for(TimingEdge e : this.timingEdges){
 			e.setRouteDelay(routeDelay);
 		}

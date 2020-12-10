@@ -136,7 +136,7 @@ public class TimingVertex {
     	if(this.requiredTime == null){
     		this.requiredTime = requiredTime;
     	}else{
-    		if(this.requiredTime < requiredTime){
+    		if(this.requiredTime > requiredTime){
     			this.requiredTime = requiredTime;
     		}
     	}

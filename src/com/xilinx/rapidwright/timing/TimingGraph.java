@@ -90,7 +90,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     static HashSet<String> unisimFlipFlopTypes;
     
     //========================= for router =================================================
-    Map<SitePinInst, TimingVertex> spiAndTimingVertices = new HashMap<>();
     Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> spiPairsAndTimingEdges = new HashMap<>();
 //    Map<TimingVertex, SitePinInst> timingVertexSitePinInsts = new HashMap<>();
     //========================= for router =================================================
@@ -341,17 +340,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     	return this.spiPairsAndTimingEdges;
     }
     
-    public Map<SitePinInst, TimingVertex> getSpiAndTimingVertex(){
-    	return this.spiAndTimingVertices;
-    }
-    
-    /*public Map<TimingVertex, SitePinInst> getTimingVertexandSpiMap(){
-    	for(SitePinInst spi : this.spiAndTimingVertices.keySet()){
-    		this.timingVertexSitePinInsts.putIfAbsent(this.spiAndTimingVertices.get(spi), spi);
-    	}
-    	return this.timingVertexSitePinInsts;
-    }*/
-    
   //get delay from a given path, return null if path not found in the graph
     public float getDelayOfPath(String s, RoutableTimingGroupRouter router){
     	float delay = -1;
@@ -418,10 +406,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         int sz = edgeList.size();
         for(int i=sz-1; i>=0; i-- ) {
             TimingEdge e = edgeList.get(i);
-            e.getDst().setRequiredTime(remainingRequiredTime);
+            e.getDst().setMinRequiredTime(remainingRequiredTime);
             remainingRequiredTime = remainingRequiredTime - e.getDelay();
             if (inDegreeOf(e.getSrc()) ==0) {
-                e.getSrc().setRequiredTime(remainingRequiredTime);
+                e.getSrc().setMinRequiredTime(remainingRequiredTime);
             }
         }
     }
@@ -769,7 +757,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 arrival += e.getDelay();
                 e.getDst().setMaxArrivalTime(arrival);//TODO should have a check on arrival time to set the max one
                 if (inDegreeOf(e.getSrc())==0) {
-                    e.getSrc().setArrivalTime(0);
+                    e.getSrc().setMaxArrivalTime(0);
                 }
             }
         }
@@ -1526,9 +1514,6 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 	this.spiPairsAndTimingEdges.put(spiPair, connectionEdges);
             	}
             }
-            
-            this.spiAndTimingVertices.putIfAbsent(local_spi_source, vS);
-            this.spiAndTimingVertices.putIfAbsent(spi_sink, vD);// multiple vD could be mapped to same spi_sink, but does not matter
             //====================================== for the router ========================================================
         }
         return 1;

@@ -31,7 +31,7 @@ public class RoutableTimingGroup implements Routable{
 	public short xlow, xhigh;
 	public short ylow, yhigh;
 	
-	public float base_cost;
+	private float base_cost;
 	public float delay;
 	
 	public final RoutableData rnodeData;//data for the siblings, that is for the exit nodes
@@ -122,9 +122,9 @@ public class RoutableTimingGroup implements Routable{
 					short delay = estimator.getDelayOf(thruImmuTg);
 					if(delay == -3)
 						System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-					if(delay <= 0){
+					if(delay < 0 || delay > 16380){
 						System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-						delay = 0;
+						delay = Short.MAX_VALUE/2;
 					}
 					childRNode.setDelay(delay);//TODO check //moved to delay of Siblings 
 					thruImmuTg.setDelay(delay);
@@ -145,9 +145,9 @@ public class RoutableTimingGroup implements Routable{
 					short delay = estimator.getDelayOf(thruImmuTg);
 					if(delay == -3)
 						System.out.println("  parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-					if(delay <= 0){
+					if(delay < 0 || delay > 16380){
 						System.out.println("delay = " + delay + ", " + thruImmuTg.toString() + ", parent exit node: " + this.sibTimingGroups.getExitNode().toString());
-						delay = 0;
+						delay = Short.MAX_VALUE/2;
 					}
 					childRNode.setDelay(delay);
 					thruImmuTg.setDelay(delay);
@@ -513,5 +513,10 @@ public class RoutableTimingGroup implements Routable{
 	@Override
 	public short getYmin() {
 		return this.ylow;
+	}
+
+	@Override
+	public float getBase_cost() {
+		return this.base_cost;
 	}	
 }
