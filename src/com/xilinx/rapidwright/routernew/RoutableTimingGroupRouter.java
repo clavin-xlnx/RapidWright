@@ -454,23 +454,20 @@ public class RoutableTimingGroupRouter{
 			this.tracingSetChildren(source);
 			for(Connection con : np.getConnection()) {
 				ImmutableTimingGroup sinkTG = ((RoutableTimingGroup) con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[1];
-//				System.out.println(con.toString());
+
 				short estConDelay = Short.MAX_VALUE;
 				for(Pair<RoutableTimingGroup, ImmutableTimingGroup> child : source.childrenImmuTG) {
 					try{
 						short tmpConDelay = this.estimator.getMinDelayToSinkPin(child.getSecond(), sinkTG);
 						tmpConDelay += child.getSecond().getDelay();
-//						System.out.println("   from " + child.getSecond() + " \n   to   " + sinkTG);
-//						System.out.println("     estDelay = " + tmpConDelay);
 						if(tmpConDelay < estConDelay) {
 							estConDelay = tmpConDelay;
 						}
-					}catch(NullPointerException e) {
-						System.out.println("   NPE from " + child.getSecond() + " \n   to   " + sinkTG);
+					}catch(Exception e) {
+						System.out.println("   from " + child.getSecond() + " \n   to   " + sinkTG);
 					}
 				}
 				estConDelay += source.getDelay();
-//				System.out.println("minEstDelay = " + estConDelay + "\n");
 				con.setTimingEdgeDelay(estConDelay);
 			}
 		}
@@ -481,6 +478,8 @@ public class RoutableTimingGroupRouter{
 		this.estimateDelayOfConnections();
 		this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
 		this.timingManager.calculateCriticality(this.connections, MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
+		
+		this.timingManager.getCriticalPathInfo(this);
 		
 		System.out.println(String.format("pre-routing max delay using estimation: %3.2f", maxDelayAndTimingVertex.getFirst()));
 		this.route();
@@ -551,6 +550,10 @@ public class RoutableTimingGroupRouter{
 		this.sortedListOfNetplus.addAll(this.nets);
 		Collections.sort(this.sortedListOfNetplus, Comparators.FanoutNet);
 		
+//		for(Connection c : this.sortedListOfConnection) {
+//			System.out.println(c);
+//		}
+		
 		//initialize router
 		this.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
 		//do routing
@@ -567,7 +570,7 @@ public class RoutableTimingGroupRouter{
         		trialCons.add(c);
         	}
         }
-        Collections.sort(trialCons, Comparators.FanoutBBConnection);
+        
         // this is to specify certain connections to be routed in trial mode
         /*for(Connection con : this.sortedListOfConnection){
         	if(con.id == 1216){
@@ -641,7 +644,7 @@ public class RoutableTimingGroupRouter{
 							MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
 //					this.timingManager.getCriticalPathInfo(this);
 				}
-//				this.timingGraph.getDelayOfPath("{{FD_fk/Q LUT6_117/O LUT4_8f/O LUT6_126/O LUT4_92/O FD_pg/D}}", this);
+				this.timingGraph.getDelayOfPath("{{FD_plf/Q LUT6_0/O LUT6_6f/O LUT6_7f/O LUT6_81/O LUT5_3b/O FD_ad/D}}", this);
 			}
 			
 			this.iterationEnd = System.nanoTime();
@@ -1351,6 +1354,8 @@ public class RoutableTimingGroupRouter{
 	public void exploringAndExpansion(RoutableTimingGroup rnode, Connection con){
 		this.nodesPopedFromQueue++;
 		
+		
+		
 		for(Pair<RoutableTimingGroup, ImmutableTimingGroup> childRNode : rnode.childrenImmuTG){
 			RoutableTimingGroup child = childRNode.getFirst();
 			ImmutableTimingGroup thruImmu = childRNode.getSecond();
@@ -1405,7 +1410,8 @@ public class RoutableTimingGroupRouter{
 		}else{
 //			System.out.println(thruImmuTg.toString() + ", \t\t delay = " + thruImmuTg.getDelay());
 			new_partial_path_cost = partial_path_cost + (1 - con.getCriticality()) * rnodeCost +  con.criticality * childRNode.getDelay()/20f;//upstream path cost + cost of node under consideration
-			//+ this.hopWeight * childLevel
+//			System.out.println("\tPARTIAL PATH COST = " + partial_path_cost + ", \t rnodeBaseCost = " + childRNode.getBase_cost() + ", \t rnodeCost = " + rnodeCost + ", \t delay = " + rnode.getDelay() + ", \t conCriti = " + con.getCriticality());
+			
 		}
 		float new_lower_bound_total_path_cost;
 		float expected_distance_cost = 0;
@@ -1448,8 +1454,10 @@ public class RoutableTimingGroupRouter{
 						e.printStackTrace();
 					}
 //				}
-//				if(debugTiming) System.out.println(" delay = " + delay);
+				
 				new_lower_bound_total_path_cost = (float) (new_partial_path_cost + (1 - con.getCriticality()) * this.mdWeight * expected_wire_cost + this.hopWeight * con.getCriticality() * delay/20f);//TODO sharing factor for delay?
+//				System.out.println("\t discost = " + expected_distance_cost + ", \t timigCost = " + delay + 
+//						", \t IPIN = " + 0);
 			}
 			
 		}else{//lut input pin (sink)
@@ -1615,6 +1623,7 @@ public class RoutableTimingGroupRouter{
 	
 	public void getNodeGroupTypeAndDelayMap(){
 		Map<GroupDelayType, CountingSet<Float>> typeDelays = new HashMap<>();
+		
 		for(RoutableTimingGroup rtg:this.rnodesCreated.values()){
 			GroupDelayType type = rtg.getSiblingsTimingGroup().type();
 			float delay = rtg.getDelay();
