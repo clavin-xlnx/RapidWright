@@ -160,8 +160,13 @@ public class Connection{
 	}
 	
 	public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent){
-		TimingVertex source = this.timingEdges.get(0).getSrc();
-		float slackCon = source.getRequiredTime() - source.getArrivalTime();
+		float slackCon = Float.MAX_VALUE;
+		for(TimingEdge e : this.timingEdges) {
+			float tmpslackCon = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
+			if(tmpslackCon < slackCon)
+				slackCon = tmpslackCon;
+		}
+		
 		float tempCriticality  = (1 - slackCon / maxDelay);
     	tempCriticality = (float) (Math.pow(tempCriticality, criticalityExponent) * maxCriticality);
     	
@@ -236,18 +241,20 @@ public class Connection{
 		s.append("net = " + this.net.getNet().getName());
 		s.append(", ");
 		s.append(String.format("net fanout = %3s", this.net.fanout));
+		s.append(", ");
+		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getConnectedNode().toString()));
+		s.append(", ");
+		s.append("sink = " + this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName());
 //		s.append(", ");
-//		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getConnectedNode().toString()));
+//		s.append("sourceReq = " + this.timingEdges.get(0).getSrc().getRequiredTime());
 //		s.append(", ");
-//		s.append("sink = " + this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName());
+//		s.append("sourceArr = " + this.timingEdges.get(0).getSrc().getArrivalTime());
+//		s.append(", ");
+//		s.append("sinkReq = " + this.timingEdges.get(0).getDst().getRequiredTime());
+//		s.append(", ");
+//		s.append("sinkArr = " + this.timingEdges.get(0).getDst().getArrivalTime());
 		s.append(", ");
-		s.append("sourceReq = " + this.timingEdges.get(0).getSrc().getRequiredTime());
-		s.append(", ");
-		s.append("sourceArr = " + this.timingEdges.get(0).getSrc().getArrivalTime());
-		s.append(", ");
-		s.append("sinkReq = " + this.timingEdges.get(0).getDst().getRequiredTime());
-		s.append(", ");
-		s.append("sinkArr = " + this.timingEdges.get(0).getDst().getArrivalTime());
+		s.append(String.format("delay = %4.1f ", this.timingEdges.get(0).getDelay()));
 		s.append(", ");
 		s.append(String.format("criticality = %4.3f ", this.getCriticality()));
 		
