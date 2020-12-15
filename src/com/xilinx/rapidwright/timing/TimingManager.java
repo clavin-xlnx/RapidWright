@@ -130,9 +130,29 @@ public class TimingManager {
     	Map<TimingEdge, Connection> timingEdgeConnctionMap = router.timingEdgeConnectionMap;
     	
     	System.out.println("Detail delays:");
+    	System.out.printf("------------------  -------------------  ----------  ---------------  --------  ---------- ---------------\n");
+    	System.out.printf("%18s  %19s  %10s  %14s  %8s  %10s  %15s\n", 
+        		"First TimingVertex", 
+        		"Second TimingVertex", 
+        		"Logic (ps)", 
+        		"Intrasite (ps)", 
+        		"Net (ps)",
+        		"Total (ps)",
+        		"Net name"
+        		);     
     	for(TimingEdge e : criticalEdges){
-    		System.out.println(e.toString() + ", " + e.delaysInfo() + ", eSrcReq = " + e.getSrc().getRequiredTime() + ", eSrcArr = " + e.getSrc().getArrivalTime()
-    				+ ", dstReq = " + e.getDst().getRequiredTime() + ", dstArr = " + e.getDst().getArrivalTime());
+    		System.out.printf("%18s  %19s  %10.1f  %14.1f  %8.1f  %10.1f  %15s\n", 
+    				e.getSrc(),
+    				e.getDst(),
+    				e.getLogicDelay(),
+    				e.getIntraSiteDelay(),
+    				e.getNetDelay(),
+    				e.getDelay(),
+    				e.getNet() == null? "null" : e.getNet().getName());
+    	}
+    	System.out.printf("------------------  -------------------  ----------  ---------------  --------  ---------- ---------------\n");
+    	
+    	for(TimingEdge e : criticalEdges) {
     		if(timingEdgeConnctionMap.containsKey(e)){
     			System.out.println(timingEdgeConnctionMap.get(e));
     			List<ImmutableTimingGroup> groups = timingEdgeConnctionMap.get(e).timingGroups;
@@ -140,6 +160,7 @@ public class TimingManager {
     				System.out.println("\t " + groups.get(iGroup));
     			}
     		}
+    		System.out.println();
     	}
     	
     }
