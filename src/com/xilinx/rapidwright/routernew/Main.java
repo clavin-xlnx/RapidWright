@@ -19,19 +19,19 @@ public class Main {
 	private CodePerfTracker t;
 	
 	private boolean routerNew = true;
-	private RoutingGranularityOpt opt = RoutingGranularityOpt.NODE;
+	private RoutingGranularityOpt opt = RoutingGranularityOpt.TIMINGGROUP;
 	
 	//allowed number of routing iterations
 	private int nrOfTrials = 60;
 	private int bbRange = 5;
 	private boolean isINTtileRange = false;//TODO
-	private float mdWeight = 1.5f;
-	private float hopWeight = 0.5f;
+	private float mdWeight = 2.5f;
+	private float hopWeight = 0.7f;
 	private float initial_pres_fac = 0.5f; 
 	private float pres_fac_mult = 2f; 
 	private float acc_fac = 1;
 	private float base_cost_fac = 1;
-	private boolean timingDriven = false;
+	private boolean timingDriven = true;
 	private boolean partialRouting = false;
 	private boolean virtualModeAvailable = false;
 	private boolean hpcRun = false;
