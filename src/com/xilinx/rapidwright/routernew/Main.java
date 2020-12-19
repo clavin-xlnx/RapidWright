@@ -83,11 +83,7 @@ public class Main {
 				this.acc_fac = Float.parseFloat(arguments[++i]);
 				
 			}else if(arguments[i].contains("base_cost_fac")){
-//				if(this.opt == RoutingGranularityOpt.WIRE){
-//					this.base_cost_fac = 1;
-//				}else {
-					this.base_cost_fac = Float.parseFloat(arguments[++i]);
-//				}
+				this.base_cost_fac = Float.parseFloat(arguments[++i]);
 				
 			}else if(arguments[i].contains("timingDriven")){
 				this.timingDriven = true;
@@ -156,7 +152,7 @@ public class Main {
 				this.rnodesInfo(router.manhattanD,
 						router.hops,
 						router.firstIterRNodes,
-						router.rrgNodeId,
+						router.rnodeId,
 						router.usedRNodes.size(),
 						router.checkAverageNumWires(),
 						1, 0, 0,
