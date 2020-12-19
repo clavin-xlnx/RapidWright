@@ -57,9 +57,6 @@ public class GraphHelper{
 			}
 		}
 		
-//		for(NodeWithCriticality n:this.vertices){
-//			System.out.println(this.nodeEdges.get(n));
-//		}
 	}
 	
 	public void addVertices(NodeWithCriticality nc){
