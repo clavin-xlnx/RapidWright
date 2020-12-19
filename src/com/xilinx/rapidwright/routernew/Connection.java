@@ -254,7 +254,7 @@ public class Connection{
 //		s.append(", ");
 //		s.append("sinkArr = " + this.timingEdges.get(0).getDst().getArrivalTime());
 		s.append(", ");
-		s.append(String.format("delay = %4.1f ", this.timingEdges.get(0).getDelay()));
+		s.append(String.format("delay = %4.1f ", this.timingEdges == null? 0:this.timingEdges.get(0).getDelay()));
 		s.append(", ");
 		s.append(String.format("criticality = %4.3f ", this.getCriticality()));
 		
