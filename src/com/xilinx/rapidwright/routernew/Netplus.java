@@ -15,7 +15,7 @@ public class Netplus{
 	private List<Connection> connections;
 	public Net net;
 	private int id;
-	public short x_min_b, x_max_b;//short better
+	public short x_min_b, x_max_b;
 	public short y_min_b, y_max_b;
 	public float x_geo, y_geo;
 	public short hpwl;
@@ -37,7 +37,7 @@ public class Netplus{
 		short x_geo_sum = 0;
 		short y_geo_sum = 0;
 		
-		short numPins = (short) (this.net.getPins().size()); //changed from getFanout()+1 to getPins().size()
+		short numPins = (short) (this.net.getPins().size());//non-zero pin size should be guaranteed
 		
 		short[] xArray = new short[numPins];
 		short[] yArray = new short[numPins];
