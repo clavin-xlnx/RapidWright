@@ -205,10 +205,23 @@ public class RoutableTimingGroup implements Routable{
 			base_cost = 1f;
 			
 		}else if(this.type == RoutableType.INTERRR){
-			//aver cost around 4 when using deltaX + deltaY +1 
-			//(most (deltaX + deltaY +1 ) values range from 1 to 90+, maximum can be 176)
-			//(deltaX + deltaY +1 ) normalized to the maximum , does not work
+			
 			base_cost = 1f;
+//			base_cost = 0.333f * (this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
+			
+//			GroupDelayType type = this.sibTimingGroups.type();
+//			switch(type) {
+//			case SINGLE:
+//				base_cost = 0.33f;
+//			case DOUBLE:
+//				base_cost = 0.33f * 2;
+//			case QUAD:
+//				base_cost = 0.33f * 4;
+//			case LONG:
+//				base_cost = 0.33f * 12;
+//			default:
+//				base_cost = 0.333f;
+//			}
 			
 		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
 			base_cost = 0.95f;//virtually the same to the logic block input pin, since no alternative ipins are considered
