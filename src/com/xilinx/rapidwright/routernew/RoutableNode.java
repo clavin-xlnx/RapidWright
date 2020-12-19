@@ -31,20 +31,6 @@ public class RoutableNode implements Routable{
 	public List<RoutableNode> children;
 	public boolean childrenSet;
 	
-	/*
-	 * This constructor does not check site pin conflicts
-	 * If nets have input SitePinInst conflicts,"target unreachable" problem will occur during routing
-	 */
-	/*public RoutableNode(int index, SitePinInst sitePinInst, RoutableType type){
-		this.index = index;
-		this.type = type;
-		this.node = sitePinInst.getConnectedNode();
-		this.rnodeData = new RoutableData(this.index);
-		this.childrenSet = false;
-		this.target = false;
-		this.setXY();
-	}*/
-	
 	public RoutableNode(int index, Node node, RoutableType type){
 		this.index = index;
 		this.type = type;
@@ -142,9 +128,6 @@ public class RoutableNode implements Routable{
 			base_cost = 1;
 			
 		}else if(this.type == RoutableType.INTERRR){
-			//aver cost around 4 when using deltaX + deltaY +1 
-			//(most (deltaX + deltaY +1 ) values range from 1 to 90+, maximum can be 176)
-			//(deltaX + deltaY +1 ) normalized to the maximum , does not work
 			base_cost = 1;
 			
 		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
@@ -277,7 +260,6 @@ public class RoutableNode implements Routable{
 
 	
 	public boolean isInBoundingBoxLimit(Connection con) {		
-//		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
 		return this.xlow > con.net.x_min_b && this.xhigh < con.net.x_max_b && this.ylow > con.net.y_min_b && this.yhigh < con.net.y_max_b;
 	}
 	
