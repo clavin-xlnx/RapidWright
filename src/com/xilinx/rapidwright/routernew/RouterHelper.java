@@ -22,11 +22,11 @@ public class RouterHelper {
 		return n.getSource() != null && n.getSinkPins().size() > 0;
 	}
 	
-	public static boolean isOneTypePinNet(Net n){
+	public static boolean isNetWithNoLoads(Net n){
 		return (n.getSource() != null && n.getSinkPins().size() == 0) || (n.getSource() == null && n.getSinkPins().size() > 0);
 	}
 	
-	public static boolean isNoPinNets(Net n){
+	public static boolean isInternallyRoutedNets(Net n){
 		return n.getPins().size() == 0;
 	}
 	
