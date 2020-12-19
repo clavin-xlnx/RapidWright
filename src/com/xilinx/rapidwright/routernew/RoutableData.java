@@ -17,8 +17,8 @@ public class RoutableData {
 	
 	private int level;
 	
-	public CountingSet<SitePinInst> sourcesSet;
-	public CountingSet<Routable> parentsSet;//the drivers of the route node
+	public CountingSet<SitePinInst> sourcesSet;//the sources of nets occupying the resource
+	public CountingSet<Routable> parentsSet;//the drivers of the resource
 	
 	public RoutableData(int index) {
     	this.index = index;
