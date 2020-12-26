@@ -18,8 +18,6 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -232,17 +230,17 @@ public class RoutableTimingGroupRouter{
 				
 			}else if (n.getType().equals(NetType.WIRE)){
 				this.inetToBeRouted++;
-				if(RouterHelper.isRegularNetToBeRouted(n)){
+				if(RouterHelper.isRoutableNetWithSourceSinks(n)){
 					if(!timingDriven) 
 						this.initializeNetAndCons(n, bbRange);
 					else 
 						this.initializeNetAndCons(n, bbRange, this.timingDriven);
 					
-				}else if(RouterHelper.isOneTypePinNet(n)){
+				}else if(RouterHelper.isDriverLessOrLoadLessNet(n)){
 					this.reserveNet(n);
 					this.iWireOneTypePin++;
 					
-				} else if(RouterHelper.isNoPinNets(n)){
+				} else if(RouterHelper.isInternallyRoutedNets(n)){
 					this.iWirePinsUnknown++;		
 				}
 			}else{
@@ -485,21 +483,11 @@ public class RoutableTimingGroupRouter{
 		this.route();
 		long end = System.nanoTime();
 		int timeInMilliseconds = (int)Math.round((end-start) * Math.pow(10, -6));
-//		this.printTotalUsedNodes();
 		this.getTotalNodesInResourceGraph();
 		this.getNodeGroupTypeAndDelayMap();
 //		this.entryNodesSharing();//4.8
 		System.out.println();
 		return timeInMilliseconds;
-	}
-	
-	public void entryNodesSharing(){
-		float sum = 0;
-		for(NodeWithFaninInfo n:RoutableTimingGroup.entryNodesExpanded){
-//			sum += n.entryHolders.size();
-		}
-		System.out.println("all entry nodes in cost map: " + RoutableTimingGroup.entryNodesExpanded.size());
-		System.out.println("average shaing for used entry nodes: " + sum/RoutableTimingGroup.entryNodesExpanded.size());
 	}
 	
 	private void setRerouteCriticality(List<Connection> connections) {
@@ -521,17 +509,6 @@ public class RoutableTimingGroupRouter{
     	}
     }
 	
-	public void settingEstimatedRouteDelay() {
-		for(Connection c:this.sortedListOfConnection) {
-			RoutableTimingGroup source = (RoutableTimingGroup)c.getSourceRNode();
-			RoutableTimingGroup sink = (RoutableTimingGroup)c.getSinkRNode();
-			System.out.println(source);
-			//TODO getting min delay from source to sink is not supported
-			short delay = this.estimator.getMinDelayToSinkPin(source.getSiblingsTimingGroup().getSiblings()[0], 
-					sink.getSiblingsTimingGroup().getSiblings()[0]);
-			c.setTimingEdgeDelay(delay);
-		}
-	}
 	public void tracingSetChildren(RoutableTimingGroup rtg) {
 		if(!rtg.childrenSet) {
 			Pair<Integer, Long> countPair = rtg.setChildren(this.rrgNodeId, this.base_cost_fac, this.rnodesCreated, 
@@ -549,10 +526,6 @@ public class RoutableTimingGroupRouter{
 		this.sortedListOfNetplus = new ArrayList<>();
 		this.sortedListOfNetplus.addAll(this.nets);
 		Collections.sort(this.sortedListOfNetplus, Comparators.FanoutNet);
-		
-//		for(Connection c : this.sortedListOfConnection) {
-//			System.out.println(c);
-//		}
 		
 		//initialize router
 		this.initializeRouter(this.initial_pres_fac, this.pres_fac_mult, this.acc_fac);
@@ -644,7 +617,7 @@ public class RoutableTimingGroupRouter{
 							MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
 //					this.timingManager.getCriticalPathInfo(this);
 				}
-				this.timingGraph.getDelayOfPath("{{FD_plf/Q LUT6_0/O LUT6_6f/O LUT6_7f/O LUT6_81/O LUT5_3b/O FD_ad/D}}", this);
+//				this.timingGraph.getDelayOfPath("{{FD_ihp/Q LUT6_0/O LUT6_6f/O LUT4_38/O LUT5_3b/O FD_ad/D}}", this);
 			}
 			
 			this.iterationEnd = System.nanoTime();
@@ -698,16 +671,6 @@ public class RoutableTimingGroupRouter{
 		}
 	}
 	
-	public void printTotalUsedNodes(){
-		Set<Node> usedNodes = new HashSet<>();
-		for(Connection c:this.sortedListOfConnection){
-			for(Node n:c.nodes){
-				usedNodes.add(n);
-			}
-		}
-		System.out.println("Total used Nodes: " + usedNodes.size());
-	}
-	
 	public void routingAndTimer(Connection con){
 		if(this.itry == 1){
 			this.routerTimer.firstIteration.start();
@@ -719,7 +682,8 @@ public class RoutableTimingGroupRouter{
 			this.routeACon(con);
 			this.routerTimer.rerouteCongestion.finish();
 			
-		}else if (con.getCriticality() > REROUTE_CRITICALITY) {
+		}
+		else if (con.getCriticality() > REROUTE_CRITICALITY) {
 			this.routerTimer.rerouteCongestion.start();
 			this.routeACon(con);
 			this.routerTimer.rerouteCongestion.finish();
@@ -727,7 +691,6 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public boolean conEntryNodeCongested(Connection con){
-//		this.routerTimer.checkOnEntryNodeCongestion.start();//0.02s first of 487
 		boolean congested = false;
 		for(NodeWithFaninInfo n : this.connectionEntryNodes.get(con)){
 			if(n != null){
@@ -736,7 +699,6 @@ public class RoutableTimingGroupRouter{
 				}
 			}
 		}
-//		this.routerTimer.checkOnEntryNodeCongestion.finish();
 		return congested;
 	}
 	
@@ -750,14 +712,12 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public boolean validEntryNodesRouting(){
-//		this.routerTimer.checkIfEntryNodesRoutingValid.start();//0.03s first of 487
 		boolean validEntryNodeRouting = true;
 		for(NodeWithFaninInfo n : RoutableTimingGroup.entryNodesExpanded){
 			if(n != null && n.isOverUsed()){
 				validEntryNodeRouting = false;
 			}
 		}
-//		this.routerTimer.checkIfEntryNodesRoutingValid.finish();
 		return validEntryNodeRouting;
 	}
 	
@@ -954,29 +914,6 @@ public class RoutableTimingGroupRouter{
 		}
 	}
 	
-	public Map<Node, Float> getNodesCriticalities(Netplus n){
-		Map<Node, Float> nodeCriticalities = new HashMap<>();
-		for(Connection c:n.getConnection()){
-			for(ImmutableTimingGroup group : c.timingGroups){
-				Node entry = group.entryNode();
-				Node exit = group.exitNode();
-				if(entry != null){
-					if(!nodeCriticalities.containsKey(entry)){
-						nodeCriticalities.put(entry, c.getCriticality());
-					}else if(nodeCriticalities.get(entry) < c.getCriticality()){
-						nodeCriticalities.put(entry, c.getCriticality());
-					}
-				}
-				if(!nodeCriticalities.containsKey(exit)){
-					nodeCriticalities.put(exit, c.getCriticality());
-				}else if(nodeCriticalities.get(exit) < c.getCriticality()){
-					nodeCriticalities.put(exit, c.getCriticality());
-				}	
-			}
-		}
-		return nodeCriticalities;
-	}
-	
 	public boolean illegalConOnEntryNode(Connection con){
 		boolean illegal = false;
 		for(NodeWithFaninInfo entry:this.connectionEntryNodes.get(con)){
@@ -985,29 +922,6 @@ public class RoutableTimingGroupRouter{
 			}
 		}
 		return illegal;
-	}
-	
-	public Node getIllegalEntryNode(Netplus illegalTree){
-		for(Connection con:illegalTree.getConnection()){
-			for(NodeWithFaninInfo entry:this.connectionEntryNodes.get(con)){
-				if(entry != null && entry.hasMultiFanin()){
-					return entry;
-				}
-			}
-		}
-		return null;
-	}
-	
-	public Set<Connection> getIllegalCons(Netplus illegalTree, Node illegalNode){
-		Set<Connection> illegalCons = new HashSet<>();
-		for(Connection con : illegalTree.getConnection()) {
-			for(Node node : this.connectionEntryNodes.get(con)) {
-				if(node!= null && node.equals(illegalNode)) {
-					illegalCons.add(con);					
-				}
-			}
-		}
-		return illegalCons;
 	}
 	
 	public void ripup(Connection con){
@@ -1286,12 +1200,8 @@ public class RoutableTimingGroupRouter{
 			RoutableTimingGroup rnode = (RoutableTimingGroup) queue.poll().rnode;
 			
 			this.routerTimer.rnodesCreation.start();
-//			if(this.debugRoutingCon)System.out.println(rnode.toString() + " 's setChildren: ");
 			this.tracingSetChildren(rnode);
 			this.routerTimer.rnodesCreation.finish();
-			
-//			this.routerTimer.rnodesDummy.start();
-//			this.routerTimer.rnodesDummy.finish();
 			
 			this.exploringAndExpansion(rnode, con);
 		}
@@ -1308,7 +1218,6 @@ public class RoutableTimingGroupRouter{
 	
 	public void printConRNodes(Connection con){
 		this.printInfo(con.toString());
-//		printConEntryNodes(con);
 		for(int i = con.timingGroups.size() - 1; i >= 0; i--) {
 			this.printInfo(con.timingGroups.get(i).toString());
 		}
@@ -1353,8 +1262,6 @@ public class RoutableTimingGroupRouter{
 	
 	public void exploringAndExpansion(RoutableTimingGroup rnode, Connection con){
 		this.nodesPopedFromQueue++;
-		
-		
 		
 		for(Pair<RoutableTimingGroup, ImmutableTimingGroup> childRNode : rnode.childrenImmuTG){
 			RoutableTimingGroup child = childRNode.getFirst();
@@ -1499,6 +1406,7 @@ public class RoutableTimingGroupRouter{
 	private float getRouteNodeCost(RoutableTimingGroup rnode, ImmutableTimingGroup thruImmuTg, Connection con, int countSourceUses) {
 		//Present congestion cost
 		float pres_cost = this.getPresentCongestionCost(countSourceUses, rnode.getOccupancy(), rnode.getPres_cost());
+														// rnode.countSourceUses(con.source)
 		float acc_cost = rnode.getAcc_cost();
 		//Bias cost
 		float bias_cost = 0;
@@ -1508,12 +1416,12 @@ public class RoutableTimingGroupRouter{
 					(Math.abs(rnode.getCenterX() - net.x_geo) + Math.abs(rnode.getCenterY() - net.y_geo)) / net.hpwl;
 		}
 		
-		//add entry node cost to the Siblings
+		//add entry node congestion penalty to the Siblings
 		NodeWithFaninInfo entry = thruImmuTg.entryNode();	
 		if(entry != null){
 			pres_cost += this.getPresentCongestionCost(entry.countSourceUses(con.source), entry.getOcc(), entry.getPresCost());	
-			acc_cost += entry.getAccCost();	
-		}	
+			acc_cost += entry.getAccCost();
+		}
 		return rnode.getBase_cost() * acc_cost * pres_cost / (1 + countSourceUses) + bias_cost;
 	}
 	
@@ -1522,14 +1430,9 @@ public class RoutableTimingGroupRouter{
 		//Present congestion cost
 		float pres_cost;
 		
-		if(containsSource) {
-			int overoccupancy = 0;
-			overoccupancy = occupancy - Routable.capacity;
-			if(overoccupancy < 0) {
-				pres_cost = 1;
-			}else{
-				pres_cost = 1 + overoccupancy * this.pres_fac;
-			}
+		if(containsSource) {//the "node" is used by other connection(s) from the same net
+			int overoccupancy = occupancy - Routable.capacity;
+			pres_cost = 1 + overoccupancy * this.pres_fac;//making it less expensive in congestion cost for the current connection
 		}else{
 			pres_cost = nodePresCost;
 		}
