@@ -90,6 +90,10 @@ public class ImmutableTimingGroup {
     	return this.groupDelay;
     }
     
+    public short get_d() {
+    	return this.d;
+    }
+    
     @Override
     public String toString(){
     	String s = "Nodes = ( ";
@@ -186,14 +190,14 @@ public class ImmutableTimingGroup {
         return new Pair(groupDelayType,groupWireDir);
     }
     
+    // added by Yun
     private short d;
-    private TimingModel timingModel;
     /**
      * Computes the D (distance) term used by the TimingModel calculation.
      * @param n Given Node to use when checking the wire names.
      * @return The D term used by the TimingModel delay calculation.
      */
-    short computeD(Node n) {
+    short computeD(Node n, TimingModel timingModel) {
         int result = 0;
         int minRow = 1<<20;
         int maxRow = 0;
