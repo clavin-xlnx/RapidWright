@@ -18,6 +18,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -26,13 +27,13 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
-import com.xilinx.rapidwright.device.e;
+import com.xilinx.rapidwright.placer.blockplacer.Point;
+import com.xilinx.rapidwright.placer.blockplacer.SmallestEnclosingCircle;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-
 import com.xilinx.rapidwright.util.Pair;
-
 import com.xilinx.rapidwright.router.RouteNode;
 import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 
 public class RoutableNodeRouter{
 	public Design design;
@@ -49,6 +50,7 @@ public class RoutableNodeRouter{
 	public int numReservedRoutableNets;
 	public int numClockNets;
 	public int numNotNeedingRoutingNets;
+	public int numDriverLessAndLoadLessNets;
 	public int numUnrecognizedNets;
 	public int numRoutbleNets;
 	
@@ -62,6 +64,7 @@ public class RoutableNodeRouter{
 	
 	public List<Connection> sortedListOfConnection;
 	public List<Netplus> sortedListOfNetplus;
+	List<Net> clkNets = new ArrayList<>();
 	
 	public RouteThruHelper routethruHelper;
 	
@@ -181,6 +184,7 @@ public class RoutableNodeRouter{
 		this.numNotNeedingRoutingNets = 0;
 		this.numUnrecognizedNets = 0;
 		this.numRoutbleNets = 0;
+		this.numDriverLessAndLoadLessNets = 0;
 		
 		this.toBeRoutedNets = new ArrayList<>();
 		this.nets = new ArrayList<>();
@@ -190,7 +194,9 @@ public class RoutableNodeRouter{
 		for(Net n:this.design.getNets()){
 			
 			if(n.isClockNet()){
-				this.reserveNet(n);
+				this.reserveNet(n);//TODO remove
+				clkNets.add(n);
+//				this.routeGlobalClkNet();
 				this.numClockNets++;
 				this.numRoutbleNets++;
 				
@@ -198,10 +204,10 @@ public class RoutableNodeRouter{
 				this.initializeNetWithRoutingOption(n, this.partialRouting, bbRange);
 				
 			}else if (n.getType().equals(NetType.WIRE)){
-				if(RouterHelper.isRegularNetToBeRouted(n)){
+				if(RouterHelper.isRoutableNetWithSourceSinks(n)){
 					this.initializeNetWithRoutingOption(n, this.partialRouting, bbRange);
 					
-				}else if(RouterHelper.isNetWithNoLoads(n)){
+				}else if(RouterHelper.isDriverLessOrLoadLessNet(n)){
 					this.reserveNet(n);
 					this.numNotNeedingRoutingNets++;
 					
@@ -218,13 +224,162 @@ public class RoutableNodeRouter{
 		return this.rnodeId;
 	}
 	
+	public void routeGlobalClkNet() {
+		boolean debug = true;
+		if(debug) System.out.println("\nROUTE CLK NET...");
+		
+		Net clk = this.clkNets.get(0);//TODO multiple GLOBAL_CLOCK, e.g. CE, CLK
+		if(debug) System.out.println(clk.toStringFull());
+//		clk.unroute();
+		
+		List<ClockRegion> clockRegions = new ArrayList<>();
+		for(SitePinInst pin : clk.getPins()) {
+			Tile t = pin.getTile();
+			ClockRegion cr = t.getClockRegion();
+			if(!clockRegions.contains(cr)) clockRegions.add(cr);
+//			clockRegions.add(this.design.getDevice().getClockRegion(cr.getRow()+1, cr.getColumn()));//why this?
+		}
+		if(debug) {
+			System.out.println(clockRegions);
+		}
+		
+		ClockRegion centroid = this.findCentroid(clk);//X2Y2
+		if(debug) System.out.println("centroid clock region is " + centroid);
+		
+		// Route from BUFG to Clock Routing Tracks
+		//using RouteNode would be better than rewriting the methods and chaning from RouteNode to RoutableNode
+		RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);//HROUTE
+		if(debug) System.out.println("clk routing line is " + clkRoutingLine);
+		//CMT_L_X36Y120/CLK_CMT_MUX_2TO1_18_CLK_OUT 0 2 NODE_GLOBAL_HROUTE
+		
+		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);//VROUTE?
+		if(debug) System.out.println("clk centroid route node is " + centroidRouteNode);
+		//RCLK_BRAM_INTF_L_X38Y149/CLK_CMT_DRVR_TRI_ESD_6_CLK_OUT_SCHMITT_B 2 7 NODE_GLOBAL_VROUTE
+		
+		// Transition centroid from routing track to vertical distribution track
+		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToDistributionLine(clk,centroidRouteNode);
+		if(debug) System.out.println("centroid distribution node is " + centroidDistNode);
+		
+		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
+		if(debug) {
+			System.out.println("vertical distribution lines:");
+			for(ClockRegion clkr : vertDistLines.keySet()) {
+				System.out.println(" \t " + clkr + " \t " + vertDistLines.get(clkr));
+			}
+		}
+		
+		List<RouteNode> distLines = new ArrayList<>();
+		//ERROR: Couldn't route to distribution line in clock region X3Y4?
+		distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
+		if(debug) {
+			System.out.println("horizontal distribution lines are");
+			for(RouteNode rn : distLines) {
+				System.out.println(" \t " + rn);
+			}
+		}
+		
+		// Separate sinks by RX/TX LCBs? I changed this method to just map connected node to SitePinInsts
+		if(debug) System.out.println("get LCB Pin mappings");
+		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
+		
+		// Route from clock distribution to all 4 LCBs
+		if(debug) System.out.println("route distribution to LCBs");
+		UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());		
+		
+		// Route from each LCB to laguna sites
+		if(debug) System.out.println("route LCBs to sinks");
+		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
+		List<PIP> afterRouting = clk.getPIPs();
+		if(debug) {
+			for(PIP pip : afterRouting) {
+				System.out.println(pip);
+			}
+		}
+	}
+	
+	public Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk){
+		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
+		for(SitePinInst p : clk.getPins()){
+			if(p.isOutPin()) continue;
+			Node n = p.getConnectedNode();
+			RouteNode rn = new RouteNode(n.getTile(), n.getWire());
+			ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
+			if(sinks == null){
+				sinks = new ArrayList<>();
+				lcbMappings.put(rn, sinks);
+			}
+			sinks.add(p);
+			
+		}
+		return lcbMappings;
+	}
+	
+	//adapted from RW API
+	public ClockRegion findCentroid(Net clk) {
+		HashSet<Point> sitePinInstTilePoints = new HashSet<>();
+		
+		for(SitePinInst spi : clk.getPins()) {
+			Tile t = spi.getSite().getTile();
+			sitePinInstTilePoints.add(new Point(t.getColumn(),t.getRow()));
+		}
+		
+		Point center = SmallestEnclosingCircle.getCenterPoint(sitePinInstTilePoints);
+		Tile c = this.design.getDevice().getTile(center.y, center.x);
+		int i=1;
+		int dir = -1;
+		int count = 0;
+		// Some tiles don't belong to a clock region, we need to wiggle around 
+		// until we find one that is
+		while(c.getClockRegion() == null){
+			int neighborOffset = (count % 2 == 0) ? dir*i : i; 
+			c = c.getTileNeighbor(neighborOffset, 0);
+			count++;
+			if(count % 2 == 0) i++;
+		}
+		return c.getClockRegion();//.getNeighborClockRegion(0, 1)
+	}
+		
+	//TODO unused
+	public void categorizingNets() {
+		List<Net> routableWireNets = new ArrayList<>();
+		List<Net> notNeedingRoutingNets = new ArrayList<>();
+		List<Net> preservedRoutableNets = new ArrayList<>();
+		
+		for(Net n:this.design.getNets()){
+			
+			if(n.getType().equals(NetType.WIRE)){
+				if(RouterHelper.isRoutableNetWithSourceSinks(n)){
+					routableWireNets.add(n);
+					
+				}else if(RouterHelper.isInternallyRoutedNets(n)){
+					notNeedingRoutingNets.add(n);
+					this.numNotNeedingRoutingNets++;
+					
+				}else if(RouterHelper.isDriverLessOrLoadLessNet(n)){
+					notNeedingRoutingNets.add(n);
+					this.numDriverLessAndLoadLessNets++;
+					
+				}
+			}else if(n.isClockNet()){
+				
+				this.numClockNets++;
+				
+			}else if(n.isStaticNet()){
+				this.initializeNetWithRoutingOption(n, this.partialRouting, bbRange);
+				
+			}else{
+				System.err.println("UNRECOGNIZED NET: " + n.toString());
+			}
+		}
+	}
+	
 	public void initializeNetWithRoutingOption(Net n, boolean partialRouting, short bbRange) {
 		if(!this.partialRouting){
 			n.unroute();
 			this.initializeCategorizedNets(n, bbRange);
 		}else{
 			if(n.hasPIPs()){
-				//a simple way to create partially routed dcps with those nets unrouted
+				//a simple way to create partially routed dcps with folowing nets unrouted
 //				if(n.getName().equals("opr[54]") || n.getName().equals("n1a4") || n.getName().equals("n1a2")){
 //					n.unroute();
 //				}
@@ -742,6 +897,7 @@ public class RoutableNodeRouter{
 	
 	public int routingRuntime(){
 		 long start = System.nanoTime();
+//		 routeGlobalClkNet();
 		 this.route();
 		 long end = System.nanoTime();
 		 int timeInMilliseconds = (int)Math.round((end-start) * Math.pow(10, -6));
@@ -1475,7 +1631,7 @@ public class RoutableNodeRouter{
 		System.out.println("Total nets: " + this.design.getNets().size());
 		System.out.println("Nets not needing routing: " + this.numNotNeedingRoutingNets);
 		System.out.println("Routable nets: " + this.numRoutbleNets);
-		System.out.println("  Routed routble nets: " + (this.numClockNets + this.numReservedRoutableNets));
+		System.out.println("  Preserved routble nets: " + (this.numClockNets + this.numReservedRoutableNets));
 		System.out.println("    CLK: " + this.numClockNets);
 		System.out.println("    WIRE: " + this.numReservedRoutableNets);
 		System.out.println("  Nets to be routed: " + (this.nets.size() +  this.staticNetAndSinkRoutables.size()));
