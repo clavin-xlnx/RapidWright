@@ -18,12 +18,20 @@ public class RouterHelper {
 	}
 	
 	//methods to check the net
-	public static boolean isRegularNetToBeRouted(Net n){
+	public static boolean isRoutableNetWithSourceSinks(Net n){
 		return n.getSource() != null && n.getSinkPins().size() > 0;
 	}
 	
-	public static boolean isNetWithNoLoads(Net n){
-		return (n.getSource() != null && n.getSinkPins().size() == 0) || (n.getSource() == null && n.getSinkPins().size() > 0);
+	public static boolean isDriverLessOrLoadLessNet(Net n){
+		return (isDriverLessNet(n) || isLoadLessNet(n));
+	}
+	
+	public static boolean isDriverLessNet(Net n) {
+		return (n.getSource() == null && n.getSinkPins().size() > 0);
+	}
+	
+	public static boolean isLoadLessNet(Net n) {
+		return (n.getSource() != null && n.getSinkPins().size() == 0);
 	}
 	
 	public static boolean isInternallyRoutedNets(Net n){
