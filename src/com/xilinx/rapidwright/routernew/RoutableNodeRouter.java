@@ -194,9 +194,9 @@ public class RoutableNodeRouter{
 		for(Net n:this.design.getNets()){
 			
 			if(n.isClockNet()){
-				this.reserveNet(n);//TODO remove
 				clkNets.add(n);
-//				this.routeGlobalClkNet();
+				this.routeGlobalClkNet();
+				this.reserveNet(n);
 				this.numClockNets++;
 				this.numRoutbleNets++;
 				
@@ -225,40 +225,61 @@ public class RoutableNodeRouter{
 	}
 	
 	public void routeGlobalClkNet() {
-		boolean debug = true;
+ 		boolean debug = false;
 		if(debug) System.out.println("\nROUTE CLK NET...");
 		
 		Net clk = this.clkNets.get(0);//TODO multiple GLOBAL_CLOCK, e.g. CE, CLK
 		if(debug) System.out.println(clk.toStringFull());
-//		clk.unroute();
+		
+		clk.unroute();
 		
 		List<ClockRegion> clockRegions = new ArrayList<>();
 		for(SitePinInst pin : clk.getPins()) {
 			Tile t = pin.getTile();
 			ClockRegion cr = t.getClockRegion();
 			if(!clockRegions.contains(cr)) clockRegions.add(cr);
-//			clockRegions.add(this.design.getDevice().getClockRegion(cr.getRow()+1, cr.getColumn()));//why this?
+//			ClockRegion crOneRowAbove = this.design.getDevice().getClockRegion(cr.getRow()+1, cr.getColumn());
+//			if(!clockRegions.contains(crOneRowAbove)) clockRegions.add(crOneRowAbove);//why this?
 		}
 		if(debug) {
-			System.out.println(clockRegions);
+			System.out.println("clock regions " + clockRegions);
 		}
 		
-		ClockRegion centroid = this.findCentroid(clk);//X2Y2
+		ClockRegion centroid = this.findCentroid(clk);
 		if(debug) System.out.println("centroid clock region is " + centroid);
 		
 		// Route from BUFG to Clock Routing Tracks
 		//using RouteNode would be better than rewriting the methods and chaning from RouteNode to RoutableNode
 		RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);//HROUTE
-		if(debug) System.out.println("clk routing line is " + clkRoutingLine);
-		//CMT_L_X36Y120/CLK_CMT_MUX_2TO1_18_CLK_OUT 0 2 NODE_GLOBAL_HROUTE
+		if(debug) System.out.println("route BUFG to nearest routing track: " + clkRoutingLine);
+		if(debug) {
+			System.out.println(" used pips: ");
+			for(PIP pip:clk.getPIPs()) {
+				System.out.println(" \t " + pip.getStartNode() + "  ->  " + pip.getEndNode());
+			}
+			
+		}
 		
-		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);//VROUTE?
+		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);//V*
 		if(debug) System.out.println("clk centroid route node is " + centroidRouteNode);
-		//RCLK_BRAM_INTF_L_X38Y149/CLK_CMT_DRVR_TRI_ESD_6_CLK_OUT_SCHMITT_B 2 7 NODE_GLOBAL_VROUTE
+		if(debug) {
+			System.out.println(" used pips: ");
+			for(PIP pip:clk.getPIPs()) {
+				System.out.println(" \t " + pip.getStartNode() + "  ->  " + pip.getEndNode());
+			}
+			
+		}
 		
 		// Transition centroid from routing track to vertical distribution track
 		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToDistributionLine(clk,centroidRouteNode);
 		if(debug) System.out.println("centroid distribution node is " + centroidDistNode);
+		if(debug) {
+			System.out.println(" used pips: ");
+			for(PIP pip:clk.getPIPs()) {
+				System.out.println(" \t " + pip.getStartNode() + "  ->  " + pip.getEndNode());
+			}
+			
+		}
 		
 		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
 		if(debug) {
@@ -301,7 +322,21 @@ public class RoutableNodeRouter{
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
 		for(SitePinInst p : clk.getPins()){
 			if(p.isOutPin()) continue;
-			Node n = p.getConnectedNode();
+			Node n = null;//TODO should be a node whose name ends with "CLK_LEAF"
+			//tile = p.getSite.getINTtile() wireIndex = getWire(wireName)
+			//wire name GCLK_B_0_...
+			// some keys of RoutableNodes can have many sitePinInsts
+			for(Node prev : p.getConnectedNode().getAllUphillNodes()) {
+				if(prev.getTile().equals(p.getSite().getIntTile())) {
+					for(Node prevPrev : prev.getAllUphillNodes()) {
+						if(prevPrev.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF) {
+							n = prevPrev;
+							break;
+						}
+					}
+				}
+			}
+			
 			RouteNode rn = new RouteNode(n.getTile(), n.getWire());
 			ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
 			if(sinks == null){
@@ -319,6 +354,7 @@ public class RoutableNodeRouter{
 		HashSet<Point> sitePinInstTilePoints = new HashSet<>();
 		
 		for(SitePinInst spi : clk.getPins()) {
+			if(spi.isOutPin()) continue;
 			Tile t = spi.getSite().getTile();
 			sitePinInstTilePoints.add(new Point(t.getColumn(),t.getRow()));
 		}
@@ -336,7 +372,7 @@ public class RoutableNodeRouter{
 			count++;
 			if(count % 2 == 0) i++;
 		}
-		return c.getClockRegion();//.getNeighborClockRegion(0, 1)
+		return c.getClockRegion();//.getNeighborClockRegion(0, 1);
 	}
 		
 	//TODO unused
@@ -1347,20 +1383,21 @@ public class RoutableNodeRouter{
 	}
 	
 	public void checkPIPsUsage(){
-		Map<PIP, Integer> pipsUsage = new HashMap<>();
+		Map<PIP, Set<Net>> pipsUsage = new HashMap<>();
 		for(Net net:this.design.getNets()){
 			for(PIP pip:net.getPIPs()){
-				if(!pipsUsage.containsKey(pip)){
-					pipsUsage.put(pip, 1);
-				}else{
-					pipsUsage.put(pip, pipsUsage.get(pip) + 1);
-				}
+				Set<Net> users = pipsUsage.get(pip);
+				if(users == null) 
+					users = new HashSet<>();
+				users.add(net);
+				pipsUsage.put(pip, users);
+				
 			}
 		}
 		int pipsError = 0;
 		for(PIP pip:pipsUsage.keySet()){
-			if(pipsUsage.get(pip) > 1){
-				System.out.println("pip " + pip + " usage = " + pipsUsage.get(pip));
+			if(pipsUsage.get(pip).size() > 1){
+				System.out.println("pip " + pip + " users = " + pipsUsage.get(pip));
 				pipsError++;
 			}
 		}
