@@ -23,7 +23,6 @@ package com.xilinx.rapidwright.timing;
 
 import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Wire;
@@ -80,10 +79,10 @@ public class SiblingsTimingGroup {
         if (sitePin.getPinType() == PinType.IN) {
             // input sitepin has two nodes
             Node nextNextNode = node;
-            IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
+            IntentCode nextNextIc = nextNextNode.getIntentCode();
 
             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) {
-                IntentCode nextPrvIc = nextPrvNode.getAllWiresInNode()[0].getIntentCode();
+                IntentCode nextPrvIc = nextPrvNode.getIntentCode();
                 ImmutableTimingGroup newTS = new ImmutableTimingGroup(
                         NodeWithFaninInfo.create(nextNextNode),
                         NodeWithFaninInfo.create(nextPrvNode),
@@ -93,7 +92,7 @@ public class SiblingsTimingGroup {
         } else {
             // output sitepin has only one node
             ImmutableTimingGroup tg = new ImmutableTimingGroup(
-                    NodeWithFaninInfo.create(node), node.getAllWiresInNode()[0].getIntentCode());
+                    NodeWithFaninInfo.create(node), node.getIntentCode());
             siblings.add(tg);
         }
 
@@ -159,19 +158,8 @@ public class SiblingsTimingGroup {
     public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes) {
         List<SiblingsTimingGroup> result =  new ArrayList<>();
 
-/*        if (this.isVirtual()) {
-            this.virtual = false;
-//             Route should evaluate MH distance of the virtual node and delay of its parent. Does this make sense?
-//             It will not if none of the virtual nodes in this batch will become least cost.
-            result.add(this);
-            return result;
-        }*/
-
-        boolean aboveRclk = true;
-        boolean belowRclk = true;
-
         Node prevNode = siblings[0].exitNode();
-        if(prevNode.getAllWiresInNode()[0].getIntentCode() == IntentCode.NODE_PINFEED){ 
+        if(prevNode.getIntentCode() == IntentCode.NODE_PINFEED){ 
         	return result;
         }
         
@@ -182,12 +170,10 @@ public class SiblingsTimingGroup {
 
                 // If this tile is next to RCLK SDQNODE will bleed over. This is likely to cause long delay.
                 // TODO: to exclude only next to RCLK
-//                if (nextNode.toString().contains("/SDQNODE_"))
-//                    continue;
                 if (isExcluded(nextNode))
                     continue;
                 
-                IntentCode ic = nextNode.getAllWiresInNode()[0].getIntentCode();
+                IntentCode ic = nextNode.getIntentCode();
                 //TODO check: only excluding NODE_CLE_OUTUT will cause an issue of non-thruImmuTg between two ITERRR in setChildren()
                 if(ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_CLE_OUTPUT){ 
                 	continue;
@@ -214,12 +200,6 @@ public class SiblingsTimingGroup {
                                                                   GroupDelayType.OTHER));
 
                 } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
-                    // TODO: to exclude only next to RCLK
-//                    if (       nextNode.toString().contains("/EE12_BEG0")  // bleed down
-//                            || nextNode.toString().contains("/EE12_BEG7")) // bleed up
-//                      if (isExcluded(nextNode))
-//                          continue;
-
                     ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
                     result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}, 
                     									GroupDelayType.LONG));
@@ -232,7 +212,7 @@ public class SiblingsTimingGroup {
                             continue;
                         
                         if (!reservedNodes.contains(nextNextNode)) {
-                            IntentCode nextNextIc = nextNextNode.getAllWiresInNode()[0].getIntentCode();
+                            IntentCode nextNextIc = nextNextNode.getIntentCode();
                             List<ImmutableTimingGroup> tgs = new ArrayList<>();
                             ImmutableTimingGroup throughTg = null;
                             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) { // need to get all downhill PIPs
@@ -252,7 +232,7 @@ public class SiblingsTimingGroup {
                                 // TODO: Currently the whole sibling is considered together as a whole.
                                 // TODO: (need to revisit this if the assumption changes.)
                                 // TODO: Thus only check nodes that can be key nodes. nextPrvNode is not a key node.
-                                IntentCode nextPrvIc       = nextPrvNode.getAllWiresInNode()[0].getIntentCode();
+                                IntentCode nextPrvIc       = nextPrvNode.getIntentCode();
                                 ImmutableTimingGroup newTS = new ImmutableTimingGroup(
                                         NodeWithFaninInfo.create(nextNextNode),
                                         NodeWithFaninInfo.create(nextPrvNode),
@@ -289,7 +269,7 @@ public class SiblingsTimingGroup {
         // toString will return INT_X0Y1/INODE_E_1_FT1 , while first wire name return just INODE_E_1_FT1
         builder.append(siblings[0].exitNode().toString());
         builder.append("  - ");
-        builder.append(siblings[0].exitNode().getAllWiresInNode()[0].getIntentCode());
+        builder.append(siblings[0].exitNode().getIntentCode());
 ////        builder.append("  - ");
 ////        builder.append(siblings[0].exitNode().getAllWiresInNode()[0].getWireName());
 //        builder.append("  : ");
@@ -335,7 +315,6 @@ public class SiblingsTimingGroup {
 		for(ImmutableTimingGroup immuTg : this.siblings){
     		if(immuTg.entryNode() != null){
     			for(Node n:immuTg.entryNode().getAllUphillNodes()){
-//    				System.out.println(immuTg.toString());
         			this.fanins.put(NodeWithFaninInfo.create(n), immuTg);
         		}
     		}else{//output pin Sibling and global siblings
