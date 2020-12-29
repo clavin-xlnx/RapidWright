@@ -245,14 +245,6 @@ public class Connection{
 		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getConnectedNode().toString()));
 		s.append(", ");
 		s.append("sink = " + this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName());
-//		s.append(", ");
-//		s.append("sourceReq = " + this.timingEdges.get(0).getSrc().getRequiredTime());
-//		s.append(", ");
-//		s.append("sourceArr = " + this.timingEdges.get(0).getSrc().getArrivalTime());
-//		s.append(", ");
-//		s.append("sinkReq = " + this.timingEdges.get(0).getDst().getRequiredTime());
-//		s.append(", ");
-//		s.append("sinkArr = " + this.timingEdges.get(0).getDst().getArrivalTime());
 		s.append(", ");
 		s.append(String.format("delay = %4.1f ", this.timingEdges == null? 0:this.timingEdges.get(0).getDelay()));
 		s.append(", ");

@@ -83,15 +83,10 @@ public class ImmutableTimingGroup {
     
     public void setDelay(short delay){
     	this.groupDelay = delay;
-    	this.delaySet = true;
     }
     
     public short getDelay(){
     	return this.groupDelay;
-    }
-    
-    public short get_d() {
-    	return this.d;
     }
     
     @Override
@@ -116,8 +111,7 @@ public class ImmutableTimingGroup {
     final private GroupDelayType groupDelayType;
     // used to lookup coefficients based on directions
     final private GroupWireDirection groupWireDir; // ver, hor
-    private short groupDelay; //TODO Yun
-    public boolean delaySet; //TODO remove
+    private short groupDelay;
 
     private GroupWireDirection getDirection (NodeWithFaninInfo node) {
         // TODO: is there a better than name checking ?
@@ -190,49 +184,4 @@ public class ImmutableTimingGroup {
         return new Pair(groupDelayType,groupWireDir);
     }
     
-    // added by Yun
-    private short d;
-    /**
-     * Computes the D (distance) term used by the TimingModel calculation.
-     * @param n Given Node to use when checking the wire names.
-     * @return The D term used by the TimingModel delay calculation.
-     */
-    short computeD(Node n, TimingModel timingModel) {
-        int result = 0;
-        int minRow = 1<<20;
-        int maxRow = 0;
-        int minCol = 1<<20;
-        int maxCol = 0;
-        List<Wire> wList = new ArrayList<>();
-        for (Wire w : n.getAllWiresInNode()) {
-            if (w.getWireName().contains("BEG")) {
-                wList.add(0,w);
-            }
-            if (w.getWireName().contains("END")) {
-                wList.add(w);
-            }
-        }
-        for (Wire w1 : wList) {
-            if (w1.getTile().getColumn() < minCol)
-                minCol = w1.getTile().getColumn();
-            if (w1.getTile().getColumn() > maxCol)
-                maxCol = w1.getTile().getColumn();
-            if (w1.getTile().getRow() < minRow)
-                minRow = w1.getTile().getRow();
-            if (w1.getTile().getRow() > maxRow)
-                maxRow = w1.getTile().getRow();
-        }
-        int col1 = minCol;
-        int row1 = minRow;
-        int col2 = maxCol;
-        int row2 = maxRow;
-        if (groupWireDir == GroupWireDirection.HORIZONTAL && col1 < col2) {
-            result += timingModel.computeHorizontalDistFromArray(col1, col2, groupDelayType);
-        }
-        if (groupWireDir == GroupWireDirection.VERTICAL && row1 < row2) {
-            result += timingModel.computeVerticalDistFromArray(row1, row2, groupDelayType);
-        }
-        this.d = (short) result;
-        return (short) result;
-    }
 }
