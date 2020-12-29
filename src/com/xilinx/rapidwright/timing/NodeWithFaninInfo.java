@@ -13,14 +13,11 @@ import com.xilinx.rapidwright.routernew.CountingSet;
 import com.xilinx.rapidwright.routernew.Routable;
 
 public class NodeWithFaninInfo extends Node{
-
-    //Node.toString
-
+	
     CountingSet<SitePinInst> sources;
     CountingSet<Routable> parents;
     float pres_cost;
     float acc_cost; 
-//    public Set<Integer> entryHolders;
     
     static Map<Node, NodeWithFaninInfo> nodePairs;
     
@@ -28,23 +25,22 @@ public class NodeWithFaninInfo extends Node{
     	nodePairs = new HashMap<>();
     }
     
-    // Make sure you have setter/acccessor
-    public void  setPresCost(float v) {pres_cost = v;}
-    public float getPresCost()           {return pres_cost;}
+
 
     //  To convert Node to NodeWithFaninInfo.
     //	from: Node              n = axyz();
     //	to:   NodeWithFaninInfo n = NodeWithFaninInfo.create(axyz());
     public static NodeWithFaninInfo create(Node node){
     	//merge() is not desired 
-    	if(nodePairs.containsKey(node)){
-        	return nodePairs.get(node);
-        }else{
-        	Wire wire = node.getAllWiresInNode()[0];
-        	NodeWithFaninInfo nodeWithFaninInfo = new NodeWithFaninInfo(wire);
-        	nodePairs.put(node, nodeWithFaninInfo);
-        	return nodeWithFaninInfo;
-        }
+    	NodeWithFaninInfo nodeWithFaninInfo = nodePairs.get(node);
+    	if(nodeWithFaninInfo != null) {
+    		return nodeWithFaninInfo;
+    	}else {
+    		Wire wire = node.getAllWiresInNode()[0];
+        	NodeWithFaninInfo newNodeWithFaninInfo = new NodeWithFaninInfo(wire);
+        	nodePairs.put(node, newNodeWithFaninInfo);
+        	return newNodeWithFaninInfo;
+    	}
     }
     
     public void initialize(){
@@ -56,7 +52,14 @@ public class NodeWithFaninInfo extends Node{
     
     public NodeWithFaninInfo(Wire wire){
         super(wire);
-//        this.entryHolders = new HashSet<>();
+    }
+    
+    public void  setPresCost(float v) {
+    	pres_cost = v;
+    }
+    
+    public float getPresCost() {
+    	return pres_cost;
     }
     
     public void setAccCost(float accCost){
@@ -100,9 +103,6 @@ public class NodeWithFaninInfo extends Node{
     	if(this.sources == null){
     		this.sources = new CountingSet<>();
     	}
-//    	}else{
-//    		if(this.sources.uniqueSize() > 1) System.out.println("source set exists and unique size = " + this.sources.uniqueSize());
-//    	}
     	this.sources.add(source);
     }
     
@@ -114,11 +114,8 @@ public class NodeWithFaninInfo extends Node{
     }
     
     public boolean isUsed(){
-    	/*boolean check = false;
-    	if(this.toString().equals("INT_X9Y96/INT_NODE_IMUX_17_INT_OUT0"))
-    		check = true;*/
+
     	if(this.sources == null){
-//    		if(check) System.out.println("INT_X9Y96/INT_NODE_IMUX_17_INT_OUT0 null sources");
     		return false;
     	}else if(this.sources.uniqueSize() > 0){
     		return true;
@@ -127,7 +124,6 @@ public class NodeWithFaninInfo extends Node{
     }
     
     public boolean isOverUsed(){
-//    	if()
     	if(this.sources == null){
     		return false;
     	}else if(this.sources.uniqueSize() > Routable.capacity){
