@@ -1,13 +1,10 @@
 package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
@@ -47,73 +44,28 @@ public class RoutableNode implements Routable{
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
 		timer.getNextRoutable.finish();
 		
-		timer.getNextDummy.start();
-		timer.getNextDummy.finish();
-		
 		timer.addChildren.start();
 		callingOfGetNextRoutable++;
 		this.children = new ArrayList<>();
 		for(Node node:allDownHillNodes){
-			//TODO check if CLK_CMT_MUX_3TO1_32_CLK_OUT connected to the target node is included
-			/*if(this.targetTileOfTheLocalClockNetFound(node, c)){
-				System.out.println(routethruHelper.isRouteThru(this.node, node));
-				System.out.println();
-			}*/
-			//TODO recognize available routethrus
+			//TODO make available routethrus available
 			if(!routethruHelper.isRouteThru(this.node, node)){//routethrus are forbidden in this way
-				if(!createdRoutable.containsKey(node)){
-					RoutableNode child;
+				RoutableNode child = createdRoutable.get(node);
+				if(child == null) {
 					child = new RoutableNode(globalIndex, node, RoutableType.INTERRR);
 					child.setBaseCost(base_cost_fac);
 					globalIndex++;
 					this.children.add(child);
 					createdRoutable.put(node, child);
-				}else{
-					this.children.add(createdRoutable.get(node));//the sink routable of a target has been created up-front 
+				}else {
+					this.children.add(child);//the sink routable of a target has been created up-front 
 				}
 			}
 		}
 		this.childrenSet = true;
 		timer.addChildren.finish();
 		
-		return new Pair(globalIndex, callingOfGetNextRoutable);
-	}
-	
-	public boolean targetTileOfTheLocalClockNetFound(Node node, Connection c){
-		boolean foundTargetTile = node.getTile().getName().equals("XIPHY_L_X63Y120");
-		
-		if(foundTargetTile){
-			Tile tile = node.getTile();
-			Set<Node> allNodesInTile = new HashSet<>();
-			
-			for(PIP pip:tile.getPIPs()){
-				Node nodeStart = pip.getStartNode();
-				allNodesInTile.add(nodeStart);
-				Node nodeEnd = pip.getEndNode();
-				allNodesInTile.add(nodeEnd);
-			}
-			
-			Node targetNode = ((RoutableNode)c.getSinkRNode()).getNode();
-			for(Node n:targetNode.getAllUphillNodes()){
-				System.out.println(n.toString());
-			}
-		}
-		
-		
-		return foundTargetTile;
-	}
-	
-	//TODO how to efficiently check if the routethru is available
-	public boolean containsAvailableRoutethru(Node n){
-		boolean containsRouthru = false;
-		for(Wire w:n.getAllWiresInNode()){
-			if(w.isRouteThru()){
-				containsRouthru = true;
-				System.out.println(w.getWireName() + " ");
-				break;
-			}
-		}
-		return containsRouthru;
+		return new Pair<Integer, Long>(globalIndex, callingOfGetNextRoutable);
 	}
 	
 	@Override
@@ -161,12 +113,15 @@ public class RoutableNode implements Routable{
 				xCoordinates.add((short) w.getTile().getColumn());
 				yCoordinates.add((short) w.getTile().getRow());
 				
-			}	
+			}
 		}
-		this.xlow = this.min(xCoordinates);
-		this.xhigh = this.max(xCoordinates);
-		this.ylow = this.min(yCoordinates);
-		this.yhigh = this.max(yCoordinates);
+		Pair<Short, Short> xminMax = this.minMax(xCoordinates);
+		Pair<Short, Short> yminMax = this.minMax(yCoordinates);
+		
+		this.xlow = xminMax.getFirst();
+		this.xhigh = xminMax.getSecond();
+		this.ylow = yminMax.getFirst();
+		this.yhigh = yminMax.getSecond();
 	}
 	
 	public short max(List<Short> coordinates){
@@ -177,13 +132,17 @@ public class RoutableNode implements Routable{
 		}
 		return max;
 	}
-	public short min(List<Short> coordinates){
+	
+	public Pair<Short, Short> minMax(List<Short> coordinates){
+		short max = 0;
 		short min = 10000;
 		for(short c:coordinates){
+			if(c > max)
+				max = c;
 			if(c < min)
 				min = c;
 		}
-		return min;
+		return new Pair<Short, Short>(min, max);
 	}
 	
 	@Override
