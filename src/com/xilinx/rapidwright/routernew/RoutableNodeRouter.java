@@ -44,7 +44,6 @@ public class RoutableNodeRouter{
 	public List<Net> toBeRoutedNets;
 	public List<Netplus> nets;
 	public List<Connection> connections;
-	public int numOneSinkNets;
 	public int numRoutableNetsToBeRouted;
 	public int numConsToBeRouted;
 	public int numReservedRoutableNets;
@@ -154,7 +153,6 @@ public class RoutableNodeRouter{
 		this.partialRouting = partialRouting;
 		
 		this.routerTimer = new RouterTimer();
-		this.numOneSinkNets = 0;
 		this.rnodeId = 0;
 		this.rnodeId = this.initializeNetsCons(this.bbRange, this.base_cost_fac);
 				
@@ -192,7 +190,6 @@ public class RoutableNodeRouter{
 		this.staticNetAndSinkRoutables = new HashMap<>();
 		
 		for(Net n:this.design.getNets()){
-			
 			if(n.isClockNet()){
 				clkNets.add(n);
 				this.routeGlobalClkNet();
@@ -226,12 +223,11 @@ public class RoutableNodeRouter{
 	
 	public void routeGlobalClkNet() {
  		boolean debug = false;
+ 		boolean debugPrintPIPs = false;
 		if(debug) System.out.println("\nROUTE CLK NET...");
 		
-		Net clk = this.clkNets.get(0);//TODO multiple GLOBAL_CLOCK, e.g. CE, CLK
-		if(debug) System.out.println(clk.toStringFull());
-		
-		clk.unroute();
+		Net clk = this.clkNets.get(0);//TODO to separate multiple GLOBAL_CLOCKs, e.g. CE, CLK
+		clk.unroute();//TODO initialize it with partialRouting option
 		
 		List<ClockRegion> clockRegions = new ArrayList<>();
 		for(SitePinInst pin : clk.getPins()) {
@@ -241,88 +237,71 @@ public class RoutableNodeRouter{
 //			ClockRegion crOneRowAbove = this.design.getDevice().getClockRegion(cr.getRow()+1, cr.getColumn());
 //			if(!clockRegions.contains(crOneRowAbove)) clockRegions.add(crOneRowAbove);//why this?
 		}
-		if(debug) {
-			System.out.println("clock regions " + clockRegions);
-		}
+		if(debug) System.out.println("clock regions " + clockRegions);
 		
 		ClockRegion centroid = this.findCentroid(clk);
-		if(debug) System.out.println("centroid clock region is " + centroid);
+		if(debug) System.out.println(" centroid clock region is  \n \t" + centroid);
 		
-		// Route from BUFG to Clock Routing Tracks
+		//Route from BUFG to Clock Routing Tracks
 		//using RouteNode would be better than rewriting the methods and chaning from RouteNode to RoutableNode
 		RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);//HROUTE
-		if(debug) System.out.println("route BUFG to nearest routing track: " + clkRoutingLine);
-		if(debug) {
-			System.out.println(" used pips: ");
-			for(PIP pip:clk.getPIPs()) {
-				System.out.println(" \t " + pip.getStartNode() + "  ->  " + pip.getEndNode());
-			}
-			
-		}
+		if(debug) System.out.println("route BUFG to nearest routing track: \n \t" + clkRoutingLine);
+		if(debugPrintPIPs) this.printCLKPIPs(clk);
 		
-		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);//V*
-		if(debug) System.out.println("clk centroid route node is " + centroidRouteNode);
-		if(debug) {
-			System.out.println(" used pips: ");
-			for(PIP pip:clk.getPIPs()) {
-				System.out.println(" \t " + pip.getStartNode() + "  ->  " + pip.getEndNode());
-			}
-			
-		}
+		if(debug) System.out.println("route To Centroid ");
+		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);//VROUTE
+		if(debug) System.out.println(" clk centroid route node is \n \t" + centroidRouteNode);
+		if(debugPrintPIPs) this.printCLKPIPs(clk);
 		
 		// Transition centroid from routing track to vertical distribution track
+		System.out.println("transition Centroid To Distribution Line");
 		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToDistributionLine(clk,centroidRouteNode);
-		if(debug) System.out.println("centroid distribution node is " + centroidDistNode);
-		if(debug) {
-			System.out.println(" used pips: ");
-			for(PIP pip:clk.getPIPs()) {
-				System.out.println(" \t " + pip.getStartNode() + "  ->  " + pip.getEndNode());
-			}
-			
-		}
+		if(debug) System.out.println(" centroid distribution node is \n \t" + centroidDistNode);
+		if(debugPrintPIPs) this.printCLKPIPs(clk);
 		
+		//routeCentroidToVerticalDistributionLines and routeCentroidToHorizontalDistributionLines could result in duplicated PIPs
+		if(debug) System.out.println("route Centroid To Vertical Distribution Lines");
+		//Each ClockRegion is not necessarily the one that each RouteNode value belongs to (same row is a must)
 		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
 		if(debug) {
-			System.out.println("vertical distribution lines:");
-			for(ClockRegion clkr : vertDistLines.keySet()) {
-				System.out.println(" \t " + clkr + " \t " + vertDistLines.get(clkr));
-			}
+			System.out.println(" clock region - vertical distribution node ");
+			for(ClockRegion cr : vertDistLines.keySet()) System.out.println(" \t" + cr + " \t " + vertDistLines.get(cr));
 		}
+		if(debugPrintPIPs) this.printCLKPIPs(clk);
 		
+		if(debug) System.out.println("route Centroid To Horizontal Distribution Lines");
 		List<RouteNode> distLines = new ArrayList<>();
-		//ERROR: Couldn't route to distribution line in clock region X3Y4?
 		distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
-		if(debug) {
-			System.out.println("horizontal distribution lines are");
-			for(RouteNode rn : distLines) {
-				System.out.println(" \t " + rn);
-			}
-		}
+		System.out.println(" dist lines are \n \t" + distLines);
+		if(debugPrintPIPs) this.printCLKPIPs(clk);
 		
-		// Separate sinks by RX/TX LCBs? I changed this method to just map connected node to SitePinInsts
+		//I changed this method to just map connected node to SitePinInsts
 		if(debug) System.out.println("get LCB Pin mappings");
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		
-		// Route from clock distribution to all 4 LCBs
+		// Route from clock distribution to all leaf clock buffers
 		if(debug) System.out.println("route distribution to LCBs");
 		UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());		
+		if(debugPrintPIPs) this.printCLKPIPs(clk);
 		
-		// Route from each LCB to laguna sites
+		// Route from each LCB to sinks
 		if(debug) System.out.println("route LCBs to sinks");
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
-		List<PIP> afterRouting = clk.getPIPs();
-		if(debug) {
-			for(PIP pip : afterRouting) {
-				System.out.println(pip);
-			}
-		}
+		if(debugPrintPIPs) this.printCLKPIPs(clk);
+		
+		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
+		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
+		clk.getPIPs().clear();
+		clk.setPIPs(clkPIPsWithoutDuplication);
+		
+		if(debugPrintPIPs) this.printCLKPIPs(clk);
 	}
 	
 	public Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk){
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
 		for(SitePinInst p : clk.getPins()){
 			if(p.isOutPin()) continue;
-			Node n = null;//TODO should be a node whose name ends with "CLK_LEAF"
+			Node n = null;//n should be a node whose name ends with "CLK_LEAF"
 			//tile = p.getSite.getINTtile() wireIndex = getWire(wireName)
 			//wire name GCLK_B_0_...
 			// some keys of RoutableNodes can have many sitePinInsts
@@ -337,7 +316,8 @@ public class RoutableNodeRouter{
 				}
 			}
 			
-			RouteNode rn = new RouteNode(n.getTile(), n.getWire());
+			RouteNode rn = n != null? new RouteNode(n.getTile(), n.getWire()):null;
+			if(rn == null) throw new RuntimeException("ERROR: No mapped LCB to SitePinInst " + p);
 			ArrayList<SitePinInst> sinks = lcbMappings.get(rn);
 			if(sinks == null){
 				sinks = new ArrayList<>();
@@ -346,7 +326,14 @@ public class RoutableNodeRouter{
 			sinks.add(p);
 			
 		}
+		
 		return lcbMappings;
+	}
+	
+	public void printCLKPIPs(Net clk) {
+		for(PIP pip : clk.getPIPs()) {
+			System.out.println(" \t " + pip.getStartNode() + "  ->  " + pip.getEndNode());
+		}
 	}
 	
 	//adapted from RW API
@@ -372,7 +359,7 @@ public class RoutableNodeRouter{
 			count++;
 			if(count % 2 == 0) i++;
 		}
-		return c.getClockRegion();//.getNeighborClockRegion(0, 1);
+		return c.getClockRegion();//.getNeighborClockRegion(0, 1);//why neighbor?
 	}
 		
 	//TODO unused
@@ -415,16 +402,11 @@ public class RoutableNodeRouter{
 			this.initializeCategorizedNets(n, bbRange);
 		}else{
 			if(n.hasPIPs()){
-				//a simple way to create partially routed dcps with folowing nets unrouted
-//				if(n.getName().equals("opr[54]") || n.getName().equals("n1a4") || n.getName().equals("n1a2")){
-//					n.unroute();
-//				}
-				
-				this.reserveNet(n);//changed from reserving pips only to reserve the net
+				// in partial routing mode, nets in the design having pips will be preserved
+				this.reserveNet(n);
 				this.numReservedRoutableNets++;
 				this.numRoutbleNets++;
-			}else{
-				
+			}else{			
 				this.initializeCategorizedNets(n, bbRange);
 			}
 		}
@@ -684,8 +666,6 @@ public class RoutableNodeRouter{
 			np.addCons(c);
 			this.numConsToBeRouted++;
 		}
-		if(n.getSinkPins().size() == 1)
-			this.numOneSinkNets++;
 	}
 	
 	public void reservePipsOfNet(Net n){
@@ -1383,12 +1363,12 @@ public class RoutableNodeRouter{
 	}
 	
 	public void checkPIPsUsage(){
-		Map<PIP, Set<Net>> pipsUsage = new HashMap<>();
+		Map<PIP, List<Net>> pipsUsage = new HashMap<>();
 		for(Net net:this.design.getNets()){
 			for(PIP pip:net.getPIPs()){
-				Set<Net> users = pipsUsage.get(pip);
+				List<Net> users = pipsUsage.get(pip);
 				if(users == null) 
-					users = new HashSet<>();
+					users = new ArrayList<>();
 				users.add(net);
 				pipsUsage.put(pip, users);
 				
@@ -1672,7 +1652,6 @@ public class RoutableNodeRouter{
 		System.out.println("    CLK: " + this.numClockNets);
 		System.out.println("    WIRE: " + this.numReservedRoutableNets);
 		System.out.println("  Nets to be routed: " + (this.nets.size() +  this.staticNetAndSinkRoutables.size()));
-		System.out.println("    one-sink nets: " + this.numOneSinkNets);
 		System.out.println("    static nets to be routed: " + this.staticNetAndSinkRoutables.size());
 		System.out.println("    site pins to be routed: " + (this.connections.size() + this.getNumSitePinOfStaticNets()));	
 		if(this.numUnrecognizedNets != 0)
