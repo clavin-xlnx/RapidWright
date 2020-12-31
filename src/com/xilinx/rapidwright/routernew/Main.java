@@ -255,8 +255,8 @@ public class Main {
 							router.averImmuTgPerSiblings,
 							router.averNodePerSiblings,
 							router.averFanoutRNodes,
-							router.estimator.intableQuery,
-							router.estimator.outOfTableQuery);
+							router.estimator != null? router.estimator.intableQuery : 0,
+							router.estimator != null? router.estimator.outOfTableQuery : 0);
 					
 					this.runtimeInfoPrinting(routingRuntime, 
 							router.firstRouting,
