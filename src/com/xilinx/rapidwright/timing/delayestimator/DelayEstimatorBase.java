@@ -124,7 +124,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
 	        }
 	        delay = calcTimingGroupDelay(node.tg, node.begin(), node.end(), 0d);
 		}catch(Exception e){
-        	System.out.println(tg.toString());
+        	System.out.println("EXCEPTION CAUGHT WHEN GETTING DELAY OF " + tg.exitNode().toString());
 		}
         return delay.shortValue();
     }
