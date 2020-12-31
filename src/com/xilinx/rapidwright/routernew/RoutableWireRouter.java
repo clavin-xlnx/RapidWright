@@ -1037,7 +1037,7 @@ public class RoutableWireRouter{
 		if(rnode.type == RoutableType.INTERRR) {
 			Netplus net = con.getNet();
 			bias_cost = 0.5f * rnode.base_cost / net.fanout * 
-					(Math.abs(rnode.getCenterX() - net.x_geo) + Math.abs(rnode.getCenterY() - net.y_geo)) / net.hpwl;
+					(Math.abs(rnode.getX() - net.x_geo) + Math.abs(rnode.getY() - net.y_geo)) / net.hpwl;
 		}
 		
 		/*if(this.debugExpansion)
@@ -1049,9 +1049,9 @@ public class RoutableWireRouter{
 	private float expectMahatD(RoutableWire childRNode, Connection con){
 		float md;
 		if(this.itry == 1){
-			md = Math.abs(childRNode.getCenterX() - con.sink.getTile().getColumn()) + Math.abs(childRNode.getCenterY() - con.sink.getTile().getRow());
+			md = Math.abs(childRNode.getX() - con.sink.getTile().getColumn()) + Math.abs(childRNode.getY() - con.sink.getTile().getRow());
 		}else{
-			md = Math.abs(childRNode.getCenterX() - con.getSinkRNode().getCenterX()) + Math.abs(childRNode.getCenterY() - con.getSinkRNode().getCenterY());
+			md = Math.abs(childRNode.getX() - con.getSinkRNode().getX()) + Math.abs(childRNode.getY() - con.getSinkRNode().getY());
 		}
 		return md;
 	}

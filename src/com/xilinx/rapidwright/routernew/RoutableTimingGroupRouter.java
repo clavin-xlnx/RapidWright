@@ -473,18 +473,20 @@ public class RoutableTimingGroupRouter{
 	
 	public int routingRuntime(){
 		long start = System.nanoTime();
-		this.estimateDelayOfConnections();
-		this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
-		this.timingManager.calculateCriticality(this.connections, MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
+		if(this.timingDriven) {
+			this.estimateDelayOfConnections();
+			this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
+			this.timingManager.calculateCriticality(this.connections, MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
 		
-		this.timingManager.getCriticalPathInfo(this);
+			this.timingManager.getCriticalPathInfo(this);
 		
-		System.out.println(String.format("pre-routing max delay using estimation: %3.2f", maxDelayAndTimingVertex.getFirst()));
+			System.out.println(String.format("pre-routing max delay using estimation: %3.2f", maxDelayAndTimingVertex.getFirst()));
+		}
 		this.route();
 		long end = System.nanoTime();
 		int timeInMilliseconds = (int)Math.round((end-start) * Math.pow(10, -6));
 		this.getTotalNodesInResourceGraph();
-		this.getNodeGroupTypeAndDelayMap();
+		if(this.timingDriven) this.getNodeGroupTypeAndDelayMap();
 //		this.entryNodesSharing();//4.8
 		System.out.println();
 		return timeInMilliseconds;
@@ -1413,7 +1415,7 @@ public class RoutableTimingGroupRouter{
 		if(rnode.type == RoutableType.INTERRR) {
 			Netplus net = con.getNet();
 			bias_cost = 0.5f * rnode.getBase_cost() / net.fanout * 
-					(Math.abs(rnode.getCenterX() - net.x_geo) + Math.abs(rnode.getCenterY() - net.y_geo)) / net.hpwl;
+					(Math.abs(rnode.getX() - net.x_geo) + Math.abs(rnode.getY() - net.y_geo)) / net.hpwl;
 		}
 		
 		//add entry node congestion penalty to the Siblings
@@ -1442,7 +1444,7 @@ public class RoutableTimingGroupRouter{
 	
 	private float expectMahatD(RoutableTimingGroup childRNode, Connection con){
 		float md;
-		md = Math.abs(childRNode.getCenterX() - con.getSinkRNode().getCenterX()) + Math.abs(childRNode.getCenterY() - con.getSinkRNode().getCenterY());
+		md = Math.abs(childRNode.getX() - con.getSinkRNode().getX()) + Math.abs(childRNode.getY() - con.getSinkRNode().getY());
 		return md;
 	}
 	

@@ -1569,12 +1569,8 @@ public class RoutableNodeRouter{
 		//Present congestion cost
 		float pres_cost;
 		if(containsSource) {
-			int overoccupation = rnode.getOccupancy() - Routable.capacity;
-			if(overoccupation < 0) {
-				pres_cost = 1;
-			}else{
-				pres_cost = 1 + overoccupation * this.pres_fac;
-			}
+			int overoccupation = rnode.getOccupancy() - Routable.capacity;	
+			pres_cost = 1 + overoccupation * this.pres_fac;
 		}else{
 			pres_cost = rnode.getPres_cost();
 		}
@@ -1584,7 +1580,7 @@ public class RoutableNodeRouter{
 		if(rnode.type == RoutableType.INTERRR) {
 			Netplus net = con.getNet();
 			bias_cost = 0.5f * rnode.base_cost / net.fanout * 
-					(Math.abs(rnode.getCenterX() - net.x_geo) + Math.abs(rnode.getCenterY() - net.y_geo)) / net.hpwl;
+					(Math.abs(rnode.getX() - net.x_geo) + Math.abs(rnode.getY() - net.y_geo)) / net.hpwl;
 		}
 		
 		return rnode.base_cost * rnode.getAcc_cost() * pres_cost / (1 + countSourceUses) + bias_cost;
@@ -1592,7 +1588,7 @@ public class RoutableNodeRouter{
 	
 	private float expectMahatD(RoutableNode childRNode, Connection con){
 		float md;
-		md = Math.abs(childRNode.getCenterX() - con.getSinkRNode().getCenterX()) + Math.abs(childRNode.getCenterY() - con.getSinkRNode().getCenterY());
+		md = Math.abs(childRNode.getX() - con.getSinkRNode().getX()) + Math.abs(childRNode.getY() - con.getSinkRNode().getY());
 		return md;
 	}
 	

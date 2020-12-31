@@ -13,12 +13,8 @@ public interface Routable {
 	public boolean illegal();
 	
 	public void setXY();
-	public float getCenterX();
-	public float getCenterY();
-	public short getXmax();
-	public short getXmin();
-	public short getYmax();
-	public short getYmin();
+	public short getX();
+	public short getY();
 	
 	public boolean isTarget();
 	public void setTarget(boolean isTarget);

@@ -15,8 +15,7 @@ public class RoutableWire implements Routable{
 	public Wire wire;
 	public RoutableType type;
 	
-	public short xlow, xhigh;
-	public short ylow, yhigh;
+	public short x, y;
 		
 	public float base_cost;
 	
@@ -105,10 +104,8 @@ public class RoutableWire implements Routable{
 
 	@Override
 	public void setXY() {
-		this.xlow = (short) this.wire.getTile().getColumn();
-		this.xhigh = this.xlow;
-		this.ylow = (short) this.wire.getTile().getRow();
-		this.yhigh = this.ylow;
+		this.x = (short) this.wire.getTile().getColumn();	
+		this.y = (short) this.wire.getTile().getRow();
 	}
 
 	@Override
@@ -124,25 +121,11 @@ public class RoutableWire implements Routable{
 			data.setPres_cost(1 + (occ - cap + 1) * pres_fac);
 		}
 	}
-
-	@Override
-	public float getCenterX() {
-		return (this.xhigh + this.xlow) / 2;
-	}
-
-	@Override
-	public float getCenterY() {
-		return (this.yhigh + this.ylow) / 2;
-	}
 	
 	@Override
 	public String toString(){
 		String coordinate = "";
-		if(this.xlow == this.xhigh && this.ylow == this.yhigh) {
-			coordinate = "(" + this.xlow + "," + this.ylow + ")";
-		} else {
-			coordinate = "(" + this.xlow + "," + this.ylow + ") to (" + this.xhigh + "," + this.yhigh + ")";
-		}
+		coordinate = "(" + this.x + "," + this.y + ")";
 		
 		StringBuilder s = new StringBuilder();
 		s.append("RNode " + this.index + " ");
@@ -173,13 +156,13 @@ public class RoutableWire implements Routable{
 	public float getManhattanD() {
 		float md = 0;
 		if(this.rnodeData.getPrev() != null){
-			md = Math.abs(this.rnodeData.getPrev().getCenterX() - this.getCenterX()) + Math.abs(this.rnodeData.getPrev().getCenterY() - this.getCenterY());
+			md = Math.abs(this.rnodeData.getPrev().getX() - this.getX()) + Math.abs(this.rnodeData.getPrev().getY() - this.getY());
 		}
 		return md;
 	}
 	
 	public boolean isInBoundingBoxLimit(Connection con) {		
-		return this.xlow < con.net.x_max_b && this.xhigh > con.net.x_min_b && this.ylow < con.net.y_max_b && this.yhigh > con.net.y_min_b;
+		return this.x < con.net.x_max_b && this.x > con.net.x_min_b && this.y < con.net.y_max_b && this.y > con.net.y_min_b;
 	}
 
 	@Override
@@ -247,23 +230,13 @@ public class RoutableWire implements Routable{
 	}
 	
 	@Override
-	public short getXmax() {
-		return this.xhigh;
+	public short getX() {
+		return this.x;
 	}
-
+	
 	@Override
-	public short getXmin() {
-		return this.xlow;
-	}
-
-	@Override
-	public short getYmax() {
-		return this.yhigh;
-	}
-
-	@Override
-	public short getYmin() {
-		return this.ylow;
+	public short getY() {
+		return this.y;
 	}
 
 	@Override

@@ -16,8 +16,7 @@ public class RoutableNode implements Routable{
 	private Node node;
 	public RoutableType type;
 	
-	public short xlow, xhigh;
-	public short ylow, yhigh;
+	public short x, y;
 	
 	public float base_cost;
 	
@@ -105,44 +104,26 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public void setXY() {
-		List<Short> xCoordinates = new ArrayList<>();
-		List<Short> yCoordinates = new ArrayList<>();
-		for(Wire w : this.node.getAllWiresInNode()){
-			Tile tile = w.getTile();
-			if(tile.getTileTypeEnum() == TileTypeEnum.INT){
-				xCoordinates.add((short) w.getTile().getColumn());
-				yCoordinates.add((short) w.getTile().getRow());
-				
+		Wire[] wires = this.node.getAllWiresInNode();
+		List<Tile> intTiles = new ArrayList<>();
+		
+		for(Wire w : wires) {
+			if(w.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
+				intTiles.add(w.getTile());
 			}
 		}
-		Pair<Short, Short> xminMax = this.minMax(xCoordinates);
-		Pair<Short, Short> yminMax = this.minMax(yCoordinates);
 		
-		this.xlow = xminMax.getFirst();
-		this.xhigh = xminMax.getSecond();
-		this.ylow = yminMax.getFirst();
-		this.yhigh = yminMax.getSecond();
-	}
-	
-	public short max(List<Short> coordinates){
-		short max = 0;
-		for(short c:coordinates){
-			if(c > max)
-				max = c;
+		if(intTiles.size() > 1) {
+			this.x = (short) intTiles.get(1).getColumn();
+			this.y = (short) intTiles.get(1).getRow();
+		}else if(intTiles.size() == 1) {
+			this.x = (short) intTiles.get(0).getColumn();
+			this.y = (short) intTiles.get(0).getRow();
+		}else {
+			System.out.println(this.getNode() + " " + wires[0].getTile() + "\n");
+			this.x = (short) wires[0].getTile().getColumn();
+			this.y = (short) wires[0].getTile().getRow();
 		}
-		return max;
-	}
-	
-	public Pair<Short, Short> minMax(List<Short> coordinates){
-		short max = 0;
-		short min = 10000;
-		for(short c:coordinates){
-			if(c > max)
-				max = c;
-			if(c < min)
-				min = c;
-		}
-		return new Pair<Short, Short>(min, max);
 	}
 	
 	@Override
@@ -159,43 +140,17 @@ public class RoutableNode implements Routable{
 			data.setPres_cost(1 + (occ - cap + 1) * pres_fac);
 		}
 	}
-
-	@Override
-	public float getCenterX() {
-		return (this.xhigh + this.xlow) / 2;
-	}
-
-	@Override
-	public float getCenterY() {
-		return (this.yhigh + this.ylow) / 2;
-	}
 	
 	@Override
 	public String toString(){
-		String coordinate = "";
-		if(this.xlow == this.xhigh && this.ylow == this.yhigh) {
-			coordinate = "(" + this.xlow + "," + this.ylow + ")";
-		} else {
-			coordinate = "(" + this.xlow + "," + this.ylow + ") to (" + this.xhigh + "," + this.yhigh + ")";
-		}
-		
+		String coordinate = "";	
+		coordinate = "(" + this.x + "," + this.y + ")";
 		StringBuilder s = new StringBuilder();
 		s.append("id = " + this.index);
 		s.append(", ");
 		s.append("node " + this.node.toString());
 		s.append(", ");
 		s.append(coordinate);
-//		s.append(String.format("basecost = %.2e", this.base_cost));
-//		s.append(", ");
-//		s.append(String.format("capacity = %d", Routable.capacity));
-//		s.append(", ");
-//		s.append(String.format("occupation = %d", this.rnodeData.getOccupation()));
-//		s.append(", ");
-//		s.append(String.format("num_unique_sources = %d", this.rnodeData.numUniqueSources()));
-//		s.append(", ");
-//		s.append(String.format("num_unique_parents = %d", this.rnodeData.numUniqueParents()));
-//		s.append(", ");
-//		s.append(String.format("level = %d", this.rnodeData.getLevel()));
 		s.append(", ");
 		s.append(String.format("type = %s", this.type));
 		
@@ -211,14 +166,14 @@ public class RoutableNode implements Routable{
 	public float getManhattanD() {
 		float md = 0;
 		if(this.rnodeData.getPrev() != null){
-			md = Math.abs(this.rnodeData.getPrev().getCenterX() - this.getCenterX()) + Math.abs(this.rnodeData.getPrev().getCenterY() - this.getCenterY());
+			md = Math.abs(this.rnodeData.getPrev().getX() - this.getX()) + Math.abs(this.rnodeData.getPrev().getY() - this.getY());
 		}
 		return md;
 	}
 
 	
 	public boolean isInBoundingBoxLimit(Connection con) {		
-		return this.xlow > con.net.x_min_b && this.xhigh < con.net.x_max_b && this.ylow > con.net.y_min_b && this.yhigh < con.net.y_max_b;
+		return this.x > con.net.x_min_b && this.x < con.net.x_max_b && this.y > con.net.y_min_b && this.y < con.net.y_max_b;
 	}
 	
 	@Override
@@ -285,25 +240,15 @@ public class RoutableNode implements Routable{
 		return 0;
 	}
 	@Override
-	public short getXmax() {
-		return this.xhigh;
+	public short getX() {
+		return this.x;
 	}
 
 	@Override
-	public short getXmin() {
-		return this.xlow;
+	public short getY() {
+		return this.y;
 	}
-
-	@Override
-	public short getYmax() {
-		return this.yhigh;
-	}
-
-	@Override
-	public short getYmin() {
-		return this.ylow;
-	}
-
+	
 	@Override
 	public float getBase_cost() {
 		return this.base_cost;

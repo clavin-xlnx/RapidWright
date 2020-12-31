@@ -85,10 +85,10 @@ public class Connection{
 		short x_min, x_max, y_min, y_max;
 		short x_geo = (short) Math.ceil(this.net.x_geo);
 		short y_geo = (short) Math.ceil(this.net.y_geo);
-		x_max = this.maxOfThree(this.sourceRNode.getXmax(), this.sinkRNode.getXmax(), x_geo);
-		x_min = this.minOfThree(this.sourceRNode.getXmin(), this.sinkRNode.getXmin(), x_geo);
-		y_max = this.maxOfThree(this.sourceRNode.getYmax(), this.sinkRNode.getYmax(), y_geo);
-		y_min = this.minOfThree(this.sourceRNode.getYmin(), this.sinkRNode.getYmin(), y_geo);
+		x_max = this.maxOfThree(this.sourceRNode.getX(), this.sinkRNode.getX(), x_geo);
+		x_min = this.minOfThree(this.sourceRNode.getX(), this.sinkRNode.getX(), x_geo);
+		y_max = this.maxOfThree(this.sourceRNode.getY(), this.sinkRNode.getY(), y_geo);
+		y_min = this.minOfThree(this.sourceRNode.getY(), this.sinkRNode.getY(), y_geo);
 		this.x_max_b = (short) (x_max + bbRange);
 		this.x_min_b = (short) (x_min - bbRange);
 		this.y_max_b = (short) (y_max + bbRange);
