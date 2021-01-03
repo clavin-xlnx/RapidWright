@@ -230,7 +230,10 @@ public class RoutableTimingGroup implements Routable{
 		if(intTiles.size() > 1) {
 			this.x = (short) intTiles.get(1).getColumn();
 			this.y = (short) intTiles.get(1).getRow();
-		}else {
+		}else if(intTiles.size() == 1){
+			this.x = (short) intTiles.get(0).getColumn();
+			this.y = (short) intTiles.get(0).getRow();
+		}else{
 			this.x = (short) wires[0].getTile().getColumn();
 			this.y = (short) wires[0].getTile().getRow();
 		}

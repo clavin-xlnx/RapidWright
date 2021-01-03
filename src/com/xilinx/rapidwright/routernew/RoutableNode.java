@@ -38,12 +38,7 @@ public class RoutableNode implements Routable{
 	
 	public Pair<Integer, Long> setChildren(Connection c, int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable, 
 			RouteThruHelper routethruHelper, RouterTimer timer, long callingOfGetNextRoutable){
-		
-		timer.getNextRoutable.start();
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
-		timer.getNextRoutable.finish();
-		
-		timer.addChildren.start();
 		callingOfGetNextRoutable++;
 		this.children = new ArrayList<>();
 		for(Node node:allDownHillNodes){
@@ -62,7 +57,6 @@ public class RoutableNode implements Routable{
 			}
 		}
 		this.childrenSet = true;
-		timer.addChildren.finish();
 		
 		return new Pair<Integer, Long>(globalIndex, callingOfGetNextRoutable);
 	}
@@ -120,7 +114,6 @@ public class RoutableNode implements Routable{
 			this.x = (short) intTiles.get(0).getColumn();
 			this.y = (short) intTiles.get(0).getRow();
 		}else {
-			System.out.println(this.getNode() + " " + wires[0].getTile() + "\n");
 			this.x = (short) wires[0].getTile().getColumn();
 			this.y = (short) wires[0].getTile().getRow();
 		}
