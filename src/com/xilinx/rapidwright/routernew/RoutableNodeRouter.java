@@ -294,7 +294,10 @@ public class RoutableNodeRouter{
 		clk.getPIPs().clear();
 		clk.setPIPs(clkPIPsWithoutDuplication);
 		
-		if(debugPrintPIPs) this.printCLKPIPs(clk);
+		if(debugPrintPIPs) {
+			System.out.println("Final CLK routing");
+			this.printCLKPIPs(clk);
+		}
 	}
 	
 	public Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk){
@@ -331,9 +334,11 @@ public class RoutableNodeRouter{
 	}
 	
 	public void printCLKPIPs(Net clk) {
+		System.out.println(" \t  used pips");
 		for(PIP pip : clk.getPIPs()) {
-			System.out.println(" \t " + pip.getStartNode() + "  ->  " + pip.getEndNode());
+			System.out.println(" \t  " + pip.getStartNode() + "  ->  " + pip.getEndNode());
 		}
+		System.out.println();
 	}
 	
 	//adapted from RW API
