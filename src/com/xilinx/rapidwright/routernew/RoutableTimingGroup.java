@@ -13,6 +13,7 @@ import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.GroupDelayType;
+import com.xilinx.rapidwright.timing.GroupWireDirection;
 import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
 import com.xilinx.rapidwright.timing.NodeWithFaninInfo;
 import com.xilinx.rapidwright.timing.SiblingsTimingGroup;
@@ -167,23 +168,39 @@ public class RoutableTimingGroup implements Routable{
 			
 		}else if(this.type == RoutableType.INTERRR){
 			
-			base_cost = 1f;
-//			base_cost = 0.333f * (this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
+//			base_cost = 1f;
+//			base_cost = 1f * (Math.abs((this.x - this.getNode().getAllWiresInNode()[0].getTile().getColumn()) + Math.abs(this.y - this.getNode().getAllWiresInNode()[0].getTile().getRow()) )+ 1);;
+//			base_cost = 0.333f * (Math.abs((this.x - this.getNode().getAllWiresInNode()[0].getTile().getColumn()) + Math.abs(this.y - this.getNode().getAllWiresInNode()[0].getTile().getRow()) )+ 1);
 			
-//			GroupDelayType type = this.sibTimingGroups.type();
-//			switch(type) {
-//			case SINGLE:
-//				base_cost = 0.33f;
-//			case DOUBLE:
-//				base_cost = 0.33f * 2;
-//			case QUAD:
-//				base_cost = 0.33f * 4;
-//			case LONG:
-//				base_cost = 0.33f * 12;
-//			default:
-//				base_cost = 0.333f;
-//			}
-			
+			GroupDelayType type = this.sibTimingGroups.type();
+			GroupWireDirection direction = this.sibTimingGroups.direct();
+//			System.out.printf(this.getNode() + " " + type);
+			switch(type) {
+			case SINGLE:
+				base_cost = 1f;
+				break;
+			case DOUBLE:
+				if(direction == GroupWireDirection.VERTICAL)
+					base_cost = 1f * 2;
+				else
+					base_cost = 1f * 1;
+				break;
+			case QUAD:
+				if(direction == GroupWireDirection.VERTICAL)
+					base_cost = 1f * 4;
+				else
+					base_cost = 1f * 2;
+				break;
+			case LONG:
+				if(direction == GroupWireDirection.VERTICAL)
+					base_cost = 1f * 12;
+				else
+					base_cost = 1f * 6;;
+				break;
+			default:
+				base_cost = 1f;
+			}
+//			System.out.println(base_cost);
 		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
 			base_cost = 0.95f;//virtually the same to the logic block input pin, since no alternative ipins are considered
 		}

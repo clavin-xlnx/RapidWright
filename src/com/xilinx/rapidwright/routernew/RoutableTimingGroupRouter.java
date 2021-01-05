@@ -67,7 +67,7 @@ public class RoutableTimingGroupRouter{
 	public PriorityQueue<QueueElement> queue;
 	public Collection<RoutableData> rnodesTouched;
 	public Map<NodeWithFaninInfo, RoutableTimingGroup> rnodesCreated;
-	public Set<ImmutableTimingGroup> rnodesExpanded = new HashSet<>();
+//	public Set<ImmutableTimingGroup> rnodesExpanded = new HashSet<>();
 	
 	//map for solving congestion on entry nodes that are shared among siblings
 	public Map<Connection, List<NodeWithFaninInfo>> connectionEntryNodes;
@@ -246,10 +246,6 @@ public class RoutableTimingGroupRouter{
 			}else{
 				System.out.println("UNKNOWN type net: " + n.toString());
 			}
-		}
-		
-		for(Connection c:this.connections) {
-			c.calculateGeoConBoundingBox(bbRange);
 		}
 		
 		return rrgNodeId;
@@ -546,13 +542,6 @@ public class RoutableTimingGroupRouter{
         	}
         }
         
-        // this is to specify certain connections to be routed in trial mode
-        /*for(Connection con : this.sortedListOfConnection){
-        	if(con.id == 1216){
-        		trialCons.add(con);
-        	}
-        }*/
-        
 		while(this.itry < this.nrOfTrials){
 			this.iterationStart = System.nanoTime();
 			this.connectionsRoutedIteration = 0;	
@@ -560,8 +549,6 @@ public class RoutableTimingGroupRouter{
 			
 			if(printRoutingSteps) this.printInfo("set reroute criticality");
 			this.setRerouteCriticality(this.sortedListOfConnection);
-			//TODO sorting connections based on their criticalities
-//			Collections.sort(this.sortedListOfConnection, Comparators.ConnectionCriticality);	
 			
 			if(this.trial) this.printInfo("iteration " + this.itry + " begins");
 			
@@ -569,9 +556,6 @@ public class RoutableTimingGroupRouter{
 			if(!this.trial){
 				for(Connection con:this.sortedListOfConnection){
 					this.routingAndTimer(con);
-//					if(con.net.getNet().getName().equals("n1916")) {
-//						this.printConRNodes(con);
-//					}
 				}
 			}else{
 				for(Connection con : trialCons){		
@@ -610,16 +594,14 @@ public class RoutableTimingGroupRouter{
 					float maxCriticality = this.timingManager.calculateCriticality(this.sortedListOfConnection, 
 							MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
 					System.out.println(String.format("           max criticality: %3.2f", maxCriticality));
-//					 this.timingManager.getCriticalPathInfo(this);
 					
 				}else{
 					this.timingManager.updateIllegalNetsDelays(illegalTrees, this.nodesDelays);
 					this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
 					this.timingManager.calculateCriticality(this.sortedListOfConnection, 
 							MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
-//					this.timingManager.getCriticalPathInfo(this);
+
 				}
-//				this.timingGraph.getDelayOfPath("{{FD_ihp/Q LUT6_0/O LUT6_6f/O LUT4_38/O LUT5_3b/O FD_ad/D}}", this);
 			}
 			
 			this.iterationEnd = System.nanoTime();
@@ -1151,34 +1133,6 @@ public class RoutableTimingGroupRouter{
 		System.out.println(aver);
 	}
 	
-	public void findCongestion(){
-		for(RoutableTimingGroup rn : this.rnodesCreated.values()){
-			if(rn.overUsed()){
-				System.out.println(rn.toString());
-			}
-		}
-		Set<Connection> congestedCons = new HashSet<>();
-//		Map<Netplus<Node>, Integer> congestedNets = new HashMap<>();
-		for(Connection con:this.sortedListOfConnection){
-			if(con.congested()){
-				congestedCons.add(con);
-				/*Netplus<Node> np = con.getNet();
-				if(congestedNets.containsKey(np)){
-					congestedNets.put(np, congestedNets.get(np)+1);
-				}else{
-					congestedNets.put(np, 1);
-				}*/
-			}
-		}
-		for(Connection con:congestedCons){
-			System.out.println(con.toString());
-			for(Routable rn : con.rnodes){
-				if(rn.overUsed()) System.out.println("\t"+ rn.toString());
-			}
-			System.out.println();
-		}
-	}
-	
 	public boolean targetReached(Connection con){
 		if(this.queue.size() > 0){
 			return this.queue.peek().rnode.isTarget();
@@ -1193,10 +1147,6 @@ public class RoutableTimingGroupRouter{
 
 	public void routeACon(Connection con){
 		this.prepareForRoutingACon(con);
-//		if(this.debugRoutingCon && this.targetCon(con)) this.printInfo("routing for " + con.toStringTG());
-//		
-//		if(this.debugRoutingCon && this.targetCon(con)) System.out.println("target set " + con.getSinkRNode().isTarget() + ", "
-//				+ ((RoutableTimingGroup) con.getSinkRNode()).getSiblingsTimingGroup().hashCode());
 		while(!this.targetReached(con)){
 			
 			RoutableTimingGroup rnode = (RoutableTimingGroup) queue.poll().rnode;
@@ -1277,13 +1227,11 @@ public class RoutableTimingGroupRouter{
 							continue;
 						}
 					}
-					this.rnodesExpanded.add(thruImmu);
 					this.addNodeToQueue(rnode, child, thruImmu, con);
 					this.nodesExpanded++;
 					
 				}
 			}else if(child.isTarget()){	
-				this.rnodesExpanded.add(thruImmu);
 				this.addNodeToQueue(rnode, child, thruImmu, con);
 				this.nodesExpanded++;
 				
@@ -1292,8 +1240,6 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	private boolean usablePINBounce(RoutableTimingGroup childGroup, Routable sinkPinTG){
-		// TODO not accurate, would cause the target unreachable
-		// probably due to the column & row info
 		// which part of the node should be used to define the column and row? base INT tile? ending INT tile?
 		
 		int columnChild = childGroup.getNode().getTile().getColumn();
@@ -1317,10 +1263,7 @@ public class RoutableTimingGroupRouter{
 		if(!this.timingDriven){
 			new_partial_path_cost = partial_path_cost + rnodeCost;
 		}else{
-//			System.out.println(thruImmuTg.toString() + ", \t\t delay = " + thruImmuTg.getDelay());
-			new_partial_path_cost = partial_path_cost + (1 - con.getCriticality()) * rnodeCost +  con.criticality * childRNode.getDelay()/20f;//upstream path cost + cost of node under consideration
-//			System.out.println("\tPARTIAL PATH COST = " + partial_path_cost + ", \t rnodeBaseCost = " + childRNode.getBase_cost() + ", \t rnodeCost = " + rnodeCost + ", \t delay = " + rnode.getDelay() + ", \t conCriti = " + con.getCriticality());
-			
+			new_partial_path_cost = partial_path_cost + (1 - con.getCriticality()) * rnodeCost +  con.criticality * childRNode.getDelay()/20f;//upstream path cost + cost of node under consideration		
 		}
 		float new_lower_bound_total_path_cost;
 		float expected_distance_cost = 0;
@@ -1334,22 +1277,8 @@ public class RoutableTimingGroupRouter{
 				new_lower_bound_total_path_cost = (float) (new_partial_path_cost + this.mdWeight * expected_wire_cost + this.hopWeight * childLevel);
 			}else{
 				ImmutableTimingGroup immuTG = thruImmuTg;
-//				if(childRNode.getGroupDelayType() != GroupDelayType.GLOBAL ) {
 					try{
 						delay = this.estimator.getMinDelayToSinkPin(immuTG, this.sinkPinTG);
-					
-//					  if(delay < 0 || delay > 16380){ if(immuTG.entryNode() != null)
-//						  System.out.printf("delay = "+ delay + ", from ImmuTimingGroup ( " +
-//						  immuTG.entryNode().toString() + " -> " + immuTG.exitNode().toString() +
-//						  " )"); 
-//					  else System.out.printf("delay = "+ delay +
-//						  ", from ImmuTimingGroup exit node only ( " + immuTG.exitNode().toString() +
-//						  " )");
-//					  
-//					  if(this.sinkPinTG.entryNode() != null) 
-//						  System.out.println(" to ( " + this.sinkPinTG.entryNode().toString() + " -> " + this.sinkPinTG.exitNode().toString() + " )"); 
-//					  else
-//						  System.out.println(" to ( " + this.sinkPinTG.exitNode().toString() + " )"); }
 					 
 					}catch(Exception e){
 						if(immuTG.entryNode() != null)
@@ -1362,11 +1291,8 @@ public class RoutableTimingGroupRouter{
 							System.out.println(" to ( " + this.sinkPinTG.exitNode().toString() + " )");
 						e.printStackTrace();
 					}
-//				}
 				
 				new_lower_bound_total_path_cost = (float) (new_partial_path_cost + (1 - con.getCriticality()) * this.mdWeight * expected_wire_cost + this.hopWeight * con.getCriticality() * delay/20f);//TODO sharing factor for delay?
-//				System.out.println("\t discost = " + expected_distance_cost + ", \t timigCost = " + delay + 
-//						", \t IPIN = " + 0);
 			}
 			
 		}else{//lut input pin (sink)

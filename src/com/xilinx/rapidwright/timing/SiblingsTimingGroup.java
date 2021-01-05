@@ -54,6 +54,10 @@ public class SiblingsTimingGroup {
         return this.type;
     }
     
+    public GroupWireDirection direct() {
+        return this.siblings[0].wireDirection();
+    }
+    
     public ImmutableTimingGroup getThruImmuTg(NodeWithFaninInfo lastExitNode){
     	if(this.fanins.size() > 0)
     		return this.fanins.get(lastExitNode);
