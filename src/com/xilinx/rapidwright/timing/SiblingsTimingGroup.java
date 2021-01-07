@@ -44,8 +44,7 @@ public class SiblingsTimingGroup {
     public NodeWithFaninInfo getExitNode() {
         return siblings[0].exitNode();
     }
-
-    // TODO: remove this if we know for sure that entryNode has only one wire
+    
     public ImmutableTimingGroup[] getSiblings() {
         return siblings;
     }
