@@ -37,7 +37,6 @@ public class RoutableTimingGroupRouter{
 	public Design design;
 	public String dcpFileName;
 	public int nrOfTrials;
-	public CodePerfTracker t;
 	
 	public DelayEstimatorTable estimator;
 	public TimingManager timingManager;
@@ -159,7 +158,6 @@ public class RoutableTimingGroupRouter{
 		
 		this.dcpFileName = dcpFileName;
 		this.nrOfTrials = nrOfTrials;
-		this.t = t;
 		
 		this.initial_pres_fac = initial_pres_fac;
 		this.pres_fac_mult = pres_fac_mult;
@@ -217,9 +215,6 @@ public class RoutableTimingGroupRouter{
 		this.iNullEDIFNet = 0;
 		
 		for(Net n:this.design.getNets()){
-			if(n.getName().equals("LUT6_2_a5/I0")){
-				System.out.println(n.toStringFull());
-			}
 			if(n.isClockNet()){
 				this.reserveNet(n);
 				this.iclockAndStaticNet++;
@@ -442,6 +437,10 @@ public class RoutableTimingGroupRouter{
 		System.out.println();
 	}
 	
+	long intableCall = 0;
+	long outtableCall = 0;
+	long pinbounce = 0;
+	long pinfeed = 0;
 	public void estimateDelayOfConnections() {
 		for(Netplus np : this.nets) {
 			RoutableTimingGroup source = (RoutableTimingGroup) (np.getConnection().get(0).getSourceRNode());
@@ -465,6 +464,11 @@ public class RoutableTimingGroupRouter{
 				con.setTimingEdgeDelay(estConDelay);
 			}
 		}
+		
+		intableCall = this.estimator.intableQuery;
+		outtableCall = this.estimator.outOfTableQuery;
+		pinbounce = this.estimator.pinbounceQuery;
+		pinfeed = this.estimator.pinfeedQuery;
 	}
 	
 	public int routingRuntime(){
@@ -588,12 +592,11 @@ public class RoutableTimingGroupRouter{
 			
 			//update timing and criticalities of connections
 			if(this.timingDriven) {
+				this.routerTimer.updateTiming.start();
 				if(illegalTrees == null){
 					this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
-					
-					float maxCriticality = this.timingManager.calculateCriticality(this.sortedListOfConnection, 
+					this.timingManager.calculateCriticality(this.sortedListOfConnection, 
 							MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
-					System.out.println(String.format("           max criticality: %3.2f", maxCriticality));
 					
 				}else{
 					this.timingManager.updateIllegalNetsDelays(illegalTrees, this.nodesDelays);
@@ -602,6 +605,7 @@ public class RoutableTimingGroupRouter{
 							MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
 
 				}
+				this.routerTimer.updateTiming.finish();
 			}
 			
 			this.iterationEnd = System.nanoTime();
@@ -626,7 +630,6 @@ public class RoutableTimingGroupRouter{
 			
 			this.routerTimer.updateCost.start();
 			//Updating the cost factors
-			if(printRoutingSteps) this.printInfo("update cost factors");
 			this.updateCostFactors();
 			// increase router iteration
 			this.itry++;
@@ -634,7 +637,7 @@ public class RoutableTimingGroupRouter{
 		}
 		
 		if (this.itry == this.nrOfTrials + 1) {
-			System.out.println("Routing failled after " + this.itry + " trials!");
+			System.out.println("Routing terminated after " + this.itry + " trials!");
 		}
 		
 		return;
@@ -1252,7 +1255,8 @@ public class RoutableTimingGroupRouter{
 		
 		return false;
 	}
-	
+	long callDelayEstimator = 0;
+	long noCallOfDelayEstimator = 0;
 	private void addNodeToQueue(RoutableTimingGroup rnode, RoutableTimingGroup childRNode, ImmutableTimingGroup thruImmuTg, Connection con) {
 		RoutableData data = childRNode.rnodeData;
 		int countSourceUses = data.countSourceUses(con.source);		
@@ -1279,7 +1283,7 @@ public class RoutableTimingGroupRouter{
 				ImmutableTimingGroup immuTG = thruImmuTg;
 					try{
 						delay = this.estimator.getMinDelayToSinkPin(immuTG, this.sinkPinTG);
-					 
+						callDelayEstimator++;
 					}catch(Exception e){
 						if(immuTG.entryNode() != null)
 							System.out.printf("Get min delay from ImmuTimingGroup ( " + immuTG.entryNode().toString() + " -> " + immuTG.exitNode().toString() + " )");
@@ -1297,6 +1301,7 @@ public class RoutableTimingGroupRouter{
 			
 		}else{//lut input pin (sink)
 			new_lower_bound_total_path_cost = new_partial_path_cost;
+			noCallOfDelayEstimator++;
 		}	
 		/*if(this.debugExpansion){
 			System.out.println("\t\t partial_path_cost = " + partial_path_cost 
