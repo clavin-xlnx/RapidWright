@@ -13,13 +13,11 @@ public class RouterTimer {
 	public RouterTimer() {
 		this.firstIteration = new Timer("first iteration");
 		this.rerouteCongestion = new Timer("reroute congestion");
-		
-		this.rnodesCreation = new Timer("rnodes creation");
-		
+		this.rnodesCreation = new Timer("rnodes creation");	
 		this.rerouteIllegal = new Timer("fix illegal tree");
-		
 		this.calculateStatistics = new Timer("calc stat");
 		this.updateCost = new Timer("update cost");
+		this.updateTiming = new Timer("update timing");
 		this.pipsAssignment = new Timer("pips assignment");
 	}
 	
@@ -28,11 +26,10 @@ public class RouterTimer {
 		String result = "";
 		
 		result += this.firstIteration;
-		result += this.rerouteCongestion;
-		
-		result += this.rnodesCreation;
-		
+		result += this.rerouteCongestion;	
+		result += this.rnodesCreation;	
 		result += this.calculateStatistics;
+		result += this.updateTiming;
 		result += this.updateCost;
 		result += this.rerouteIllegal;
 		result += this.pipsAssignment;
