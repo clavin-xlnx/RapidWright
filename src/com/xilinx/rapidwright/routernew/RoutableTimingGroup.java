@@ -158,7 +158,7 @@ public class RoutableTimingGroup implements Routable{
 	@Override
 	public void setBaseCost(float fac) {
 		this.setBaseCost();
-		this.base_cost *= fac;//(this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
+		this.base_cost *= fac;
 	}
 	
 	//TODO ADJUST (1 1 0.95 orginal)
@@ -195,7 +195,7 @@ public class RoutableTimingGroup implements Routable{
 				if(direction == GroupWireDirection.VERTICAL)
 					base_cost = 1f * 12;
 				else
-					base_cost = 1f * 6;;
+					base_cost = 1f * 6;
 				break;
 			default:
 				base_cost = 1f;
@@ -251,6 +251,7 @@ public class RoutableTimingGroup implements Routable{
 			this.x = (short) intTiles.get(0).getColumn();
 			this.y = (short) intTiles.get(0).getRow();
 		}else{
+			System.out.println("non-INT tile wire of node " + this.getNode());
 			this.x = (short) wires[0].getTile().getColumn();
 			this.y = (short) wires[0].getTile().getRow();
 		}
