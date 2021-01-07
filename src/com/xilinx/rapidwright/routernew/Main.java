@@ -24,7 +24,7 @@ public class Main {
 	//allowed number of routing iterations
 	private int nrOfTrials = 60;
 	private int bbRange = 5;
-	private boolean isINTtileRange = false;//TODO
+	private boolean isINTtileRange = false;
 	private float mdWeight = 2.5f;
 	private float hopWeight = 0.7f;
 	private float initial_pres_fac = 0.5f; 
@@ -156,7 +156,7 @@ public class Main {
 						router.usedRNodes.size(),
 						router.checkAverageNumWires(),
 						1, 0, 0,
-						router.averFanoutRNodes, 0, 0);
+						router.averFanoutRNodes, 0, 0, 0, 0, 0, 0);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.firstRouting,
@@ -202,7 +202,7 @@ public class Main {
 						router.usedRNodes.size(),
 						1,
 						0, 0, 0,
-						router.averFanoutRNodes, 0, 0);
+						router.averFanoutRNodes, 0, 0, 0, 0, 0, 0);
 				
 				this.runtimeInfoPrinting(routingRuntime, 
 						router.firstIterRouting,
@@ -255,8 +255,12 @@ public class Main {
 							router.averImmuTgPerSiblings,
 							router.averNodePerSiblings,
 							router.averFanoutRNodes,
-							router.estimator != null? router.estimator.intableQuery : 0,
-							router.estimator != null? router.estimator.outOfTableQuery : 0);
+							router.estimator != null? router.estimator.intableQuery - router.intableCall: 0,
+							router.estimator != null? router.estimator.outOfTableQuery - router.outtableCall: 0,
+							router.callDelayEstimator,
+							router.noCallOfDelayEstimator,
+							router.estimator != null? router.estimator.pinbounceQuery - router.pinbounce: 0,
+							router.estimator != null? router.estimator.pinfeedQuery - router.pinfeed: 0);
 					
 					this.runtimeInfoPrinting(routingRuntime, 
 							router.firstRouting,
@@ -343,7 +347,8 @@ public class Main {
 	}
 	
 	public void rnodesInfo(float sumMD, long hops, int firstIterRNodes, int totalRNodes, int totalUsage, float averWire, float averNode,
-			float averImmuTgSiblings, float averNodeSiblings, float averChildren, long intableQ, long outOfTableQ){
+			float averImmuTgSiblings, float averNodeSiblings, float averChildren, long intableQ, long outOfTableQ, 
+			long callOfDelayEstimator, long noCallOfDelayEstimator, long pinbounce, long pinfeed){
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Total Manhattan distance: %10.2f\n", sumMD);
 		System.out.printf("Total hops: %d\n", hops);
@@ -359,9 +364,13 @@ public class Main {
 			System.out.printf("Average #TG per siblings: %5.2f\n", averImmuTgSiblings);
 			System.out.printf("Average #node per siblings: %5.2f\n", averNodeSiblings);
 			System.out.printf("Average #children per siblings: %5.2f\n", averChildren);
-			System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");	
-			System.out.println("Queries of intable delay: " + intableQ);
-			System.out.println("Queries of out-of-table delay: " + outOfTableQ);
+			System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
+			System.out.println("Total Queries of delay estimator in pushing: " + callOfDelayEstimator);
+			System.out.println(" Queries of intable delay: " + intableQ);
+			System.out.println(" Queries of out-of-table delay: " + outOfTableQ);
+			System.out.println(" Queries of pinbounce: " + pinbounce);
+			System.out.println(" Queries of pinfeed: " + pinfeed);
+			System.out.println("No call of delay estimator in pushing: " + noCallOfDelayEstimator);
 		}
 	}
 	
