@@ -84,11 +84,15 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 	public String CLE_OUT_INTABLE_FILE;
 	public long intableQuery;
 	public long outOfTableQuery;
+	public long pinfeedQuery;
+	public long pinbounceQuery;
 	
     public DelayEstimatorTable(Device device, T ictInfo, boolean hpcRun) {
         this(device, ictInfo, true, hpcRun);
         this.intableQuery = 0;
         this.outOfTableQuery = 0;
+        this.pinfeedQuery = 0;
+        this.pinbounceQuery = 0;
      }
 
     DelayEstimatorTable(Device device, T ictInfo, boolean fastMode, boolean hpcRun) {
@@ -188,7 +192,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         if (timingGroup.delayType() == GroupDelayType.PIN_BOUNCE) {
             NodePair np = new NodePair(timingGroup, sinkPin);
             Short dly = delayFrBounceToSink.get(np);
-            
+            this.pinbounceQuery++;
             if (dly == null)
                 return Short.MAX_VALUE/2;
             else{
@@ -196,6 +200,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 return (short) (dly + K0.get(T.Direction.INPUT).get(GroupDelayType.PINFEED));
             }
         } else if (timingGroup.delayType() == GroupDelayType.PINFEED) {
+        	this.pinfeedQuery++;
             return Short.MAX_VALUE/2;
         } else {
             Pair<RoutingNode,RoutingNode> srcDst = tgsToSrcDstNodeMapper.apply(timingGroup, sinkPin);
@@ -1496,8 +1501,10 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     }
 
     private Pair<Short, String> getMinDelayToSinkPin(RoutingNode beg, RoutingNode end) {
-        if (beg.tg == null)
-            return new Pair<Short,String>(Short.MAX_VALUE,null);
+        if (beg.tg == null) {
+        	System.out.println("null beg");
+            return new Pair<Short,String>(Short.MAX_VALUE,null);     
+        }
         return getMinDelayToSinkPin( beg.tg, end.tg, beg.x, beg.y, end.x, end.y, beg.side, end.side, beg.orientation, end.orientation);
     }
 
