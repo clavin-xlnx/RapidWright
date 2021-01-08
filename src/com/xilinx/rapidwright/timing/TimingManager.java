@@ -97,8 +97,6 @@ public class TimingManager {
     	this.timingGraph.computeArrivalTimesTopologicalOrder();
     	Pair<Float, TimingVertex> maxs = this.timingGraph.getMaxDelay();
     	this.timingGraph.setTimingRequirementTopologicalOrder(maxs.getFirst());
-//    	this.timingGraph.computeSlacks();//if slackCon does not use sinkTimingVertex's slack, not necessary to compute
-    	//or could be used to report worst slack?
     	
     	return maxs;
     }
