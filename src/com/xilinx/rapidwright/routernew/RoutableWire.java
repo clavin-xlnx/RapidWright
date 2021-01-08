@@ -33,6 +33,7 @@ public class RoutableWire implements Routable{
 		this.childrenSet = false;
 		this.target = false;
 		this.setXY();
+		this.setBaseCost();
 	}
 	
 	public RoutableWire(int index, Wire wire, RoutableType type){
@@ -43,6 +44,7 @@ public class RoutableWire implements Routable{
 		this.childrenSet = false;
 		this.target = false;
 		this.setXY();
+		this.setBaseCost();
 	}
 	
 	public int setChildren(int globalIndex, float base_cost_fac, Map<Wire, RoutableWire> createdRoutable){
@@ -53,7 +55,6 @@ public class RoutableWire implements Routable{
 				if(!createdRoutable.containsKey(wire)){
 					RoutableWire child;
 					child = new RoutableWire(globalIndex, wire, RoutableType.INTERRR);
-					child.setBaseCost(base_cost_fac);
 					globalIndex++;
 					this.children.add(child);
 					createdRoutable.put(wire, child);
@@ -64,12 +65,6 @@ public class RoutableWire implements Routable{
 		}
 		this.childrenSet = true;
 		return globalIndex;
-	}
-	
-	@Override
-	public void setBaseCost(float fac) {
-		this.setBaseCost();
-		this.base_cost *= fac;//(this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
 	}
 	
 	public void setBaseCost(){

@@ -29,8 +29,7 @@ public class Main {
 	private float hopWeight = 0.7f;
 	private float initial_pres_fac = 0.5f; 
 	private float pres_fac_mult = 2f; 
-	private float acc_fac = 1;
-	private float base_cost_fac = 1;
+	private float acc_fac = 1f;
 	private boolean timingDriven = true;
 	private boolean partialRouting = false;
 	private boolean virtualModeAvailable = false;
@@ -82,9 +81,6 @@ public class Main {
 			}else if(arguments[i].contains("acc_fac")){
 				this.acc_fac = Float.parseFloat(arguments[++i]);
 				
-			}else if(arguments[i].contains("base_cost_fac")){
-				this.base_cost_fac = Float.parseFloat(arguments[++i]);
-				
 			}else if(arguments[i].contains("timingDriven")){
 				this.timingDriven = true;
 				
@@ -135,7 +131,6 @@ public class Main {
 						this.initial_pres_fac,
 						this.pres_fac_mult,
 						this.acc_fac,
-						this.base_cost_fac,
 						this.partialRouting);
 				
 				router.designInfo();
@@ -181,8 +176,7 @@ public class Main {
 						this.hopWeight,
 						this.initial_pres_fac,
 						this.pres_fac_mult,
-						this.acc_fac,
-						this.base_cost_fac);
+						this.acc_fac);
 				
 				router.designInfo();
 				this.routerConfigurationInfo();
@@ -230,7 +224,6 @@ public class Main {
 						this.initial_pres_fac,
 						this.pres_fac_mult,
 						this.acc_fac,
-						this.base_cost_fac,
 						this.timingDriven,
 						this.hpcRun);
 					router.designInfo();
@@ -340,8 +333,6 @@ public class Main {
 		s.append("pres fac mult: " + this.pres_fac_mult);
 		s.append("\n");
 		s.append("acc fac: " + this.acc_fac);
-		s.append("\n");
-		s.append("base cost fac: " + this.base_cost_fac);
 		
 		System.out.println(s);
 	}

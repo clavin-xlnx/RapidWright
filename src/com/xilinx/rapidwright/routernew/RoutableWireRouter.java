@@ -85,8 +85,7 @@ public class RoutableWireRouter{
 			float hopWeight,
 			float initial_pres_fac, 
 			float pres_fac_mult, 
-			float acc_fac,
-			float base_cost_fac){
+			float acc_fac){
 		this.design = design;
 		this.queue = new PriorityQueue<>(Comparators.PRIORITY_COMPARATOR);
 		this.rnodesTouched = new ArrayList<>();
@@ -139,7 +138,6 @@ public class RoutableWireRouter{
 						type = RoutableType.SINKRR;
 					}*/
 					RoutableWire reservedRRGNode = new RoutableWire(rrgNodeId, pin, RoutableType.RESERVED);
-					reservedRRGNode.setBaseCost(Float.MAX_VALUE - 1);
 					this.rnodesCreated.put(reservedRRGNode.wire, reservedRRGNode);
 					rrgNodeId++;			
 				}
@@ -149,7 +147,6 @@ public class RoutableWireRouter{
 					Node nodeStart = pip.getStartNode();
 					for(Wire wire : nodeStart.getAllWiresInNode()){
 						RoutableWire startRRGNode = new RoutableWire(rrgNodeId, wire, RoutableType.RESERVED);//INTERRR not accurate
-						startRRGNode.setBaseCost(Float.MAX_VALUE - 1);
 						this.rnodesCreated.put(wire, startRRGNode);
 						rrgNodeId++;
 					}
@@ -157,7 +154,6 @@ public class RoutableWireRouter{
 					Node nodeEnd = pip.getEndNode();
 					for(Wire wire : nodeEnd.getAllWiresInNode()){
 						RoutableWire endRRGNode = new RoutableWire(rrgNodeId, wire, RoutableType.RESERVED);//INTERRR not accurate
-						endRRGNode.setBaseCost(Float.MAX_VALUE - 1);
 						this.rnodesCreated.put(wire, endRRGNode);
 						rrgNodeId++;
 					}
@@ -171,7 +167,6 @@ public class RoutableWireRouter{
 				
 				SitePinInst source = n.getSource();
 				RoutableWire sourceRNode = new RoutableWire(rrgNodeId, source, RoutableType.SOURCERR);
-				sourceRNode.setBaseCost(base_cost_fac);
 				this.rnodesCreated.put(sourceRNode.wire, sourceRNode);	
 				rrgNodeId++;
 				
@@ -181,7 +176,6 @@ public class RoutableWireRouter{
 					
 					//create RNode of the sink pin external wire up front 
 					RoutableWire sinkRNode = new RoutableWire(rrgNodeId, sink, RoutableType.SINKRR);
-					sinkRNode.setBaseCost(base_cost_fac);
 					c.setSinkRNode(sinkRNode);
 					this.rnodesCreated.put(sinkRNode.wire, sinkRNode);
 					rrgNodeId++;

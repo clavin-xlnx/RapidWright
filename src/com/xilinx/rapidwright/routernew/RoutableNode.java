@@ -4,11 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.timing.GroupWireDirection;
 import com.xilinx.rapidwright.util.Pair;
 
 public class RoutableNode implements Routable{
@@ -34,6 +36,7 @@ public class RoutableNode implements Routable{
 		this.childrenSet = false;
 		this.target = false;
 		this.setXY();
+		this.setBaseCost();
 	}
 	
 	public Pair<Integer, Long> setChildren(Connection c, int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable, 
@@ -47,7 +50,6 @@ public class RoutableNode implements Routable{
 				RoutableNode child = createdRoutable.get(node);
 				if(child == null) {
 					child = new RoutableNode(globalIndex, node, RoutableType.INTERRR);
-					child.setBaseCost(base_cost_fac);
 					globalIndex++;
 					this.children.add(child);
 					createdRoutable.put(node, child);
@@ -61,18 +63,12 @@ public class RoutableNode implements Routable{
 		return new Pair<Integer, Long>(globalIndex, callingOfGetNextRoutable);
 	}
 	
-	@Override
-	public void setBaseCost(float fac) {
-		this.setBaseCost();
-		this.base_cost *= fac;//(this.xhigh - this.xlow) + (this.yhigh - this.ylow) + 1;
-	}
-	
 	public void setBaseCost(){
 		if(this.type == RoutableType.SOURCERR){
 			base_cost = 1;
 			
 		}else if(this.type == RoutableType.INTERRR){
-			base_cost = 1;
+			base_cost = 1f;
 			
 		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
 			base_cost = 0.95f;//virtually the same to the logic block input pin, since no alternative ipins are considered
@@ -98,6 +94,11 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public void setXY() {
+		try {
+			this.node.getAllWiresInNode();
+		}catch (Exception e) {
+			System.out.println(this.node);
+		}
 		Wire[] wires = this.node.getAllWiresInNode();
 		List<Tile> intTiles = new ArrayList<>();
 		
