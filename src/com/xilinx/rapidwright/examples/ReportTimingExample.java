@@ -65,8 +65,8 @@ public class ReportTimingExample {
         
         System.out.println(s);
         
-        tim.getTimingGraph().getDelayOfPath("{FD_ibb/Q LUT6_0/O LUT6_133/O LUT6_2_30/LUT5/O FD_k/D}", null);
-//        tim.getTimingGraph().getDelayOfPath("{FD_mjn/Q LUT6_2_a5/LUT5/O LUT5_27a/O LUT6_5ea/O FD_kpd/D}", null);
+        //path should be customized
+//        tim.getTimingGraph().getDelayOfPath("{FD_ibb/Q LUT6_0/O LUT6_133/O LUT6_2_30/LUT5/O FD_k/D}", null);
         //================= router debugging ====================
     }
 }
