@@ -129,7 +129,6 @@ public class RoutableNodeRouter{
 			float initial_pres_fac, 
 			float pres_fac_mult, 
 			float acc_fac,
-			float base_cost_fac,
 			boolean partialRouting){
 		this.design = design;
 		DesignTools.createMissingSitePinInsts(this.design);
@@ -190,6 +189,7 @@ public class RoutableNodeRouter{
 		this.staticNetAndSinkRoutables = new HashMap<>();
 		
 		for(Net n:this.design.getNets()){
+			
 			if(n.isClockNet()){
 				clkNets.add(n);
 				this.routeGlobalClkNet();
@@ -212,7 +212,7 @@ public class RoutableNodeRouter{
 					this.reserveNet(n);
 					this.numNotNeedingRoutingNets++;
 				}
-			}else{
+			}else {
 				this.numUnrecognizedNets++;
 				System.err.println("UNRECOGNIZED NET: " + n.toString());
 			}
@@ -224,18 +224,17 @@ public class RoutableNodeRouter{
 	public void routeGlobalClkNet() {
  		boolean debug = false;
  		boolean debugPrintPIPs = false;
-		if(debug) System.out.println("\nROUTE CLK NET...");
+ 		if(debug) System.out.println("\nROUTE CLK NET...");
 		
 		Net clk = this.clkNets.get(0);//TODO to separate multiple GLOBAL_CLOCKs, e.g. CE, CLK
 		clk.unroute();//TODO initialize it with partialRouting option
 		
 		List<ClockRegion> clockRegions = new ArrayList<>();
 		for(SitePinInst pin : clk.getPins()) {
+			if(pin.isOutPin()) continue;
 			Tile t = pin.getTile();
 			ClockRegion cr = t.getClockRegion();
 			if(!clockRegions.contains(cr)) clockRegions.add(cr);
-//			ClockRegion crOneRowAbove = this.design.getDevice().getClockRegion(cr.getRow()+1, cr.getColumn());
-//			if(!clockRegions.contains(crOneRowAbove)) clockRegions.add(crOneRowAbove);//why this?
 		}
 		if(debug) System.out.println("clock regions " + clockRegions);
 		
@@ -261,6 +260,7 @@ public class RoutableNodeRouter{
 		
 		//routeCentroidToVerticalDistributionLines and routeCentroidToHorizontalDistributionLines could result in duplicated PIPs
 		if(debug) System.out.println("route Centroid To Vertical Distribution Lines");
+		
 		//Each ClockRegion is not necessarily the one that each RouteNode value belongs to (same row is a must)
 		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
 		if(debug) {
@@ -298,7 +298,17 @@ public class RoutableNodeRouter{
 			System.out.println("Final CLK routing");
 			this.printCLKPIPs(clk);
 		}
-	}
+//		List<Site> sites = new ArrayList<>();
+//		for(PIP p:clkPIPsWithoutDuplication) {
+//			if(p.getEndNode().toString().contains("BUFCE_ROW")) {
+//				Site s = p.getEndNode().getSitePin().getSite();
+//				if(!sites.contains(s)) sites.add(s);
+//			}
+//		}
+//		for(Site site : sites)
+//			clk.setBufferDelay(site, 0);
+		//clk.setBufferDelay(arg0, arg1);//delay 0 by default, int 1 2 4 8
+	}//setBufferDelay
 	
 	public Map<RouteNode, ArrayList<SitePinInst>> getLCBPinMappings(Net clk){
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = new HashMap<>();
@@ -364,7 +374,7 @@ public class RoutableNodeRouter{
 			count++;
 			if(count % 2 == 0) i++;
 		}
-		return c.getClockRegion();//.getNeighborClockRegion(0, 1);//why neighbor?
+		return c.getClockRegion();
 	}
 		
 	//TODO unused
@@ -442,6 +452,7 @@ public class RoutableNodeRouter{
 	
 	public void routeStaticNets(){
 		for(Net n:this.staticNetAndSinkRoutables.keySet()){
+//			System.out.println(n.toStringFull());
 			this.routeStaticNet(n);
 		}
 	}
@@ -540,7 +551,7 @@ public class RoutableNodeRouter{
 				}
 			}
 			if(!success){
-				System.out.println("FAILED to route " + netType + " pin " + sink.toString());
+				System.out.println("FAILED to route " + netType + " pin " + sink.toString() + ", pintype " + sink.getPinType());
 			}else{
 				sink.setRouted(true);
 			}
@@ -637,7 +648,6 @@ public class RoutableNodeRouter{
 	}
 	
 	public void initializeNetAndCons(Net n, short bbRange){
-		
 		Netplus np = new Netplus(numRoutableNetsToBeRouted, bbRange, n);
 		this.nets.add(np);
 		this.numRoutableNetsToBeRouted++;
@@ -671,6 +681,7 @@ public class RoutableNodeRouter{
 			np.addCons(c);
 			this.numConsToBeRouted++;
 		}
+		
 	}
 	
 	public void reservePipsOfNet(Net n){
@@ -690,6 +701,10 @@ public class RoutableNodeRouter{
 	public void reserveConnectedNodesOfNetPins(Net n){
 		for(SitePinInst pin:n.getPins()){
 			Node node = pin.getConnectedNode();
+			if(node == null) {
+				System.out.println("null node connected to pin " + pin + " of net " + n);
+				continue;
+			}
 			RoutableType rtype = null;
 			if(pin.isOutPin()) {
 				rtype = RoutableType.SOURCERR;
@@ -708,16 +723,15 @@ public class RoutableNodeRouter{
 		if(!this.rnodesCreated.containsKey(node)){//TODO reserved rnodes.contains()
 			//this is for initializing sources and sinks of those to-be-routed nets's connections
 			rrgNode = new RoutableNode(globalIndex, node, type);
-			rrgNode.setBaseCost(base_cost_fac);
 			this.rnodesCreated.put(rrgNode.getNode(), rrgNode);
 			this.rnodeId++;
 		}else{
 			//this is for checking preserved routing resource conflicts among routed nets
 			rrgNode = this.rnodesCreated.get(node);
 			if(rrgNode.type == type && type == RoutableType.SINKRR && netType == NetType.WIRE)
-				System.err.println("Conflicting Sink Site Pin Connected Node: " + node);
+				System.out.println("! Conflicting Sink Site Pin Connected Node: " + node);
 			if(rrgNode.type == type && type == RoutableType.RESERVED && netType == NetType.WIRE) {
-				System.err.println("Conflicting Routing Node: " + node);//TODO add the later nets to be routed
+				System.out.println("! Conflicting Routing Node: " + node);//TODO add the later nets to be routed
 				
 			}
 		}
@@ -726,7 +740,6 @@ public class RoutableNodeRouter{
 	}
 	
 	public void setBaseCostAndAdd(RoutableNode rrgNode, float base_cost_fac){
-		rrgNode.setBaseCost(base_cost_fac);
 		this.rnodesCreated.put(rrgNode.getNode(), rrgNode);
 		this.rnodeId++;
 	}

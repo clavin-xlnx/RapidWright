@@ -16,6 +16,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.EDIFNet;
@@ -65,8 +66,7 @@ public class RoutableTimingGroupRouter{
 	public Set<Node> reservedNodes;
 	public PriorityQueue<QueueElement> queue;
 	public Collection<RoutableData> rnodesTouched;
-	public Map<NodeWithFaninInfo, RoutableTimingGroup> rnodesCreated;
-//	public Set<ImmutableTimingGroup> rnodesExpanded = new HashSet<>();
+	public Map<Node, RoutableTimingGroup> rnodesCreated;
 	
 	//map for solving congestion on entry nodes that are shared among siblings
 	public Map<Connection, List<NodeWithFaninInfo>> connectionEntryNodes;
@@ -133,7 +133,6 @@ public class RoutableTimingGroupRouter{
 			float initial_pres_fac, 
 			float pres_fac_mult, 
 			float acc_fac,
-			float base_cost_fac,
 			boolean timingDriven,
 			boolean hpcRun){
 		
@@ -279,8 +278,9 @@ public class RoutableTimingGroupRouter{
 		Netplus np = new Netplus(inetToBeRouted, bbRange, n);
 		this.nets.add(np);
 		
-		SitePinInst source = n.getSource();
-		RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
+		SitePinInst source = n.getSource();		
+		RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.PINFEED_O, this.timingModel, this.base_cost_fac);
+		
 		for(SitePinInst sink:n.getSinkPins()){
 			if(RouterHelper.isExternalConnectionToCout(source, sink)){
 				source = n.getAlternateSource();
@@ -288,13 +288,13 @@ public class RoutableTimingGroupRouter{
 					String errMsg = "net alternate source is null: " + n.toStringFull();
 					 throw new IllegalArgumentException(errMsg);
 				}
-				sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
+				sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.PINFEED_O, this.timingModel, this.base_cost_fac);
 			}
 			
 			Connection c = new Connection(icon, source, sink);	
 			c.setSourceRNode(sourceRNode);
 			
-			RoutableTimingGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.SINKRR, this.timingModel, this.base_cost_fac);
+			RoutableTimingGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.PINFEED_I, this.timingModel, this.base_cost_fac);
 			c.setSinkRNode(sinkRNode);
 			this.connections.add(c);
 			c.setNet(np);
@@ -315,7 +315,7 @@ public class RoutableTimingGroupRouter{
 			
 			SitePinInst source = n.getSource();
 			
-			RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
+			RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.PINFEED_O, this.timingModel, this.base_cost_fac);
 			for(SitePinInst sink:n.getSinkPins()){
 				if(RouterHelper.isExternalConnectionToCout(source, sink)){//|| n.getName().equals("ncda") || n.getName().equals("ncfe") || n.getName().equals("ncf8")
 					source = n.getAlternateSource();
@@ -323,13 +323,13 @@ public class RoutableTimingGroupRouter{
 						String errMsg = "net alternative source is null: " + n.toStringFull();
 						 throw new IllegalArgumentException(errMsg);
 					}
-					sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
+					sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.PINFEED_O, this.timingModel, this.base_cost_fac);
 				}
 				
 				Connection c = new Connection(icon, source, sink);
 				c.setSourceRNode(sourceRNode);
 				
-				RoutableTimingGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.SINKRR, this.timingModel, this.base_cost_fac);
+				RoutableTimingGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.PINFEED_I, this.timingModel, this.base_cost_fac);
 				c.setSinkRNode(sinkRNode);
 				
 				//set TimingEdge of connection			
@@ -342,8 +342,13 @@ public class RoutableTimingGroupRouter{
 				
 				this.connections.add(c);
 				c.setNet(np);
-				for(TimingEdge e : c.timingEdges){
-					this.timingEdgeConnectionMap.put(e, c); // for timing info
+				try {
+					for(TimingEdge e : c.timingEdges){//TODO NPE for BRAMs
+						this.timingEdgeConnectionMap.put(e, c); // for timing info
+					}
+				}catch(Exception e) {
+					System.out.println(n.toStringFull());
+					System.out.println();
 				}
 				np.addCons(c);
 				this.icon++;
@@ -359,8 +364,7 @@ public class RoutableTimingGroupRouter{
 	
 	public RoutableTimingGroup createRoutableNodeAndAdd(int index, SitePinInst sitePinInst, RoutableType type, TimingModel model, float base_cost_fac){
 		RoutableTimingGroup routableTG = new RoutableTimingGroup(index, sitePinInst, type, this.estimator);
-		routableTG.setBaseCost(base_cost_fac);
-		this.rnodesCreated.put(routableTG.getSiblingsTimingGroup().getSiblings()[0].exitNode(), routableTG);
+		this.rnodesCreated.put(routableTG.getNode(), routableTG);
 		this.rrgNodeId++;
 		return routableTG;
 	}
@@ -446,7 +450,7 @@ public class RoutableTimingGroupRouter{
 			RoutableTimingGroup source = (RoutableTimingGroup) (np.getConnection().get(0).getSourceRNode());
 			this.tracingSetChildren(source);
 			for(Connection con : np.getConnection()) {
-				ImmutableTimingGroup sinkTG = ((RoutableTimingGroup) con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[1];
+				ImmutableTimingGroup sinkTG = ((RoutableTimingGroup) con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[0];
 
 				short estConDelay = Short.MAX_VALUE;
 				for(Pair<RoutableTimingGroup, ImmutableTimingGroup> child : source.childrenImmuTG) {
@@ -478,17 +482,12 @@ public class RoutableTimingGroupRouter{
 			this.maxDelayAndTimingVertex = this.timingManager.calculateArrivalRequireAndSlack();
 			this.timingManager.calculateCriticality(this.connections, MAX_CRITICALITY, CRITICALITY_EXPONENT, maxDelayAndTimingVertex.getFirst());
 		
-			this.timingManager.getCriticalPathInfo(this);
-		
-			System.out.println(String.format("pre-routing max delay using estimation: %3.2f", maxDelayAndTimingVertex.getFirst()));
+			System.out.println(String.format("pre-routing max delay estimated: %3.2f", maxDelayAndTimingVertex.getFirst()));
 		}
 		this.route();
 		long end = System.nanoTime();
 		int timeInMilliseconds = (int)Math.round((end-start) * Math.pow(10, -6));
-		this.getTotalNodesInResourceGraph();
-		if(this.timingDriven) this.getNodeGroupTypeAndDelayMap();
-//		this.entryNodesSharing();//4.8
-		System.out.println();
+		this.getNodeGroupTypeAndDelayMap();
 		return timeInMilliseconds;
 	}
 	
@@ -879,7 +878,6 @@ public class RoutableTimingGroupRouter{
 				boolean isCyclic = graphHelper.isCyclic(illegalTree);
 				if(isCyclic){
 					//remove cycles
-					System.out.println(illegalTree.getNet().getName() + " cycle exists");
 					graphHelper.cutOffIllegalEdges(illegalTree, true);//clean version (update to router fields)
 				}else{
 					graphHelper.cutOffIllegalEdges(illegalTree, false);
@@ -915,10 +913,6 @@ public class RoutableTimingGroupRouter{
 		RoutableTimingGroup parent = null;	
 		for(int i = con.rnodes.size() - 1; i >= 0; i--){
 			RoutableTimingGroup rnode = (RoutableTimingGroup) con.rnodes.get(i);
-			if(rnode == null){
-				System.out.println(con.rnodes.size() + ", " + i);
-				System.out.println();
-			}
 			RoutableData rNodeData = rnode.rnodeData;
 			
 			rNodeData.removeSource(con.source);
@@ -983,7 +977,7 @@ public class RoutableTimingGroupRouter{
 	
 	public NodeWithFaninInfo addEntryNodeSource(RoutableTimingGroup rnode, Connection con, int i){
 		//thruImmuTg will never be null for non-source resources
-		if(rnode.type != RoutableType.SOURCERR){
+		if(rnode.type != RoutableType.PINFEED_O){
 			NodeWithFaninInfo thruEntryNode = this.connectionEntryNodes.get(con).get(i);
 			if(thruEntryNode != null){
 				thruEntryNode.addSource(con.source);
@@ -1004,7 +998,7 @@ public class RoutableTimingGroupRouter{
 	}
 	
 	public NodeWithFaninInfo removeEntryNodeSource(RoutableTimingGroup rnode, Connection con, int i){
-		if(rnode.type != RoutableType.SOURCERR){//SOURCERR does not have a thruImmuTg (null)
+		if(rnode.type != RoutableType.PINFEED_O){//SOURCERR does not have a thruImmuTg (null)
 			NodeWithFaninInfo thruEntryNode = this.connectionEntryNodes.get(con).get(i);//thruImmuTg that should not be used here,
 			//because it might be changed during the routing process of other connections that use the same rnode
 			if(thruEntryNode != null){
@@ -1222,22 +1216,22 @@ public class RoutableTimingGroupRouter{
 			RoutableTimingGroup child = childRNode.getFirst();
 			ImmutableTimingGroup thruImmu = childRNode.getSecond();
 			
-			if(child.type == RoutableType.INTERRR){
+			if(child.type == RoutableType.WIRE){
 				if(child.isInBoundingBoxLimit(con)){
-					//PIN_BOUNCE
-					if(thruImmu.delayType() == GroupDelayType.PIN_BOUNCE){
-						if(!this.usablePINBounce(child, con.getSinkRNode())){
-							continue;
-						}
-					}
 					this.addNodeToQueue(rnode, child, thruImmu, con);
 					this.nodesExpanded++;
 					
 				}
+			}else if(child.type == RoutableType.PINBOUNCE) {
+				if(child.isInBoundingBoxLimit(con)){
+					if(this.usablePINBounce(child, con.getSinkRNode())){
+						this.addNodeToQueue(rnode, child, thruImmu, con);
+						this.nodesExpanded++;
+					}
+				}
 			}else if(child.isTarget()){	
 				this.addNodeToQueue(rnode, child, thruImmu, con);
 				this.nodesExpanded++;
-				
 			}
 		}
 	}
@@ -1273,7 +1267,7 @@ public class RoutableTimingGroupRouter{
 		float expected_distance_cost = 0;
 		float expected_wire_cost;
 		short delay = 0;
-		if(childRNode.type == RoutableType.INTERRR){
+		if(!childRNode.isTarget()){
 			expected_distance_cost = this.expectMahatD(childRNode, con);
 			expected_wire_cost = expected_distance_cost / (1 + countSourceUses);
 			
@@ -1343,10 +1337,11 @@ public class RoutableTimingGroupRouter{
 		float acc_cost = rnode.getAcc_cost();
 		//Bias cost
 		float bias_cost = 0;
-		if(rnode.type == RoutableType.INTERRR) {
+
+		if(!rnode.isTarget()) {
 			Netplus net = con.getNet();
 			bias_cost = 0.5f * rnode.getBase_cost() / net.fanout * 
-					(Math.abs(rnode.getX() - net.x_geo) + Math.abs(rnode.getY() - net.y_geo)) / net.hpwl;
+						(Math.abs(rnode.getX() - net.x_geo) + Math.abs(rnode.getY() - net.y_geo)) / net.hpwl;
 		}
 		
 		//add entry node congestion penalty to the Siblings
@@ -1375,7 +1370,7 @@ public class RoutableTimingGroupRouter{
 	
 	private float expectMahatD(RoutableTimingGroup childRNode, Connection con){
 		float md;
-		md = Math.abs(childRNode.getX() - con.getSinkRNode().getX()) + Math.abs(childRNode.getY() - con.getSinkRNode().getY());
+		md = (float) (Math.abs(childRNode.getX() - con.getSinkRNode().getX())*2 + Math.abs(childRNode.getY() - con.getSinkRNode().getY())*4);
 		return md;
 	}
 	
@@ -1392,7 +1387,7 @@ public class RoutableTimingGroupRouter{
 		//set the sink rrg node of con as the target
 		con.getSinkRNode().setTarget(true);
 		//TODO currently, the one with index 1 is selected for delay estimation
-		this.sinkPinTG = ((RoutableTimingGroup)con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[1];
+		this.sinkPinTG = ((RoutableTimingGroup)con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[0];
 		
 		// Add source to queue
 		RoutableTimingGroup source = (RoutableTimingGroup) con.getSourceRNode();
@@ -1461,7 +1456,7 @@ public class RoutableTimingGroupRouter{
 		Map<GroupDelayType, CountingSet<Float>> typeDelays = new HashMap<>();
 		
 		for(RoutableTimingGroup rtg:this.rnodesCreated.values()){
-			GroupDelayType type = rtg.getSiblingsTimingGroup().type();
+			GroupDelayType type = rtg.getSiblingsTimingGroup().groupDelayType();
 			float delay = rtg.getDelay();
 			if(!typeDelays.containsKey(type)){
 				CountingSet<Float> delays = new CountingSet<>();

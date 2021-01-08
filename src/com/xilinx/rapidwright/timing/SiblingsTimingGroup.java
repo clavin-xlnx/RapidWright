@@ -49,11 +49,11 @@ public class SiblingsTimingGroup {
         return siblings;
     }
 
-    public GroupDelayType type() {
+    public GroupDelayType groupDelayType() {
         return this.type;
     }
     
-    public GroupWireDirection direct() {
+    public GroupWireDirection groupWireDirectiont() {
         return this.siblings[0].wireDirection();
     }
     

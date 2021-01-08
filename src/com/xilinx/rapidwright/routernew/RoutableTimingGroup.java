@@ -58,10 +58,11 @@ public class RoutableTimingGroup implements Routable{
 		this.target = false;
 		this.childrenSet = false;
 		this.setXY();
+		this.setBaseCost();
 		this.thruImmuTg = null;
 		if(estimator != null) this.setDelay(estimator.getDelayOfSitePin(sitePinInst));
 		this.sibTimingGroups.getSiblings()[0].setDelay((short)this.delay);
-		if(this.type == RoutableType.SOURCERR){
+		if(this.type == RoutableType.PINFEED_O){
 			this.virtualMode = false;
 		}else{
 			this.virtualMode = true; // true or false does not matter to sinkrr, becase of the isTarget() check
@@ -70,18 +71,18 @@ public class RoutableTimingGroup implements Routable{
 	
 	public RoutableTimingGroup(int index, SiblingsTimingGroup sTimingGroups){
 		this.index = index;
-		this.type = RoutableType.INTERRR;
 		this.sibTimingGroups = sTimingGroups;
 		this.rnodeData = new RoutableData(this.index);
 		this.target= false;
 		this.childrenSet = false;	
 		this.setXY();
+		this.setBaseCost();
 		this.thruImmuTg = null;
 		this.virtualMode = true;
 	}
 	
 	public Pair<Integer, Long> setChildren(int globalIndex, float base_cost_fac, 
-			Map<NodeWithFaninInfo, RoutableTimingGroup> createdRoutable, 
+			Map<Node, RoutableTimingGroup> createdRoutable, 
 			Set<Node> reservedNodes,
 			RouteThruHelper helper,
 			boolean timingDriven,
@@ -101,7 +102,6 @@ public class RoutableTimingGroup implements Routable{
 			
 			if(childRNode == null){
 				childRNode = new RoutableTimingGroup(globalIndex, stGroups);
-				childRNode.setBaseCost(base_cost_fac);
 				globalIndex++;
 				createdRoutable.put(key, childRNode);
 				thruImmuTg = stGroups.getThruImmuTg(this.sibTimingGroups.getExitNode());	
@@ -144,65 +144,62 @@ public class RoutableTimingGroup implements Routable{
 		}
 	}
 	
-	public List<Node> downHillNodesodTheLastNode(){
-		List<Node> nodes = this.sibTimingGroups.getSiblings()[0].exitNode().getAllDownhillNodes();
-		for(Node node:nodes){
-			System.out.println(node.toString() + " downhill nodes: ");
-			for(Node dn:node.getAllDownhillNodes()){
-				System.out.println("\t" + dn.toString());
-			}
-		}
-		return nodes;
-	}
-	
-	@Override
-	public void setBaseCost(float fac) {
-		this.setBaseCost();
-		this.base_cost *= fac;
-	}
-	
 	//TODO ADJUST (1 1 0.95 orginal)
 	public void setBaseCost(){
-		if(this.type == RoutableType.SOURCERR){
+		if(this.type == RoutableType.PINFEED_O){
 			base_cost = 1f;
 			
-		}else if(this.type == RoutableType.INTERRR){
-			
-//			base_cost = 1f;
-//			base_cost = 1f * (Math.abs((this.x - this.getNode().getAllWiresInNode()[0].getTile().getColumn()) + Math.abs(this.y - this.getNode().getAllWiresInNode()[0].getTile().getRow()) )+ 1);;
-//			base_cost = 0.333f * (Math.abs((this.x - this.getNode().getAllWiresInNode()[0].getTile().getColumn()) + Math.abs(this.y - this.getNode().getAllWiresInNode()[0].getTile().getRow()) )+ 1);
-			
-			GroupDelayType type = this.sibTimingGroups.type();
-			GroupWireDirection direction = this.sibTimingGroups.direct();
-//			System.out.printf(this.getNode() + " " + type);
+		}else if(this.type == RoutableType.PINFEED_I){
+			base_cost = 0.95f;
+		}else{
+			GroupDelayType type = this.sibTimingGroups.groupDelayType();
+			GroupWireDirection direction = this.sibTimingGroups.groupWireDirectiont();
 			switch(type) {
 			case SINGLE:
-				base_cost = 1f;
+				if(direction == GroupWireDirection.VERTICAL)
+					base_cost = 1f;
+				else
+					base_cost = 1.2f;
+				this.type = RoutableType.WIRE;
 				break;
 			case DOUBLE:
 				if(direction == GroupWireDirection.VERTICAL)
-					base_cost = 1f * 2;
+					base_cost = 1.2f;
 				else
-					base_cost = 1f * 1;
+					base_cost = 1.4f;
+				this.type = RoutableType.WIRE;
 				break;
 			case QUAD:
-				if(direction == GroupWireDirection.VERTICAL)
-					base_cost = 1f * 4;
+				if(direction == GroupWireDirection.VERTICAL)//vertical QUAD less expensive
+					base_cost = 1.4f;
 				else
-					base_cost = 1f * 2;
+					base_cost = 1.6f;
+				this.type = RoutableType.WIRE;
 				break;
 			case LONG:
-				if(direction == GroupWireDirection.VERTICAL)
-					base_cost = 1f * 12;
+				if(direction == GroupWireDirection.VERTICAL)//vertical LONG less expensive
+					base_cost = 1.6f;
 				else
-					base_cost = 1f * 6;
+					base_cost = 1.8f;
+				this.type = RoutableType.WIRE;
+				break;
+			case INTERNAL:
+			case GLOBAL:
+				base_cost = 1f;
+				this.type = RoutableType.WIRE;
+				break;
+			case PIN_BOUNCE:
+				base_cost = 1f;
+				this.type = RoutableType.PINBOUNCE;
+				break;
+			case PINFEED:
+				base_cost = 1f;
+				this.type = RoutableType.PINFEED_I;
 				break;
 			default:
 				base_cost = 1f;
+				this.type = null;
 			}
-//			System.out.println(base_cost);
-		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
-			base_cost = 0.95f;//virtually the same to the logic block input pin, since no alternative ipins are considered
 		}
 	}
 
@@ -432,7 +429,7 @@ public class RoutableTimingGroup implements Routable{
 	}
 	
 	public GroupDelayType getGroupDelayType(){
-		return this.sibTimingGroups.type();
+		return this.sibTimingGroups.groupDelayType();
 	}
 	
 	@Override

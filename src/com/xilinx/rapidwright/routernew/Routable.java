@@ -5,8 +5,6 @@ import com.xilinx.rapidwright.device.Node;
 public interface Routable {
 	//public static final
 	short capacity = 1;
-	
-	public void setBaseCost(float base_cost_fac);
 
 	public boolean used();
 	public boolean overUsed();

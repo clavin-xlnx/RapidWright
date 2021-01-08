@@ -46,7 +46,7 @@ public class Netplus{
 		for(SitePinInst spi:net.getPins()){
 			
 			try{
-				short x = (short) spi.getTile().getColumn();
+				short x = (short) spi.																																																																																																											getTile().getColumn();
 				short y = (short) spi.getTile().getRow();
 				xArray[iPin] = x;
 				yArray[iPin] = y;
@@ -77,8 +77,8 @@ public class Netplus{
 		this.x_geo = x_geo_sum / numPins;
 		this.y_geo = y_geo_sum / numPins;
 		
-		this.x_min_b = (short) (x_min - bbRange);
-		this.x_max_b = (short) (x_max + bbRange);
+		this.x_min_b = (short) (x_min - 2*bbRange);
+		this.x_max_b = (short) (x_max + 2*bbRange);
 		this.y_min_b = (short) (y_min - bbRange);
 		this.y_max_b = (short) (y_max + bbRange);
 		
