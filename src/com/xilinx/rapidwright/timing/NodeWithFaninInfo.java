@@ -1,10 +1,7 @@
 package com.xilinx.rapidwright.timing;
 
-
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
@@ -25,8 +22,6 @@ public class NodeWithFaninInfo extends Node{
     	nodePairs = new HashMap<>();
     }
     
-
-
     //  To convert Node to NodeWithFaninInfo.
     //	from: Node              n = axyz();
     //	to:   NodeWithFaninInfo n = NodeWithFaninInfo.create(axyz());

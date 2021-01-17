@@ -78,7 +78,7 @@ public class SiblingsTimingGroup {
 
         List<ImmutableTimingGroup> siblings    = new ArrayList<>();
         this.fanins = new HashMap<>();
-
+        //TODO YZ: connected node of IN sitePinInst to BRAM has INTENT_DEFAULT code
         if (sitePin.getPinType() == PinType.IN) {
             // input sitepin has two nodes
             Node nextNextNode = node;

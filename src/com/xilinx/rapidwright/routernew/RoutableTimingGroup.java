@@ -81,13 +81,12 @@ public class RoutableTimingGroup implements Routable{
 		this.virtualMode = true;
 	}
 	
-	public Pair<Integer, Long> setChildren(int globalIndex, float base_cost_fac, 
+	public Pair<Integer, Long> setChildren(int globalIndex,
 			Map<Node, RoutableTimingGroup> createdRoutable, 
 			Set<Node> reservedNodes,
 			RouteThruHelper helper,
 			boolean timingDriven,
 			DelayEstimatorTable estimator,
-			RouterTimer timer,
 			long callingOfGetNextRoutable){
 		
 		List<SiblingsTimingGroup> next = this.sibTimingGroups.getNextSiblingTimingGroups(reservedNodes);
@@ -248,7 +247,7 @@ public class RoutableTimingGroup implements Routable{
 			this.x = (short) intTiles.get(0).getColumn();
 			this.y = (short) intTiles.get(0).getRow();
 		}else{
-			System.out.println("non-INT tile wire of node " + this.getNode());
+//			System.out.println("non-INT tile wire of node " + this.getNode());
 			this.x = (short) wires[0].getTile().getColumn();
 			this.y = (short) wires[0].getTile().getRow();
 		}
@@ -416,17 +415,6 @@ public class RoutableTimingGroup implements Routable{
 	public RoutableType getRoutableType() {
 		return this.type;
 	}
-
-	@Override
-	public boolean isGlobal() {
-		return false;
-	}
-
-	@Override
-	public boolean isBounce() {
-		
-		return false;
-	}
 	
 	public GroupDelayType getGroupDelayType(){
 		return this.sibTimingGroups.groupDelayType();
@@ -470,5 +458,26 @@ public class RoutableTimingGroup implements Routable{
 	@Override
 	public float getBase_cost() {
 		return this.base_cost;
-	}	
+	}
+	
+	@Override
+	public RoutableData getRoutableData() {
+		return this.rnodeData;
+	}
+	
+	@Override
+	public boolean isChildrenSet() {
+		return childrenSet;
+	}
+
+	@Override
+	public void setChildrenSet(boolean childrenSet) {
+		this.childrenSet = childrenSet;
+	}
+
+	@Override
+	public List<Routable> getChildren() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

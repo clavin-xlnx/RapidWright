@@ -9,13 +9,10 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
-
+/**
+ * A collections of methods for getting design nets info and generating pips
+ */
 public class RouterHelper {
-	//a collections of methods for routing
-	public RouterHelper(){
-		
-	}
-	
 	//methods to categorize the net
 	public static boolean isRoutableNetWithSourceSinks(Net n){
 		return n.getSource() != null && n.getSinkPins().size() > 0;
@@ -81,11 +78,8 @@ public class RouterHelper {
 	
 	public static PIP findThePIPbetweenTwoNodes(Node nodeFormer, Node nodeLatter){
 		PIP pip = findPIP(nodeLatter.getTile(), nodeFormer.getAllWiresInNode(), nodeLatter.getWire());
-		
-//		if(pip == null) {
-//			pip = findPIP(nodeFormer.getTile(), nodeLatter.getAllWiresInNode(), nodeFormer.getWire());
-//		}
-		if(pip == null) {//for other scenarios, such as LAG tile nodes, LAG_LAG_X12Y250/LAG_MUX_ATOM_0_TXOUT to node LAG_LAG_X12Y310/UBUMP0 
+		//for other scenarios, such as LAG tile nodes, LAG_LAG_X12Y250/LAG_MUX_ATOM_0_TXOUT to node LAG_LAG_X12Y310/UBUMP0
+		if(pip == null) {
 			pip = findPIP(nodeFormer, nodeLatter);
 		}
 		
@@ -105,7 +99,7 @@ public class RouterHelper {
 		return pip;
 	}
 	
-	//this will return null for NodeGroup router, because nodeFormer is Node, NodeLatter is NodeWithFaninInfo
+	//TODO Node.euqal(NodeWithFaninInfo) results in null PIP when using NodeGroup router
 	public static PIP findPIP(Node nodeFormer, Node nodeLatter) {
 		PIP pip = null;
 		for(PIP p : nodeFormer.getAllDownhillPIPs()) {

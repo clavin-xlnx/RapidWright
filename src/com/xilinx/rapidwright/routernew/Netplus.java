@@ -6,12 +6,10 @@ import java.util.List;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
-
+/**
+ * Netplus is a wrapper class of Net with additional information for router
+ */
 public class Netplus{
-	/**
-	 * Netplus is a class with additional information of a net for 
-	 * a PathFinder-based router development
-	 */
 	private List<Connection> connections;
 	public Net net;
 	private int id;
@@ -110,6 +108,13 @@ public class Netplus{
 			}
 		}
 		return null;
+	}
+	
+	public void extendBoundingBox() {
+		this.x_min_b -= 4;
+		this.x_max_b += 4;
+		this.y_min_b -= 2;
+		this.y_max_b += 2;
 	}
 	
 	public int hashCode(){

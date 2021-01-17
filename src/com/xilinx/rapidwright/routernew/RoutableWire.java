@@ -22,7 +22,7 @@ public class RoutableWire implements Routable{
 	public final RoutableData rnodeData;
 	
 	public boolean target;
-	public List<RoutableWire> children;
+	public List<Routable> children;
 	public boolean childrenSet;
 	
 	public RoutableWire(int index, SitePinInst sitePinInst, RoutableType type){
@@ -47,21 +47,20 @@ public class RoutableWire implements Routable{
 		this.setBaseCost();
 	}
 	
-	public int setChildren(int globalIndex, float base_cost_fac, Map<Wire, RoutableWire> createdRoutable){
+	public int setChildren(int globalIndex, Map<Wire, RoutableWire> createdRoutable, Set<Wire> reserved){
 		this.children = new ArrayList<>();
 		List<Wire> wires = this.wire.getTile().getWireConnections(this.wire.getWireIndex());
 		for(Wire wire:wires){
-//			if(wire.getTile().getName().startsWith("INT_")){
-				if(!createdRoutable.containsKey(wire)){
-					RoutableWire child;
-					child = new RoutableWire(globalIndex, wire, RoutableType.INTERRR);
-					globalIndex++;
-					this.children.add(child);
-					createdRoutable.put(wire, child);
-				}else{
-					this.children.add(createdRoutable.get(wire));//the sink routable a target created up-front 
-				}
-//			}
+			if(reserved.contains(wire)) continue;
+			if(!createdRoutable.containsKey(wire)){
+				RoutableWire child;
+				child = new RoutableWire(globalIndex, wire, RoutableType.INTERRR);
+				globalIndex++;
+				this.children.add(child);
+				createdRoutable.put(wire, child);
+			}else{
+				this.children.add(createdRoutable.get(wire));//the sink routable a target created up-front 
+			}
 		}
 		this.childrenSet = true;
 		return globalIndex;
@@ -72,9 +71,6 @@ public class RoutableWire implements Routable{
 			base_cost = 1;
 			
 		}else if(this.type == RoutableType.INTERRR){
-			//aver cost around 4 when using deltaX + deltaY +1 
-			//(most (deltaX + deltaY +1 ) values range from 1 to 90+, maximum can be 176)
-			//(deltaX + deltaY +1 ) normalized to the maximum , does not work
 			base_cost = 1;
 			
 		}else if(this.type == RoutableType.SINKRR){//this is for faster maze expansion convergence to the sink
@@ -176,18 +172,6 @@ public class RoutableWire implements Routable{
 	}
 
 	@Override
-	public boolean isGlobal() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public boolean isBounce() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
 	public int getOccupancy() {
 		return this.rnodeData.getOccupancy();
 	}
@@ -237,5 +221,26 @@ public class RoutableWire implements Routable{
 	@Override
 	public float getBase_cost() {
 		return this.base_cost;
+	}
+	
+	@Override
+	public RoutableData getRoutableData() {
+		return this.rnodeData;
+	}
+	
+	@Override
+	public boolean isChildrenSet() {
+		return childrenSet;
+	}
+
+	@Override
+	public void setChildrenSet(boolean childrenSet) {
+		this.childrenSet = childrenSet;
+	}
+
+	@Override
+	public List<Routable> getChildren() {
+		// TODO Auto-generated method stub
+		return this.children;
 	}
 }

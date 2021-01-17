@@ -79,6 +79,10 @@ public class TimingManager {
     
     //----------------------- methods added for timing-driven routing -------------------------------
     
+    public Map<Pair<SitePinInst, SitePinInst>, List<TimingEdge>> getSpiAndTimingEdgesMap(){
+    	return this.timingGraph.spiPairsAndTimingEdges;
+    }
+    
     public void updateIllegalNetsDelays(List<Netplus> illegalNets, Map<Node, Float> nodesDelays){
     	 for(Netplus n:illegalNets){
     		 for(Connection c:n.getConnection()){

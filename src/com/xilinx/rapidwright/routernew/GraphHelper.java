@@ -3,7 +3,12 @@ package com.xilinx.rapidwright.routernew;
 import java.util.*;
 
 import com.xilinx.rapidwright.device.Node;
-
+/**
+ * A graph tool to help fixing illegal routing trees, e.g. routing trees with cycles or multi-driver nodes
+ * based on DFS
+ * @author yun
+ *
+ */
 public class GraphHelper{
 	private List<NodeWithCriticality> vertices;
 	private Map<NodeWithCriticality, List<NodeWithCriticality>> nodeEdges;

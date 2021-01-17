@@ -3,14 +3,13 @@ package com.xilinx.rapidwright.routernew;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.timing.GroupWireDirection;
 import com.xilinx.rapidwright.util.Pair;
 
 public class RoutableNode implements Routable{
@@ -22,11 +21,11 @@ public class RoutableNode implements Routable{
 	
 	public float base_cost;
 	
-	public final RoutableData rnodeData;
+	private final RoutableData rnodeData;
 	
-	public boolean target;
-	public List<RoutableNode> children;
-	public boolean childrenSet;
+	private boolean target;
+	public List<Routable> children;
+	private boolean childrenSet;
 	
 	public RoutableNode(int index, Node node, RoutableType type){
 		this.index = index;
@@ -39,13 +38,14 @@ public class RoutableNode implements Routable{
 		this.setBaseCost();
 	}
 	
-	public Pair<Integer, Long> setChildren(Connection c, int globalIndex, float base_cost_fac, Map<Node, RoutableNode> createdRoutable, 
-			RouteThruHelper routethruHelper, RouterTimer timer, long callingOfGetNextRoutable){
+	public Pair<Integer, Long> setChildren(Connection c, int globalIndex, Map<Node, RoutableNode> createdRoutable,
+			RouteThruHelper routethruHelper, long callingOfGetNextRoutable, Set<Node> reserved){
 		List<Node> allDownHillNodes = this.node.getAllDownhillNodes();
 		callingOfGetNextRoutable++;
 		this.children = new ArrayList<>();
 		for(Node node:allDownHillNodes){
 			//TODO make available routethrus available
+			if(reserved.contains(node)) continue;
 			if(!routethruHelper.isRouteThru(this.node, node)){//routethrus are forbidden in this way
 				RoutableNode child = createdRoutable.get(node);
 				if(child == null) {
@@ -191,18 +191,6 @@ public class RoutableNode implements Routable{
 	}
 
 	@Override
-	public boolean isGlobal() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public boolean isBounce() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
 	public int getOccupancy() {
 		
 		return this.rnodeData.getOccupancy();
@@ -230,7 +218,7 @@ public class RoutableNode implements Routable{
 
 	@Override
 	public float getDelay() {
-		// TODO Auto-generated method stub
+		// Auto-generated method stub
 		return 0;
 	}
 	@Override
@@ -246,6 +234,25 @@ public class RoutableNode implements Routable{
 	@Override
 	public float getBase_cost() {
 		return this.base_cost;
+	}
+
+	@Override
+	public RoutableData getRoutableData() {
+		return this.rnodeData;
+	}
+
+	public boolean isChildrenSet() {
+		return childrenSet;
+	}
+
+	@Override
+	public void setChildrenSet(boolean childrenSet) {
+		this.childrenSet = childrenSet;
+	}
+
+	@Override
+	public List<Routable> getChildren() {
+		return this.children;
 	}
 	
 }

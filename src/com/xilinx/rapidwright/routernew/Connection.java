@@ -32,7 +32,7 @@ public class Connection{
 //	public List<Routable> pathFromSinkToSwitchBox;
 	
 	public List<Node> nodes;
-	public List<ImmutableTimingGroup> timingGroups;//TODO could be removed when not needed for debugging
+	public List<ImmutableTimingGroup> timingGroups;//TODO could be removed if not needed
 	
 	public void newNodes(){
 		this.nodes = new ArrayList<>();
@@ -215,105 +215,7 @@ public class Connection{
 	public void setSinkRNode(Routable childRNode) {
 		this.sinkRNode = childRNode;
 	}
-	
-	public String toStringTiming(){
-		StringBuilder s = new StringBuilder();
-		s.append("Con");
-		s.append(String.format("%6s", this.id));
-		s.append(", ");
-		s.append("net = " + this.net.getNet().getName());
-		s.append(", ");
-		s.append(String.format("net fanout = %3s", this.net.fanout));
-		s.append(", TimingEdge = ");
-		s.append(this.timingEdges.get(0).toString() + ", " + this.timingEdges.get(0).delaysInfo());
 		
-		return s.toString();
-	}
-	
-	public String toString() {
-		
-		StringBuilder s = new StringBuilder();
-		s.append("Con ");
-		s.append(String.format("%6s", this.id));
-		s.append(", ");
-		s.append("bb = " + this.boundingBox);
-		s.append(", ");
-		s.append("net = " + this.net.getNet().getName());
-		s.append(", ");
-		s.append(String.format("net fanout = %3s", this.net.fanout));
-		s.append(", ");
-		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getConnectedNode().toString()));
-		s.append(", ");
-		s.append("sink = " + this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName());
-		s.append(", ");
-		s.append(String.format("delay = %4.1f ", this.timingEdges == null? 0:this.timingEdges.get(0).getDelay()));
-		s.append(", ");
-		s.append(String.format("criticality = %4.3f ", this.getCriticality()));
-		
-		return s.toString();
-		
-	}
-	
-	public String toStringWire() {
-		
-		StringBuilder s = new StringBuilder();
-			
-		String coordinate = "(" + this.source.getTile().getColumn() + "," + this.source.getTile().getRow() + ") to (" 
-							+ this.sink.getTile().getColumn() + "," + this.sink.getTile().getRow() + ")";
-		
-		s.append("Con");
-		s.append(String.format("%6s", this.id));
-		s.append(", ");
-		s.append(String.format("%22s", coordinate));
-		s.append(", ");
-		s.append(String.format("net = %12s", this.net.getNet().getName()));
-		s.append(", ");
-		s.append(String.format("net fanout = %3s", this.net.fanout));
-		s.append(", ");
-		s.append(String.format("source = %26s", ((RoutableWire)this.sourceRNode).wire.toString()));
-		s.append(", ");
-		s.append(String.format("sink = %26s", ((RoutableWire)this.sinkRNode).wire.toString()));
-		s.append(", ");
-		s.append(String.format("mahattan d = %4d ", this.getManhattanDistance()));
-		
-		return s.toString();
-		
-	}
-	
-	public String toStringTG() {
-		
-		StringBuilder s = new StringBuilder();
-			
-		String coordinate = "(" + this.source.getTile().getColumn() + "," + this.source.getTile().getRow() + ") to (" 
-							+ this.sink.getTile().getColumn() + "," + this.sink.getTile().getRow() + ")";
-		
-		s.append("Con");
-		s.append(String.format("%6s", this.id));
-		s.append(", ");
-		s.append(String.format("%22s", coordinate));
-		s.append(", ");
-		s.append(String.format("net = %s", this.net.getNet().getName()));
-		s.append(", ");
-		s.append(String.format("net fanout = %3s", this.net.fanout));
-		s.append(", ");
-		s.append(String.format("source = %26s", this.source.getName() + " -> " + ((RoutableTimingGroup)this.sourceRNode).toStringShort()));
-		s.append(", ");
-		s.append(String.format("sink = %26s", ((RoutableTimingGroup) this.sinkRNode).toStringShort() + " -> " +  this.sink.getName()));
-		s.append(", ");
-		s.append(String.format("mahattan d = %4d ", this.getManhattanDistance()));
-		
-		return s.toString();
-		
-	}
-	
-	public int getManhattanDistance() {
-		int dx = Math.abs(this.source.getTile().getColumn() - this.sink.getTile().getColumn());
-		int dy = Math.abs(this.source.getTile().getRow() - this.sink.getTile().getRow());
-		int manhattanDistance = dx + dy;
-		
-		return manhattanDistance;
-	}
-	
 	public boolean congested() {
 		for(Routable rn : this.rnodes){
 			if(rn.overUsed()) {
@@ -362,5 +264,28 @@ public class Connection{
 			routeDelay += tg.getDelay();
 		}
 		return routeDelay;
+	}
+	
+	public String toString() {
+		StringBuilder s = new StringBuilder();
+		s.append("Con ");
+		s.append(String.format("%6s", this.id));
+		s.append(", ");
+		s.append("bb = " + this.boundingBox);
+		s.append(", ");
+		s.append("net = " + this.net.getNet().getName());
+		s.append(", ");
+		s.append(String.format("net fanout = %3s", this.net.fanout));
+		s.append(", ");
+		s.append(String.format("source = %26s", this.source.getName() + " -> " + this.source.getConnectedNode().toString()));
+		s.append(", ");
+		s.append("sink = " + this.sink.getConnectedNode().toString() + " -> " +  this.sink.getName());
+		s.append(", ");
+		s.append(String.format("delay = %4.1f ", this.timingEdges == null? 0:this.timingEdges.get(0).getDelay()));
+		s.append(", ");
+		s.append(String.format("criticality = %4.3f ", this.getCriticality()));
+		
+		return s.toString();
+		
 	}
 }

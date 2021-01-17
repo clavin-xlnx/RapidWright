@@ -129,7 +129,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         HashMap<String, Net> netsByName = new LinkedHashMap<>();
         for (Net n : design.getNets()) {
             netsByName.put(n.getName(), n);
-        }        String[] netsArray = netsByName.keySet().toArray(new String[netsByName.size()]);
+        }        
+        String[] netsArray = netsByName.keySet().toArray(new String[netsByName.size()]);
         //Arrays.sort(netsArray);
         for (Net n : design.getNets()) {
             netsByName.put(n.getName(), n);
@@ -1343,6 +1344,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             } else {
                 physPinName = cell.getPhysicalPinMapping(portName);
                 spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);
+                if(hport.isInput() && n.getName().equals("bd_0_i/hls_inst/inst/grp_fp_conv_fu_507/tmp_23_fu_2015_p3[7]")) {
+                	System.out.println("exampleNet " + physPinName + " " + spi5);
+                }
             }
 
             si = cell.getSiteInst();
@@ -1352,6 +1356,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (bel != null  && physPinName != null)
                 belpin = bel.getPin(physPinName.replace("[", "").replace("]", ""));
 
+            if(hport.isInput() && n.getName().equals("bd_0_i/hls_inst/inst/grp_fp_conv_fu_507/tmp_23_fu_2015_p3[7]")) {
+            	System.out.println("exampleNet " + physPinName + " " + spi5 + " " + belpin);
+            }
+            
             SitePinInst mypin = spi5;
             if (mypin == null) {
                 if (hport.isOutput()) {
@@ -1394,6 +1402,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 return -1;
         }
         String S = stringSources.keySet().iterator().next();
+        
         local_spi_source = spi_sources.size() > 0? spi_sources.get(0) : net.getSource() != null ? net.getSource() : local_spi_source;
         for (String D : stringSinks.keySet()) {
             spi_sink = stringSinks.get(D);
@@ -1404,6 +1413,14 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (vS == null)
                 vS = new TimingVertex(S);
 
+            if(n.getName().equals("bd_0_i/hls_inst/inst/grp_fp_conv_fu_507/tmp_23_fu_2015_p3[7]")) {
+            	for(SitePinInst sinkspi : n.getSinkPins()) {
+            		System.out.println(sinkspi.getName() + " " + sinkspi.getBELPin());
+            	}
+            	System.out.println("spi source size = " + spi_sources.size());
+            	System.out.println(spi_sources.get(0));
+            	System.out.println(stringSinks + " " + D + " " + sink);
+            }
 
             String vs_type = (srcCell != null) ? srcCell.getType() : null;
             if (vs_type != null && isUnisimFlipFlopType(vs_type)) {
@@ -1429,7 +1446,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             boolean forceUpdateEdge = false;
             float netDelay = 0f;
 
-            if (haveIntrasiteNet) {// net.getSinkPins().size() == 0, TODO what to do for multi-connection net with an internal connections
+            if (haveIntrasiteNet) {
                 String param2 = srcCell.getBELName()+"/"+ source.getName();
                 String param3 = null;
                 if (sink_belpins.get(D) == null) {

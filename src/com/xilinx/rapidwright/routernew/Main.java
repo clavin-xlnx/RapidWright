@@ -1,13 +1,10 @@
 package com.xilinx.rapidwright.routernew;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.Scanner;
-import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -18,22 +15,7 @@ public class Main {
 	private String toWriteDCPfileName;
 	private CodePerfTracker t;
 	
-	private boolean routerNew = true;
-	private RoutingGranularityOpt opt = RoutingGranularityOpt.TIMINGGROUP;
-	
-	//allowed number of routing iterations
-	private int nrOfTrials = 60;
-	private int bbRange = 5;
-	private boolean isINTtileRange = false;
-	private float mdWeight = 2.5f;
-	private float hopWeight = 0.7f;
-	private float initial_pres_fac = 0.5f; 
-	private float pres_fac_mult = 2f; 
-	private float acc_fac = 1f;
-	private boolean timingDriven = true;
-	private boolean partialRouting = false;
-	private boolean virtualModeAvailable = false;
-	private boolean hpcRun = false;
+	Configuration config = new Configuration();
 	
 	public Main(String[] arguments) {
 		if(arguments.length < 2){
@@ -48,52 +30,7 @@ public class Main {
 		
 		this.t = new CodePerfTracker("Router", true);
 		
-		for(int i = 2; i < arguments.length; i++) {
-			if(arguments[i].contains("routingGranularity")){
-				
-				short optNum = Short.parseShort(arguments[++i]);
-				if(optNum == 3){
-					this.opt = RoutingGranularityOpt.TIMINGGROUP;
-				}else if(optNum == 2){
-					this.opt = RoutingGranularityOpt.NODE;
-				}else if(optNum == 1){
-					this.opt = RoutingGranularityOpt.WIRE;
-				}
-				
-			}else if(arguments[i].contains("bbRange")){
-				this.bbRange = Short.parseShort(arguments[++i]);
-				
-			}else if(arguments[i].contains("isINTtileRange")){
-				this.isINTtileRange = true;
-				
-			}else if(arguments[i].contains("mdWeight")){
-				this.mdWeight = Float.parseFloat(arguments[++i]);
-				
-			}else if(arguments[i].contains("hopWeight")){
-				this.hopWeight = Float.parseFloat(arguments[++i]);
-				
-			}else if(arguments[i].contains("initial_pres_fac")){
-				this.initial_pres_fac = Float.parseFloat(arguments[++i]);
-				
-			}else if(arguments[i].contains("pres_fac_mult")){
-				this.pres_fac_mult = Float.parseFloat(arguments[++i]);
-				
-			}else if(arguments[i].contains("acc_fac")){
-				this.acc_fac = Float.parseFloat(arguments[++i]);
-				
-			}else if(arguments[i].contains("timingDriven")){
-				this.timingDriven = true;
-				
-			}else if(arguments[i].contains("partialRouting")){
-				this.partialRouting = true;
-				
-			}else if(arguments[i].contains("virtualModeAvailable")){
-				this.virtualModeAvailable = true;
-				
-			}else if(arguments[i].contains("hpcRun")){
-				this.hpcRun = true;
-			}
-		}
+		config.customizeConfig(2, arguments);
 	}
 	
 	public static void main(String[] args) {
@@ -105,34 +42,86 @@ public class Main {
 	public void processing(){
 		int routingRuntime = 0;
 		this.checkAverageWiresandNodesEachTile();
-		if(!this.routerNew){
-			RWRouter router = new RWRouter(this.design);
+					
+		if(config.getOpt() == RoutingGranularityOpt.NODE){
+			RoutableNodeRouter router = new RoutableNodeRouter(this.design, config);
+			
+			router.designInfo();
+			this.routerConfigurationInfo();
+			
 			this.t.start("Route Design");
-			router.routeDesign();
-			
-			System.out.println("------------------------------------------------------------------------------");
-			System.out.printf("Find input pin feed took : %10.4f s\n", router.findInputPinFeedTime);
-			System.out.println("Failed connections: " + router.failedConnections);
-			System.out.println("Total nodes processed: " + router.totalNodesProcessed);
-			System.out.println("------------------------------------------------------------------------------");
-			
+			routingRuntime = router.doRouting();
 			this.t.stop();
+			
 			router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
 			
-		}else{			
-			if(this.opt == RoutingGranularityOpt.NODE){
-				RoutableNodeRouter router = new RoutableNodeRouter(this.design, 
-						this.toWriteDCPfileName,
-						this.nrOfTrials,
-						this.t,
-						(short) this.bbRange,
-						this.mdWeight,
-						this.hopWeight,
-						this.initial_pres_fac,
-						this.pres_fac_mult,
-						this.acc_fac,
-						this.partialRouting);
-				
+			router.getAllHopsAndManhattanD();
+			
+			this.rnodesInfo(router.manhattanD,
+					router.hops,
+					router.firstIterRNodes,
+					router.rnodeId,
+					router.usedRNodes.size(),
+					router.checkAverageNumWires(),
+					1, 0, 0,
+					router.averFanoutRNodes, 0, 0, 0, 0, 0, 0);
+			
+			this.runtimeInfoPrinting(routingRuntime, 
+					router.itry, 
+					router.connectionsRouted,
+					router.sortedListOfConnection.size(),
+					router.nodesPushed,
+					router.nodesPushedFirstIter,
+					router.nodesPoped,
+					router.nodesPopedFirstIter,
+					router.routerTimer,
+					router.callingOfGetNextRoutable);
+			
+		}else if(config.getOpt() == RoutingGranularityOpt.WIRE){
+			RoutableWireRouter router = new RoutableWireRouter(this.design, 
+					this.toWriteDCPfileName,
+					config.getNrOfTrials(),
+					this.t,
+					(short) config.getBbRange(),
+					config.getMdWeight(),
+					config.getHopWeight(),
+					config.getInitial_pres_fac(),
+					config.getPres_fac_mult(),
+					config.getAcc_fac());
+			
+			router.designInfo();
+			this.routerConfigurationInfo();
+			
+			this.t.start("Route Design");
+			routingRuntime = router.routingRuntime();
+			this.t.stop();
+			
+			router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
+			
+			router.getAllHopsAndManhattanD();
+			
+			this.rnodesInfo(router.manhattanD,
+					router.hops,
+					router.firstIterRNodes,
+					router.rrgNodeId,
+					router.usedRNodes.size(),
+					1,
+					0, 0, 0,
+					router.averFanoutRNodes, 0, 0, 0, 0, 0, 0);
+			
+			this.runtimeInfoPrinting(routingRuntime,
+					router.itry, 
+					router.connectionsRouted,
+					router.sortedListOfConnection.size(),
+					router.nodesExpanded,
+					router.nodesExpandedFirstIter,
+					router.nodesPopedFromQueue,
+					router.nodesPopedFromQueueFirstIter,
+					router.routerTimer,
+					0);
+			
+		}else if(config.getOpt() == RoutingGranularityOpt.TIMINGGROUP){
+				RoutableTimingGroupRouter router = new RoutableTimingGroupRouter(this.design, config);
 				router.designInfo();
 				this.routerConfigurationInfo();
 				
@@ -143,19 +132,26 @@ public class Main {
 				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
 				
 				router.getAllHopsAndManhattanD();
+				router.checkAverageNumWires();
 				
 				this.rnodesInfo(router.manhattanD,
 						router.hops,
 						router.firstIterRNodes,
-						router.rnodeId,
-						router.usedRNodes.size(),
-						router.checkAverageNumWires(),
-						1, 0, 0,
-						router.averFanoutRNodes, 0, 0, 0, 0, 0, 0);
+						router.rrgNodeId,
+						router.getUsedRNodes(),
+						router.averWire,
+						router.averNodePerImmuTg,
+						router.averImmuTgPerSiblings,
+						router.averNodePerSiblings,
+						router.averFanoutRNodes,
+						router.estimator != null? router.estimator.intableQuery - router.intableCall: 0,
+						router.estimator != null? router.estimator.outOfTableQuery - router.outtableCall: 0,
+						router.callDelayEstimator,
+						router.noCallOfDelayEstimator,
+						router.estimator != null? router.estimator.pinbounceQuery - router.pinbounce: 0,
+						router.estimator != null? router.estimator.pinfeedQuery - router.pinfeed: 0);
 				
-				this.runtimeInfoPrinting(routingRuntime, 
-						router.firstRouting,
-						router.firtRnodeT,
+				this.runtimeInfoPrinting(routingRuntime,
 						router.itry, 
 						router.connectionsRouted,
 						router.sortedListOfConnection.size(),
@@ -166,127 +162,14 @@ public class Main {
 						router.routerTimer,
 						router.callingOfGetNextRoutable);
 				
-			}else if(this.opt == RoutingGranularityOpt.WIRE){
-				RoutableWireRouter router = new RoutableWireRouter(this.design, 
-						this.toWriteDCPfileName,
-						this.nrOfTrials,
-						this.t,
-						(short) this.bbRange,
-						this.mdWeight,
-						this.hopWeight,
-						this.initial_pres_fac,
-						this.pres_fac_mult,
-						this.acc_fac);
-				
-				router.designInfo();
-				this.routerConfigurationInfo();
-				
-				this.t.start("Route Design");
-				routingRuntime = router.routingRuntime();
-				this.t.stop();
-				
-				router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
-				
-				router.getAllHopsAndManhattanD();
-				
-				this.rnodesInfo(router.manhattanD,
-						router.hops,
-						router.firstIterRNodes,
-						router.rrgNodeId,
-						router.usedRNodes.size(),
-						1,
-						0, 0, 0,
-						router.averFanoutRNodes, 0, 0, 0, 0, 0, 0);
-				
-				this.runtimeInfoPrinting(routingRuntime, 
-						router.firstIterRouting,
-						router.firtRnodeT,
-						router.itry, 
-						router.connectionsRouted,
-						router.sortedListOfConnection.size(),
-						router.nodesExpanded,
-						router.nodesExpandedFirstIter,
-						router.nodesPopedFromQueue,
-						router.nodesPopedFromQueueFirstIter,
-						router.routerTimer,
-						0);
-				
-			}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
-				
-				if(!this.virtualModeAvailable){
-					RoutableTimingGroupRouter router = new RoutableTimingGroupRouter(this.design, 
-						this.toWriteDCPfileName,
-						this.nrOfTrials,
-						this.t,
-						(short) this.bbRange,
-						this.mdWeight,
-						this.hopWeight,
-						this.initial_pres_fac,
-						this.pres_fac_mult,
-						this.acc_fac,
-						this.timingDriven,
-						this.hpcRun);
-					router.designInfo();
-					this.routerConfigurationInfo();
-					
-					this.t.start("Route Design");
-					routingRuntime = router.routingRuntime();
-					this.t.stop();
-					
-					router.getDesign().writeCheckpoint(this.toWriteDCPfileName,t);
-					
-					router.getAllHopsAndManhattanD();
-					router.checkAverageNumWires();
-					
-					this.rnodesInfo(router.manhattanD,
-							router.hops,
-							router.firstIterRNodes,
-							router.rrgNodeId,
-							router.getUsedRNodes(),
-							router.averWire,
-							router.averNodePerImmuTg,
-							router.averImmuTgPerSiblings,
-							router.averNodePerSiblings,
-							router.averFanoutRNodes,
-							router.estimator != null? router.estimator.intableQuery - router.intableCall: 0,
-							router.estimator != null? router.estimator.outOfTableQuery - router.outtableCall: 0,
-							router.callDelayEstimator,
-							router.noCallOfDelayEstimator,
-							router.estimator != null? router.estimator.pinbounceQuery - router.pinbounce: 0,
-							router.estimator != null? router.estimator.pinfeedQuery - router.pinfeed: 0);
-					
-					this.runtimeInfoPrinting(routingRuntime, 
-							router.firstRouting,
-							router.firtRnodeT,
-							router.itry, 
-							router.connectionsRouted,
-							router.sortedListOfConnection.size(),
-							router.nodesExpanded,
-							router.nodesExpandedFirstIter,
-							router.nodesPopedFromQueue,
-							router.nodesPopedFromQueueFirstIter,
-							router.routerTimer,
-							router.callingOfGetNextRoutable);
-					
-					if(this.timingDriven){
-						router.timingInfo();
-						System.out.printf("==========================================================================================================================================\n");
-					}
-					
-					/*if(!hpcRun){Scanner sc= new Scanner(System.in);
-					System.out.println("Enter a list of string reported by Vivado in format\n {*Q *O ... *O *D}, of which ... only represent output");
-					
-					while(sc.hasNextLine()){
-						
-						router.timingGraph.getDelayOfPath(sc.nextLine(), router);
-						
-					}}*/
-					
+				if(config.isTimingDriven()){
+					router.timingInfo();
+					System.out.printf("==========================================================================================================================================\n");
 				}
 				
-			}		
-		}
-	}
+			}
+	}		
+	
 	
 	public void checkAverageWiresandNodesEachTile(){
 		Device dev = this.design.getDevice();
@@ -312,29 +195,7 @@ public class Main {
 	}
 	
 	public void routerConfigurationInfo(){
-		StringBuilder s = new StringBuilder();
-		s.append("Router: ");
-		if(routerNew){
-			s.append("PathFinder-based connection router");
-		}else{
-			s.append("RapidWright orginal router");
-		}
-		s.append("\n");
-		s.append("Routing granularity: " + this.opt);
-		s.append("\n");
-		s.append("Bounding box range: " + this.bbRange);
-		s.append("\n");
-		s.append("Manhattan distance weight: " + this.mdWeight);
-		s.append("\n");
-		s.append("Hops weight: " + this.hopWeight);
-		s.append("\n");
-		s.append("initial pres fac: " + this.initial_pres_fac);
-		s.append("\n");
-		s.append("pres fac mult: " + this.pres_fac_mult);
-		s.append("\n");
-		s.append("acc fac: " + this.acc_fac);
-		
-		System.out.println(s);
+		System.out.println(config);
 	}
 	
 	public void rnodesInfo(float sumMD, long hops, int firstIterRNodes, int totalRNodes, int totalUsage, float averWire, float averNode,
@@ -346,10 +207,10 @@ public class Main {
 		System.out.printf("Rnodes created 1st iter: %d\n", firstIterRNodes);
 		System.out.printf("Total rnodes created: %d\n", totalRNodes);
 		System.out.printf("Total rnodes used: %d\n", totalUsage);
-		if(this.opt == RoutingGranularityOpt.NODE){
+		if(config.getOpt() == RoutingGranularityOpt.NODE){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #children per node: %5.2f\n", averChildren);
-		}else if(this.opt == RoutingGranularityOpt.TIMINGGROUP){
+		}else if(config.getOpt() == RoutingGranularityOpt.TIMINGGROUP){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #node in rnodes: %5.2f\n", averNode);
 			System.out.printf("Average #TG per siblings: %5.2f\n", averImmuTgSiblings);
@@ -366,13 +227,11 @@ public class Main {
 	}
 	
 	public void runtimeInfoPrinting(int routingRuntime, 
-			float firstRouting,
-			float firstRnodeT,
 			int iterations,
 			int consRouted,
 			int toalCons,
-			long nodesExpanded,
-			long nodesExpandedFirstIter,
+			long nodesPushed,
+			long nodesPushedFirstIter,
 			long nodesPoped,
 			long nodesPopedFirstIter,
 			RouterTimer timer,
@@ -381,17 +240,13 @@ public class Main {
 		System.out.println("Num iterations: " + iterations);
 		System.out.println("Connections routed: " + consRouted);
 		System.out.println(" Connections rerouted: " + (consRouted - toalCons));
-		System.out.println("Nodes expanded: " + nodesExpanded);
-		System.out.println(" Nodes expanded first iter: " + nodesExpandedFirstIter);
+		System.out.println("Nodes pushed: " + nodesPushed);
+		System.out.println(" Nodes pushed first iter: " + nodesPushedFirstIter);
 		System.out.println("Nodes poped: " + nodesPoped);
 		System.out.println(" Nodes poped first iter: " + nodesPopedFirstIter);
 		System.out.println("Calls of get next routables: " + callingOfGetNextRoutable);
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.printf("Routing took %.2f s\n", routingRuntime*1e-3);
-		System.out.printf(" RnodesT in the 1st iter: %.2f s\n", firstRnodeT);
-		System.out.printf(" Routing in the 1st iter: %.2f s\n", firstRouting);
-		float rerouting = (float) (timer.rerouteCongestion.getTime() * 1e-9 - (timer.rnodesCreation.getTime()*1e-9 - firstRnodeT));
-		System.out.printf(" Rerouting needed: %.2f s\n", rerouting);
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");
 		System.out.print(timer);
 		System.out.printf("--------------------------------------------------------------------------------------------------------------------\n");

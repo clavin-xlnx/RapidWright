@@ -1,14 +1,19 @@
 package com.xilinx.rapidwright.routernew;
 
+import java.util.List;
+
 import com.xilinx.rapidwright.device.Node;
 
 public interface Routable {
 	//public static final
 	short capacity = 1;
 
+	public RoutableData getRoutableData();
 	public boolean used();
 	public boolean overUsed();
 	public boolean illegal();
+	public boolean isChildrenSet();
+	public List<Routable> getChildren();
 	
 	public void setXY();
 	public short getX();
@@ -31,10 +36,9 @@ public interface Routable {
 	public String toString();
 	public int hashCode();
 	public RoutableType getRoutableType();
-	public boolean isGlobal();
-	public boolean isBounce();
 	public Node getNode();
 
 	public float getDelay();
+	public void setChildrenSet(boolean childrenSet);
 
 }

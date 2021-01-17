@@ -5,12 +5,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-/** copied from CRoute
-
 /**
- * MultiSet that counts how many of each object are present. Implemented using a
- * HashMap<N,Integer>. Only objects that are present once or more are stored in
- * the Map.
+ * CountingSet that counts how many of each object are present. 
+ * Implemented using a HashMap<N,Integer>. 
+ * Only objects that are present once or more are stored in the Map.
  */
 public class CountingSet<E> implements Collection<E> {
 	
