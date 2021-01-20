@@ -47,7 +47,7 @@ public class Configuration {
 		this.setInitial_pres_fac(0.5f); 
 		this.setPres_fac_mult(2f); 
 		this.setAcc_fac(1f);
-		this.setTimingDriven(true);
+		this.setTimingDriven(false);
 		this.setPartialRouting(false);
 		this.setHpcRun(false);
 	}
