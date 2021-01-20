@@ -34,7 +34,7 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
-import com.xilinx.rapidwright.routernew.RoutableTimingGroupRouter;
+import com.xilinx.rapidwright.routernew.RoutableNodeGroupRouter;
 import com.xilinx.rapidwright.util.Pair;
 
 import org.jgrapht.GraphPath;
@@ -342,7 +342,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     }
     
   //get delay from a given path, return null if path not found in the graph
-    public float getDelayOfPath(String s, RoutableTimingGroupRouter router){
+    public float getDelayOfPath(String s, RoutableNodeGroupRouter router){
     	float delay = -1;
     	s = s.replace("{", "");
     	s = s.replace("}", "");
@@ -379,7 +379,7 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
     		System.out.println(e.toString() + ", " + e.delaysInfo() + ", " + e.getNet().toString());
     		if(router!= null && router.timingEdgeConnectionMap.containsKey(e)){
     			System.out.println(router.timingEdgeConnectionMap.get(e));
-    			for(ImmutableTimingGroup group : router.timingEdgeConnectionMap.get(e).timingGroups){
+    			for(NodeGroup group : router.timingEdgeConnectionMap.get(e).getNodeGroups()){
         			System.out.println("\t " + group);
         		}
     		}

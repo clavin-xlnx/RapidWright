@@ -2,17 +2,15 @@ package com.xilinx.rapidwright.routernew;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
+import com.xilinx.rapidwright.timing.NodeGroup;
 import com.xilinx.rapidwright.timing.TimingEdge;
-import com.xilinx.rapidwright.timing.TimingGraph;
-import com.xilinx.rapidwright.timing.TimingVertex;
-
+/**
+ * A connection represents a pair of associated SitePinInsts within a net
+ *
+ */
 public class Connection{
 	public final int id;
 	
@@ -32,7 +30,7 @@ public class Connection{
 //	public List<Routable> pathFromSinkToSwitchBox;
 	
 	public List<Node> nodes;
-	public List<ImmutableTimingGroup> timingGroups;//TODO could be removed if not needed
+	private List<NodeGroup> nodeGroups;//TODO could be removed if delay for each NodeGroup not needed for presenting delay
 	
 	public void newNodes(){
 		this.nodes = new ArrayList<>();
@@ -52,7 +50,7 @@ public class Connection{
 		this.boundingBox = this.calculateBoundingBox();
 		
 		this.rnodes = new ArrayList<>();
-		this.timingGroups = new ArrayList<>();
+		this.nodeGroups = new ArrayList<>();
 	}
 	
 	public short calculateBoundingBox() {
@@ -197,7 +195,7 @@ public class Connection{
 	
 	public void resetConnection(){
 		this.rnodes.clear();
-		this.timingGroups.clear();
+		this.nodeGroups.clear();
 	}
 	
 	public Routable getSourceRNode() {
@@ -242,8 +240,12 @@ public class Connection{
 		this.rnodes.add(rn);	
 	}
 	
-	public void addTimingGroup(ImmutableTimingGroup timingGroup){
-		this.timingGroups.add(timingGroup);
+	public void addNodeGroup(NodeGroup nodeGroup){
+		this.nodeGroups.add(nodeGroup);
+	}
+	
+	public List<NodeGroup> getNodeGroups(){
+		return this.nodeGroups;
 	}
 	
 	public void updateRouteDelay(){

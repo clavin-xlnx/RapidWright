@@ -7,7 +7,7 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 /**
  * Use as an edge for DelayGraph. It allows update the edge weight based on the distance at the source of this edge.
  */
-public class TimingGroupEdge extends DefaultWeightedEdge {
+public class NodeGroupEdge extends DefaultWeightedEdge {
 
     private TimingGroup tg;
     private boolean     reverseDirection;
@@ -24,7 +24,7 @@ public class TimingGroupEdge extends DefaultWeightedEdge {
         return this.marker;
     }
 
-    TimingGroupEdge(TimingGroup tg, boolean reverseDirection) {
+    NodeGroupEdge(TimingGroup tg, boolean reverseDirection) {
         this.tg = tg;
         this.reverseDirection = reverseDirection;
     }

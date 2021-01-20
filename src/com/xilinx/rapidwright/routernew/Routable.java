@@ -38,6 +38,7 @@ public interface Routable {
 	public RoutableType getRoutableType();
 	public Node getNode();
 
+	public void setDelay(short delay);
 	public float getDelay();
 	public void setChildrenSet(boolean childrenSet);
 

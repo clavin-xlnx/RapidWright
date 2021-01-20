@@ -10,6 +10,7 @@ import java.util.Map;
  * Implemented using a HashMap<N,Integer>. 
  * Only objects that are present once or more are stored in the Map.
  */
+//TODO replace this with HashMultiSet
 public class CountingSet<E> implements Collection<E> {
 	
 	private Map<E,Integer> map;
@@ -88,8 +89,7 @@ public class CountingSet<E> implements Collection<E> {
 		return false;
 	}
 	
-	@Override
-	public String toString() {
+	public String delayToString() {
 		StringBuilder s = new StringBuilder();
 		s.append("# unique delays: " + this.uniqueSize() + "\n");
 		for(E e : this.map.keySet()) {
@@ -120,7 +120,7 @@ public class CountingSet<E> implements Collection<E> {
 	public boolean retainAll(Collection<?> c) {
 		throw new RuntimeException();
 	}
-
+	
 	@Override
 	public void clear() {
 		this.map.clear();

@@ -31,8 +31,8 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.timing.GroupDelayType;
-import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
-import com.xilinx.rapidwright.timing.NodeWithFaninInfo;
+import com.xilinx.rapidwright.timing.NodeGroup;
+import com.xilinx.rapidwright.timing.EntryNode;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.PairUtil;
@@ -186,8 +186,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @return
      */
     @Override
-    public short getMinDelayToSinkPin(ImmutableTimingGroup timingGroup,
-                                      ImmutableTimingGroup sinkPin) {
+    public short getMinDelayToSinkPin(NodeGroup timingGroup,
+                                      NodeGroup sinkPin) {
         // TODO: consider puting this to graph to avoid this if
         if (timingGroup.delayType() == GroupDelayType.PIN_BOUNCE) {
             NodePair np = new NodePair(timingGroup, sinkPin);
@@ -255,7 +255,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 //    protected Function<ImmutableTimingGroup,RoutingNode> tgToNodeMapper;
     interface SerializableBiFunction<T,U,R> extends BiFunction<T,U,R>, Serializable {}
-    protected SerializableBiFunction<ImmutableTimingGroup,ImmutableTimingGroup,Pair<RoutingNode,RoutingNode>> tgsToSrcDstNodeMapper;
+    protected SerializableBiFunction<NodeGroup,NodeGroup,Pair<RoutingNode,RoutingNode>> tgsToSrcDstNodeMapper;
 
     private short width;
     private short height;
@@ -323,7 +323,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         }
 
         // to convert timing groups for lookup
-        NodePair(ImmutableTimingGroup src, ImmutableTimingGroup dst) {
+        NodePair(NodeGroup src, NodeGroup dst) {
             this();
             Node srcNode = src.exitNode();
             Node dstNode = dst.exitNode();
@@ -369,6 +369,9 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
     private void build(String loadFrom) {
         rgBuilder = new ResourceGraphBuilder(extendedWidth, extendedHeight, loadFrom, 0);
+        if(rgBuilder == null) {
+        	System.out.println(rgBuilder.nodeMan.getGraph());
+        }
         System.out.println("num nodes : " + rgBuilder.nodeMan.getGraph().vertexSet().size());
         System.out.println("num edges : " + rgBuilder.nodeMan.getGraph().edgeSet().size());
         if (this.verbose > 5 || this.verbose == -1)
@@ -496,7 +499,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         class NodeManager implements java.io.Serializable {
 
             // An complete resource graph within a given rectangle region
-            private Graph<Object, TimingGroupEdge> g;
+            private Graph<Object, NodeGroupEdge> g;
 
             // <loc <tg, node>>
             //                      x  , y     , ori         , side
@@ -518,14 +521,14 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
             NodeManager() {
                 distTypeNodemap = new HashMap();
-                g = new SimpleDirectedWeightedGraph<>(TimingGroupEdge.class);
+                g = new SimpleDirectedWeightedGraph<>(NodeGroupEdge.class);
             }
 
             void connectNodes(short i, short j, short m, short n, T.Orientation frOrientation, T.TileSide frSide,
                               T.Orientation toOrientation, T.TileSide toSide, T.TimingGroup frTg, T.TimingGroup toTg) {
                 Object frNode = getOrCreateNode(i, j, frOrientation, frSide, frTg);
                 Object toNode = getOrCreateNode(m, n, toOrientation, toSide, toTg);
-                g.addEdge(frNode, toNode, new TimingGroupEdge(frTg, m < i || n < j));
+                g.addEdge(frNode, toNode, new NodeGroupEdge(frTg, m < i || n < j));
             }
 
             // return the node. If it is newly created, set the flag to true.
@@ -574,7 +577,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
                 graphVizPrintStream.println("digraph {");
                 graphVizPrintStream.println("rankdir=LR;");
-                for (TimingGroupEdge e : g.edgeSet()) {
+                for (NodeGroupEdge e : g.edgeSet()) {
                     String srcName = nodeNames.get(g.getEdgeSource(e));
                     String dstName = nodeNames.get(g.getEdgeTarget(e));
                     String edgeProp = "";
@@ -590,7 +593,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 graphVizPrintStream.close();
             }
 
-            Graph<Object, TimingGroupEdge> getGraph() {
+            Graph<Object, NodeGroupEdge> getGraph() {
                 return g;
             }
 
@@ -676,7 +679,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 // for info only
                 {
                     int count = 0;
-                    for (TimingGroupEdge e : g.edgeSet()) {
+                    for (NodeGroupEdge e : g.edgeSet()) {
                         if (e.isMarked())
                             count++;
                     }
@@ -686,7 +689,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 // collect edges with marker
                 {
                     int count = 0;
-                    for (TimingGroupEdge oe : other.g.edgeSet()) {
+                    for (NodeGroupEdge oe : other.g.edgeSet()) {
                         if (oe.isMarked()) {
                             Object osrc = other.g.getEdgeSource(oe);
                             Object odst = other.g.getEdgeTarget(oe);
@@ -705,7 +708,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
 
 
-                            TimingGroupEdge e = g.getEdge(src, dst);
+                            NodeGroupEdge e = g.getEdge(src, dst);
                             e.setMarker();
 
                             count++;
@@ -717,7 +720,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 // for info only
                 {
                     int count = 0;
-                    for (TimingGroupEdge e : g.edgeSet()) {
+                    for (NodeGroupEdge e : g.edgeSet()) {
                         if (e.isMarked())
                             count++;
                     }
@@ -732,7 +735,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
                 {
                     int count = 0;
-                    for (TimingGroupEdge e : g.edgeSet()) {
+                    for (NodeGroupEdge e : g.edgeSet()) {
                         if (e.isMarked())
                             count++;
                     }
@@ -740,12 +743,12 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                 }
 
                 // remove unmarked edge
-                List<TimingGroupEdge> edgesToRemove = new ArrayList<>();
-                for (TimingGroupEdge e : g.edgeSet()) {
+                List<NodeGroupEdge> edgesToRemove = new ArrayList<>();
+                for (NodeGroupEdge e : g.edgeSet()) {
                     if (!e.isMarked())
                         edgesToRemove.add(e);
                 }
-                for (TimingGroupEdge e : edgesToRemove)
+                for (NodeGroupEdge e : edgesToRemove)
                     g.removeEdge(e);
 
                 List<Object> verticesToRemove = new ArrayList<>();
@@ -771,7 +774,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
                 {
                     int count = 0;
-                    for (TimingGroupEdge e : g.edgeSet()) {
+                    for (NodeGroupEdge e : g.edgeSet()) {
                         if (e.isMarked())
                             count++;
                     }
@@ -961,7 +964,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             nodeMan.plot(fname);
         }
 
-        Graph<Object, TimingGroupEdge> getGraph() {
+        Graph<Object, NodeGroupEdge> getGraph() {
             return nodeMan.getGraph();
         }
 
@@ -1227,7 +1230,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         }
         int count = 0;
-        for (TimingGroupEdge e : rgBuilder.getGraph().edgeSet()) {
+        for (NodeGroupEdge e : rgBuilder.getGraph().edgeSet()) {
             if (e.isMarked())
                 count++;
         }
@@ -1356,7 +1359,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      */
     private static class DelayGraphEntry {
         // edge need to refer to TG
-        public Graph<Object, TimingGroupEdge> g;
+        public Graph<Object, NodeGroupEdge> g;
         public Object src;
         public Object dst;
         // When the target is CLE_IN, there are 4 cases to reach CLE_IN.
@@ -1796,7 +1799,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
      * @param srcY The y coordinate of src in INT tile coordinate
      * @return     The minimum delay of a valid path between src and dst. It also returns the path using resource abbreviation, in debug mode.
      */
-    private Pair<Short,String> lookupDelay(Graph<Object, TimingGroupEdge> ig, Object src, Object dst, short srcX, short srcY) {
+    private Pair<Short,String> lookupDelay(Graph<Object, NodeGroupEdge> ig, Object src, Object dst, short srcX, short srcY) {
         boolean isBackward = false; // to be removed.
         T.Direction dir = T.Direction.VERTICAL; // to be removed
 
@@ -1825,7 +1828,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         if (verbose > 5 || verbose == -1) {
             int tempVerbose = verbose;
             verbose = 0; // to disable print from findPathBetween which is the same as what printed by findMinWeightBetween above.
-            org.jgrapht.GraphPath<Object, TimingGroupEdge> minPath =
+            org.jgrapht.GraphPath<Object, NodeGroupEdge> minPath =
                     DijkstraWithCallbacks.findPathBetween(ig, src, dst, srcX, srcY,
                             (g, u, e, x, y, dly) -> {g.setEdgeWeight(e,calcTimingGroupDelayOnEdge(e,u, dst, x, y, dly, isBackward));},
                             (g, u, e, x, y, dly) -> {return discoverVertex(e, x, y, dly, isBackward);},
@@ -1833,7 +1836,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
                     );
             verbose = tempVerbose;
 
-            for (TimingGroupEdge e : minPath.getEdgeList()) {
+            for (NodeGroupEdge e : minPath.getEdgeList()) {
                 route += e.getTimingGroup().abbr();
             }
             if (verbose > 5) {
@@ -1849,38 +1852,38 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
     // -----------------------   Methods to help testing ------------------------
     void testBounceToSink() {
         {  // exact tile as in the data
-            ImmutableTimingGroup d1 = createTG("INT_X24Y140/IMUX_W29", device);
-            ImmutableTimingGroup s1 = createTG("INT_X24Y141/BYPASS_W10", device);
+            NodeGroup d1 = createTG("INT_X24Y140/IMUX_W29", device);
+            NodeGroup s1 = createTG("INT_X24Y141/BYPASS_W10", device);
             short dly1 = getMinDelayToSinkPin(s1, d1);
             System.out.println("1 " + dly1);
-            ImmutableTimingGroup d2 = createTG("INT_X24Y140/IMUX_W10", device);
-            ImmutableTimingGroup s2 = createTG("INT_X24Y141/BYPASS_W1", device);
+            NodeGroup d2 = createTG("INT_X24Y140/IMUX_W10", device);
+            NodeGroup s2 = createTG("INT_X24Y141/BYPASS_W1", device);
             short dly2 = getMinDelayToSinkPin(s2, d2);
             System.out.println("2 " + dly2);
-            ImmutableTimingGroup d3 = createTG("INT_X24Y140/BOUNCE_E_0_FT1", device);
-            ImmutableTimingGroup s3 = createTG("INT_X24Y141/BYPASS_E14", device);
+            NodeGroup d3 = createTG("INT_X24Y140/BOUNCE_E_0_FT1", device);
+            NodeGroup s3 = createTG("INT_X24Y141/BYPASS_E14", device);
             short dly3 = getMinDelayToSinkPin(s3, d3);
             System.out.println("3 " + dly3);
-            ImmutableTimingGroup d4 = createTG("INT_X24Y140/BOUNCE_E_0_FT1", device);
-            ImmutableTimingGroup s4 = createTG("INT_X24Y141/BYPASS_W9", device);
+            NodeGroup d4 = createTG("INT_X24Y140/BOUNCE_E_0_FT1", device);
+            NodeGroup s4 = createTG("INT_X24Y141/BYPASS_W9", device);
             short dly4 = getMinDelayToSinkPin(s4, d4);
             System.out.println("4 " + dly4);
         }
         {  // diff tile from the data
-            ImmutableTimingGroup d1 = createTG("INT_X24Y10/IMUX_W29", device);
-            ImmutableTimingGroup s1 = createTG("INT_X24Y11/BYPASS_W10", device);
+            NodeGroup d1 = createTG("INT_X24Y10/IMUX_W29", device);
+            NodeGroup s1 = createTG("INT_X24Y11/BYPASS_W10", device);
             short dly1 = getMinDelayToSinkPin(s1, d1);
             System.out.println("1 " + dly1);
-            ImmutableTimingGroup d2 = createTG("INT_X24Y10/IMUX_W10", device);
-            ImmutableTimingGroup s2 = createTG("INT_X24Y11/BYPASS_W1", device);
+            NodeGroup d2 = createTG("INT_X24Y10/IMUX_W10", device);
+            NodeGroup s2 = createTG("INT_X24Y11/BYPASS_W1", device);
             short dly2 = getMinDelayToSinkPin(s2, d2);
             System.out.println("2 " + dly2);
-            ImmutableTimingGroup d3 = createTG("INT_X24Y10/BOUNCE_E_0_FT1", device);
-            ImmutableTimingGroup s3 = createTG("INT_X24Y11/BYPASS_E14", device);
+            NodeGroup d3 = createTG("INT_X24Y10/BOUNCE_E_0_FT1", device);
+            NodeGroup s3 = createTG("INT_X24Y11/BYPASS_E14", device);
             short dly3 = getMinDelayToSinkPin(s3, d3);
             System.out.println("3 " + dly3);
-            ImmutableTimingGroup d4 = createTG("INT_X24Y10/BOUNCE_E_0_FT1", device);
-            ImmutableTimingGroup s4 = createTG("INT_X24Y11/BYPASS_W9", device);
+            NodeGroup d4 = createTG("INT_X24Y10/BOUNCE_E_0_FT1", device);
+            NodeGroup s4 = createTG("INT_X24Y11/BYPASS_W9", device);
             short dly4 = getMinDelayToSinkPin(s4, d4);
             System.out.println("4 " + dly4);
         }
@@ -1997,7 +2000,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
             RoutingNode sinkInfo = route.get(i);
             Object sinkNode = rgBuilder.getNode(sinkInfo.x, sinkInfo.y, sinkInfo.orientation, sinkInfo.side, sinkInfo.tg);
 
-            TimingGroupEdge e = rgBuilder.getGraph().getEdge(sourceNode, sinkNode);
+            NodeGroupEdge e = rgBuilder.getGraph().getEdge(sourceNode, sinkNode);
 
             double tdly = calcTimingGroupDelayOnEdge(e, null, null, (short) (srcInfo.x + offsetX), (short) (srcInfo.y + offsetY), 0.0, false);
             delay += tdly;
@@ -2247,7 +2250,7 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
         return numProcessed;
     }
 
-    ImmutableTimingGroup createTG(String exitNodeName, String entryNodeName, Device device) {
+    NodeGroup createTG(String exitNodeName, String entryNodeName, Device device) {
         Node exitNode  = new Node(exitNodeName, device);
         Node entryNode = new Node(entryNodeName, device);
         // check if they are connected. Can't check if it indeed a valid TG.
@@ -2264,19 +2267,19 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 
         IntentCode exitIC  = exitNode.getAllWiresInNode()[0].getIntentCode();
         IntentCode entryIC = exitNode.getAllWiresInNode()[0].getIntentCode();
-        return new ImmutableTimingGroup(NodeWithFaninInfo.create(exitNode), NodeWithFaninInfo.create(entryNode), exitIC, entryIC);
+        return new NodeGroup(EntryNode.create(exitNode), EntryNode.create(entryNode), exitIC, entryIC);
     }
 
     // for TG with only one node
-    ImmutableTimingGroup createTG(String exitNodeName, Device device) {
+    NodeGroup createTG(String exitNodeName, Device device) {
         Node exitNode  = new Node(exitNodeName, device);
         IntentCode exitIC  = exitNode.getAllWiresInNode()[0].getIntentCode();
-        return new ImmutableTimingGroup(NodeWithFaninInfo.create(exitNode), exitIC);
+        return new NodeGroup(EntryNode.create(exitNode), exitIC);
     }
 
     void testGetDelayOf(Device device) {
 //        ImmutableTimingGroup src = createTG("INT_X12Y109/WW1_E_7_FT0", "INT_X12Y109/INT_NODE_SDQ_47_INT_OUT0", device);
-        ImmutableTimingGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
+        NodeGroup src = createTG("INT_X14Y93/SS4_W_BEG6" ,"INT_X14Y93/INT_NODE_SDQ_85_INT_OUT0" ,  device);
 //        short dly = getDelayOf(src);
 //        System.out.println("delay " + dly);
 //
@@ -2319,8 +2322,8 @@ public class DelayEstimatorTable<T extends InterconnectInfo> extends DelayEstima
 //        ImmutableTimingGroup dst = createTG("INT_X10Y111/IMUX_E37" ,"INT_X10Y111/INT_NODE_IMUX_12_INT_OUT0",  device );
 //        ImmutableTimingGroup src = createTG("INT_X9Y115/INT_INT_SDQ_75_INT_OUT0" ,"INT_X9Y115/INT_NODE_SDQ_38_INT_OUT1" ,  device);
 //        ImmutableTimingGroup dst = createTG("INT_X19Y115/IMUX_E13" ,"INT_X19Y115/INT_NODE_IMUX_18_INT_OUT0",  device );
-        ImmutableTimingGroup src = createTG("INT_X18Y97/NN12_BEG4" ,  device);
-        ImmutableTimingGroup dst = createTG("INT_X12Y99/IMUX_E43" ,"INT_X12Y100/INODE_E_3_FT1",  device );
+        NodeGroup src = createTG("INT_X18Y97/NN12_BEG4" ,  device);
+        NodeGroup dst = createTG("INT_X12Y99/IMUX_E43" ,"INT_X12Y100/INODE_E_3_FT1",  device );
 
 
         short dly = getMinDelayToSinkPin(src, dst);

@@ -23,7 +23,7 @@
 
 package com.xilinx.rapidwright.timing.delayestimator;
 
-import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
+import com.xilinx.rapidwright.timing.NodeGroup;
 
 /**
  * To estimate a route delay from a TG to a site-pin  TG.
@@ -35,7 +35,7 @@ public interface DelayEstimator {
      * @param sinkPin Timing grooup for the end of the path. It must be an input site pin.
      * @return An estimated delay including the delay of the TG and sinkPin.
      */
-    public short getMinDelayToSinkPin (ImmutableTimingGroup TG, ImmutableTimingGroup sinkPin);
+    public short getMinDelayToSinkPin (NodeGroup TG, NodeGroup sinkPin);
     public boolean load (String fileName);
     public boolean store (String fileName);
 }

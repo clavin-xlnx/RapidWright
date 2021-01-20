@@ -6,7 +6,7 @@ package com.xilinx.rapidwright.routernew;
  */
 public class Configuration {
 	//routing granularity option, i.e. Node-based or NodeGroup-based wavefront expansion step
-	private RoutingGranularityOpt opt = RoutingGranularityOpt.TIMINGGROUP;
+	private RoutingGranularityOpt opt = RoutingGranularityOpt.NODEGROUP;
 	//allowed max number of routing iterations
 	private int nrOfTrials;
 	//routing bounding box constraint
@@ -17,6 +17,11 @@ public class Configuration {
 	private float hopWeight;
 	//delay weight fator
 	private float delayWeight;
+	
+	private float criticalityExp;
+	private float minRerouteCriti;
+	private int rerouteCritiPercentage;
+	
 	//initial present congestion penalty factor
 	private float initial_pres_fac; 
 	//multiplication factor for present congestion update
@@ -31,10 +36,14 @@ public class Configuration {
 	private boolean hpcRun;
 	
 	public Configuration() {
-		this.setNrOfTrials(60);
+		this.setNrOfTrials(100);
 		this.setBbRange((short) 5);
 		this.setMdWeight(2.5f);
 		this.setHopWeight(0.7f);
+		this.setDelayWeight(0.5f);
+		this.setCriticalityExp(1);
+		this.setMinRerouteCriti(0.85f);
+		this.setRerouteCritiPercentage(3);
 		this.setInitial_pres_fac(0.5f); 
 		this.setPres_fac_mult(2f); 
 		this.setAcc_fac(1f);
@@ -48,7 +57,7 @@ public class Configuration {
 			if(arguments[i].contains("routingGranularity")){
 				short optNum = Short.parseShort(arguments[++i]);
 				if(optNum == 3){
-					this.setOpt(RoutingGranularityOpt.TIMINGGROUP);
+					this.setOpt(RoutingGranularityOpt.NODEGROUP);
 				}else if(optNum == 2){
 					this.setOpt(RoutingGranularityOpt.NODE);
 				}else if(optNum == 1){
@@ -66,6 +75,15 @@ public class Configuration {
 				
 			}else if(arguments[i].contains("delayWeight")){
 				this.setDelayWeight(Float.parseFloat(arguments[++i]));
+				
+			}else if(arguments[i].contains("criticalityExp")) {
+				this.setCriticalityExp(Float.parseFloat(arguments[++i]));
+				
+			}else if(arguments[i].contains("minRerouteCriti")){
+				this.setMinRerouteCriti(Float.parseFloat(arguments[++i]));
+				
+			}else if(arguments[i].contains("rerouteCritiPercentage")){
+				this.setRerouteCritiPercentage(Integer.parseInt(arguments[++i]));
 				
 			}else if(arguments[i].contains("initial_pres_fac")){
 				this.setInitial_pres_fac(Float.parseFloat(arguments[++i]));
@@ -131,6 +149,30 @@ public class Configuration {
 		this.hopWeight = hopWeight;
 	}
 
+	public float getCriticalityExp() {
+		return criticalityExp;
+	}
+
+	public void setCriticalityExp(float criticalityExp) {
+		this.criticalityExp = criticalityExp;
+	}
+
+	public float getMinRerouteCriti() {
+		return minRerouteCriti;
+	}
+
+	public void setMinRerouteCriti(float minRerouteCriti) {
+		this.minRerouteCriti = minRerouteCriti;
+	}
+
+	public int getRerouteCritiPercentage() {
+		return rerouteCritiPercentage;
+	}
+
+	public void setRerouteCritiPercentage(int rerouteCritiPercentage) {
+		this.rerouteCritiPercentage = rerouteCritiPercentage;
+	}
+	
 	public float getInitial_pres_fac() {
 		return initial_pres_fac;
 	}
@@ -204,6 +246,14 @@ public class Configuration {
 		s.append("Manhattan distance weight: " + this.mdWeight);
 		s.append("\n");
 		s.append("Hops weight: " + this.hopWeight);
+		s.append("\n");
+		s.append("Delay weight: " + this.delayWeight);
+		s.append("\n");
+		s.append("criticality exponent: " + this.criticalityExp);
+		s.append("\n");
+		s.append("reroute criticality threshold: " + this.minRerouteCriti);
+		s.append("\n");
+		s.append("reroute percentage: " + this.rerouteCritiPercentage);
 		s.append("\n");
 		s.append("initial pres fac: " + this.initial_pres_fac);
 		s.append("\n");

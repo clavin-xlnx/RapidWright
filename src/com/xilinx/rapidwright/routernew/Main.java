@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.HashSet;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -120,8 +119,8 @@ public class Main {
 					router.routerTimer,
 					0);
 			
-		}else if(config.getOpt() == RoutingGranularityOpt.TIMINGGROUP){
-				RoutableTimingGroupRouter router = new RoutableTimingGroupRouter(this.design, config);
+		}else if(config.getOpt() == RoutingGranularityOpt.NODEGROUP){
+				RoutableNodeGroupRouter router = new RoutableNodeGroupRouter(this.design, config);
 				router.designInfo();
 				this.routerConfigurationInfo();
 				
@@ -140,8 +139,8 @@ public class Main {
 						router.rrgNodeId,
 						router.getUsedRNodes(),
 						router.averWire,
-						router.averNodePerImmuTg,
-						router.averImmuTgPerSiblings,
+						router.averNodePerNodeGroup,
+						router.averNodeGroupPerSiblings,
 						router.averNodePerSiblings,
 						router.averFanoutRNodes,
 						router.estimator != null? router.estimator.intableQuery - router.intableCall: 0,
@@ -162,10 +161,8 @@ public class Main {
 						router.routerTimer,
 						router.callingOfGetNextRoutable);
 				
-				if(config.isTimingDriven()){
-					router.timingInfo();
-					System.out.printf("==========================================================================================================================================\n");
-				}
+				if(this.config.isTimingDriven()) router.timingInfo();
+				System.out.printf("==========================================================================================================================================\n");	
 				
 			}
 	}		
@@ -210,7 +207,7 @@ public class Main {
 		if(config.getOpt() == RoutingGranularityOpt.NODE){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #children per node: %5.2f\n", averChildren);
-		}else if(config.getOpt() == RoutingGranularityOpt.TIMINGGROUP){
+		}else if(config.getOpt() == RoutingGranularityOpt.NODEGROUP){
 			System.out.printf("Average #wire in rnodes: %5.2f\n", averWire);
 			System.out.printf("Average #node in rnodes: %5.2f\n", averNode);
 			System.out.printf("Average #TG per siblings: %5.2f\n", averImmuTgSiblings);

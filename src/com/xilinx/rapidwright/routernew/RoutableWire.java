@@ -243,4 +243,10 @@ public class RoutableWire implements Routable{
 		// TODO Auto-generated method stub
 		return this.children;
 	}
+
+	@Override
+	public void setDelay(short delay) {
+		// TODO Auto-generated method stub
+		
+	}
 }

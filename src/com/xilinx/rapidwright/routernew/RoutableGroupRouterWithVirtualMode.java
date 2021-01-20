@@ -24,8 +24,8 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.GroupDelayType;
-import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
-import com.xilinx.rapidwright.timing.NodeWithFaninInfo;
+import com.xilinx.rapidwright.timing.NodeGroup;
+import com.xilinx.rapidwright.timing.EntryNode;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingManager;
@@ -66,11 +66,11 @@ public class RoutableGroupRouterWithVirtualMode{
 	public RouteThruHelper rthHelper;
 	public Set<Node> reservedNodes;
 	public PriorityQueue<QueueElement> queue;
-	public Collection<RoutableTimingGroup> rnodesTouched;
-	public Map<Node, RoutableTimingGroup> rnodesCreated;
+	public Collection<RoutableNodeGroup> rnodesTouched;
+	public Map<Node, RoutableNodeGroup> rnodesCreated;
 	
 	//map for solving congestion on entry nodes that are shared among siblings
-	public Map<Connection, List<NodeWithFaninInfo>> connectionEntryNodes;
+	public Map<Connection, List<EntryNode>> connectionEntryNodes;
 	
 	public List<Connection> sortedListOfConnection;
 	public List<Netplus> sortedListOfNetplus;
@@ -86,7 +86,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	public float acc_fac;
 	public float base_cost_fac;
 	public boolean timingDriven;
-	public ImmutableTimingGroup sinkPinTG;
+	public NodeGroup sinkPinTG;
 	
 	public float mdWeight;
 	public float hopWeight;
@@ -105,7 +105,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	public Set<Integer> overUsedRNodes;
 	public Set<Integer> usedRNodes;
 	public Set<Integer> illegalRNodes;//nodes that have multiple drivers in a net
-	public Set<NodeWithFaninInfo> usedEntryNodes;
+	public Set<EntryNode> usedEntryNodes;
 	
 	public long hops;
 	public float manhattanD;
@@ -296,7 +296,7 @@ public class RoutableGroupRouterWithVirtualMode{
 		this.nets.add(np);
 		
 		SitePinInst source = n.getSource();
-		RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
+		RoutableNodeGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
 		for(SitePinInst sink:n.getSinkPins()){
 			if(RouterHelper.isExternalConnectionToCout(source, sink)){
 				source = n.getAlternateSource();
@@ -310,7 +310,7 @@ public class RoutableGroupRouterWithVirtualMode{
 			Connection c = new Connection(icon, source, sink);	
 			c.setSourceRNode(sourceRNode);
 			
-			RoutableTimingGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.SINKRR, this.timingModel, this.base_cost_fac);
+			RoutableNodeGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.SINKRR, this.timingModel, this.base_cost_fac);
 			c.setSinkRNode(sinkRNode);
 			this.connections.add(c);
 			c.setNet(np);
@@ -334,7 +334,7 @@ public class RoutableGroupRouterWithVirtualMode{
 			
 			SitePinInst source = n.getSource();
 			
-			RoutableTimingGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
+			RoutableNodeGroup sourceRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, source, RoutableType.SOURCERR, this.timingModel, this.base_cost_fac);
 			for(SitePinInst sink:n.getSinkPins()){
 				if(RouterHelper.isExternalConnectionToCout(source, sink)){//|| n.getName().equals("ncda") || n.getName().equals("ncfe") || n.getName().equals("ncf8")
 					source = n.getAlternateSource();
@@ -348,7 +348,7 @@ public class RoutableGroupRouterWithVirtualMode{
 				Connection c = new Connection(icon, source, sink);
 				c.setSourceRNode(sourceRNode);
 				
-				RoutableTimingGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.SINKRR, this.timingModel, this.base_cost_fac);
+				RoutableNodeGroup sinkRNode = this.createRoutableNodeAndAdd(this.rrgNodeId, sink, RoutableType.SINKRR, this.timingModel, this.base_cost_fac);
 				c.setSinkRNode(sinkRNode);
 				
 				//set TimingVertex/Edge of connection				
@@ -375,9 +375,9 @@ public class RoutableGroupRouterWithVirtualMode{
 		}
 	}
 	
-	public RoutableTimingGroup createRoutableNodeAndAdd(int index, SitePinInst sitePinInst, RoutableType type, TimingModel model, float base_cost_fac){
-		RoutableTimingGroup routableTG = new RoutableTimingGroup(index, sitePinInst, type, this.estimator);
-		this.rnodesCreated.put(routableTG.getSiblingsTimingGroup().getSiblings()[0].exitNode(), routableTG);
+	public RoutableNodeGroup createRoutableNodeAndAdd(int index, SitePinInst sitePinInst, RoutableType type, TimingModel model, float base_cost_fac){
+		RoutableNodeGroup routableTG = new RoutableNodeGroup(index, sitePinInst, type, this.estimator);
+		this.rnodesCreated.put(routableTG.getNodeGroupSiblings().getSiblings()[0].exitNode(), routableTG);
 		this.rrgNodeId++;
 		return routableTG;
 	}
@@ -385,8 +385,8 @@ public class RoutableGroupRouterWithVirtualMode{
 	public void getTotalNodesInResourceGraph(){
 		Set<Node> totalNodes = new HashSet<>();
 		
-		for(RoutableTimingGroup rtg:this.rnodesCreated.values()){
-			for(ImmutableTimingGroup immuTg:rtg.getSiblingsTimingGroup().getSiblings()){
+		for(RoutableNodeGroup rtg:this.rnodesCreated.values()){
+			for(NodeGroup immuTg:rtg.getNodeGroupSiblings().getSiblings()){
 				if(immuTg.entryNode() != null){
 					totalNodes.add(immuTg.entryNode());
 				}
@@ -425,7 +425,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	
 	public int overUsedEntryNodes(){
 		int overUsedEntryNodes = 0;
-		for(NodeWithFaninInfo n : RoutableTimingGroup.entryNodesExpanded){
+		for(EntryNode n : RoutableNodeGroup.entryNodesExpanded){
 			if(n != null && n.isOverUsed()){
 				overUsedEntryNodes++;
 			}
@@ -435,7 +435,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	
 	public int multiFaninEntryNodes(){
 		int illegalEntryNodes = 0;
-		for(NodeWithFaninInfo n : RoutableTimingGroup.entryNodesExpanded){
+		for(EntryNode n : RoutableNodeGroup.entryNodesExpanded){
 			if(n != null && n.hasMultiFanin()){
 				illegalEntryNodes++;
 			}
@@ -467,11 +467,11 @@ public class RoutableGroupRouterWithVirtualMode{
 	
 	public void entryNodesSharing(){
 		float sum = 0;
-		for(NodeWithFaninInfo n:RoutableTimingGroup.entryNodesExpanded){
+		for(EntryNode n:RoutableNodeGroup.entryNodesExpanded){
 //			sum += n.entryHolders.size();
 		}
-		System.out.println("all entry nodes in cost map: " + RoutableTimingGroup.entryNodesExpanded.size());
-		System.out.println("average shaing for used entry nodes: " + sum/RoutableTimingGroup.entryNodesExpanded.size());
+		System.out.println("all entry nodes in cost map: " + RoutableNodeGroup.entryNodesExpanded.size());
+		System.out.println("average shaing for used entry nodes: " + sum/RoutableNodeGroup.entryNodesExpanded.size());
 	}
 	
 	private void setRerouteCriticality(List<Connection> connections) {
@@ -669,7 +669,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	public boolean conEntryNodeCongested(Connection con){
 //		this.routerTimer.checkOnEntryNodeCongestion.start();//0.02s first of 487
 		boolean congested = false;
-		for(NodeWithFaninInfo n : this.connectionEntryNodes.get(con)){
+		for(EntryNode n : this.connectionEntryNodes.get(con)){
 			if(n != null){
 				if(n.isOverUsed()){
 					congested = true;
@@ -681,7 +681,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	}
 	
 	public boolean isValidRouting(){
-		for(RoutableTimingGroup rnode:this.rnodesCreated.values()){
+		for(RoutableNodeGroup rnode:this.rnodesCreated.values()){
 			if(rnode.overUsed()){
 				return false;
 			}
@@ -692,7 +692,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	public boolean validEntryNodesRouting(){
 //		this.routerTimer.checkIfEntryNodesRoutingValid.start();//0.03s first of 487
 		boolean validEntryNodeRouting = true;
-		for(NodeWithFaninInfo n : RoutableTimingGroup.entryNodesExpanded){
+		for(EntryNode n : RoutableNodeGroup.entryNodesExpanded){
 			if(n != null && n.isOverUsed()){
 				validEntryNodeRouting = false;
 			}
@@ -744,7 +744,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	//entryNode over usage should also be considered here
 	//similar update for every entry node
 	private void updateCost(float pres_fac, float acc_fac) {
-		for(RoutableTimingGroup rnode:this.rnodesCreated.values()){
+		for(RoutableNodeGroup rnode:this.rnodesCreated.values()){
 			int overuse = rnode.getOccupancy() - Routable.capacity;
 			//Present congestion penalty
 			if(overuse == 0){
@@ -757,14 +757,14 @@ public class RoutableGroupRouterWithVirtualMode{
 		
 		//update costs of entry nodes
 //		System.out.println("iteration = " + this.itry);
-		RoutableTimingGroup.updateEntryNodesCosts(pres_fac, acc_fac);
+		RoutableNodeGroup.updateEntryNodesCosts(pres_fac, acc_fac);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public void getAllHopsAndManhattanD(){
 		//first check if routing is valid
 		int err = 0;
-		for(RoutableTimingGroup rn:this.rnodesCreated.values()){
+		for(RoutableNodeGroup rn:this.rnodesCreated.values()){
 			if(rn.overUsed() || rn.illegal()){
 				err++;
 			}
@@ -808,7 +808,7 @@ public class RoutableGroupRouterWithVirtualMode{
 				}
 			}
 			
-			for(NodeWithFaninInfo entry:this.connectionEntryNodes.get(conn)){
+			for(EntryNode entry:this.connectionEntryNodes.get(conn)){
 				if(entry != null){
 					this.usedEntryNodes.add(entry);//TODO hashCode is not unique
 				}
@@ -876,7 +876,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	
 	public boolean illegalConOnEntryNode(Connection con){
 		boolean illegal = false;
-		for(NodeWithFaninInfo entry:this.connectionEntryNodes.get(con)){
+		for(EntryNode entry:this.connectionEntryNodes.get(con)){
 			if(entry != null && entry.hasMultiFanin()){
 				return true;
 			}
@@ -887,7 +887,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	public Node getIllegalEntryNode(Netplus illegalTree){
 		
 		for(Connection con:illegalTree.getConnection()){
-			for(NodeWithFaninInfo entry:this.connectionEntryNodes.get(con)){
+			for(EntryNode entry:this.connectionEntryNodes.get(con)){
 				if(entry != null && entry.hasMultiFanin()){
 					return entry;
 				}
@@ -992,7 +992,7 @@ public class RoutableGroupRouterWithVirtualMode{
 			//Get the path from the connection with maximum hops
 			List<Routable> newRouteNodes = new ArrayList<>();
 			//get the entry nodes from the critical connection
-			List<NodeWithFaninInfo> entryNodes = new ArrayList<>();
+			List<EntryNode> entryNodes = new ArrayList<>();
 			
 			boolean add = false;
 			int ir = 0;
@@ -1037,15 +1037,15 @@ public class RoutableGroupRouterWithVirtualMode{
 	}
 	
 	public void ripup(Connection con){
-		RoutableTimingGroup parent = null;	
+		RoutableNodeGroup parent = null;	
 		for(int i = con.rnodes.size() - 1; i >= 0; i--){
-			RoutableTimingGroup rnode = (RoutableTimingGroup) con.rnodes.get(i);
-			RoutableData rNodeData = rnode.rnodeData;	
+			RoutableNodeGroup rnode = (RoutableNodeGroup) con.rnodes.get(i);
+			RoutableData rNodeData = rnode.getRoutableData();	
 			rNodeData.removeSource(con.source);
 			
 			//remove sources of entry nodes
 			//moving out from ripup will require one more traversal of the con.rnodes
-			NodeWithFaninInfo thruEntryNode = this.removeEntryNodeSource(rnode, con, i);			
+			EntryNode thruEntryNode = this.removeEntryNodeSource(rnode, con, i);			
 			if(parent == null){
 				parent = rnode;
 			}else{
@@ -1062,23 +1062,23 @@ public class RoutableGroupRouterWithVirtualMode{
 			rnode.updatePresentCongestionPenalty(this.pres_fac);
 			//update present congestion penalty of entry nodes
 			if(thruEntryNode != null){
-				RoutableTimingGroup.updatePresentCongestionPenaltyOfEntryNode(thruEntryNode, this.pres_fac);
+				RoutableNodeGroup.updatePresentCongestionPenaltyOfEntryNode(thruEntryNode, this.pres_fac);
 			}
 		}
 	}
 	
 	public void add(Connection con){
-		RoutableTimingGroup parent = null;
+		RoutableNodeGroup parent = null;
 		
 		for(int i = con.rnodes.size()-1; i >= 0; i--){
 			//in the order of from sourcerr to sinkrr
-			RoutableTimingGroup rnode = (RoutableTimingGroup) con.rnodes.get(i);
-			RoutableData rNodeData = rnode.rnodeData;
+			RoutableNodeGroup rnode = (RoutableNodeGroup) con.rnodes.get(i);
+			RoutableData rNodeData = rnode.getRoutableData();
 			
 			rNodeData.addSource(con.source);
 			
 			//add sources of entry nodes
-			NodeWithFaninInfo thruEntryNode = this.addEntryNodeSource(rnode, con, i);			
+			EntryNode thruEntryNode = this.addEntryNodeSource(rnode, con, i);			
 			if(parent == null){
 				parent = rnode;
 			}else{
@@ -1096,20 +1096,20 @@ public class RoutableGroupRouterWithVirtualMode{
 			rnode.updatePresentCongestionPenalty(this.pres_fac);		
 			//update present cogestion of entry node
 			if(thruEntryNode != null){
-				RoutableTimingGroup.updatePresentCongestionPenaltyOfEntryNode(thruEntryNode, this.pres_fac);
+				RoutableNodeGroup.updatePresentCongestionPenaltyOfEntryNode(thruEntryNode, this.pres_fac);
 			}		
 		}
 	}
 	
-	public NodeWithFaninInfo addEntryNodeSource(RoutableTimingGroup rnode, Connection con, int i){
+	public EntryNode addEntryNodeSource(RoutableNodeGroup rnode, Connection con, int i){
 		//thruImmuTg will never be null for non-source resources
-		if(rnode.type != RoutableType.SOURCERR){
+		if(rnode.getRoutableType() != RoutableType.SOURCERR){
 			
 //			Node thruEntryNode = rnode.getThruImmuTg().entryNode();
-			NodeWithFaninInfo thruEntryNode = this.connectionEntryNodes.get(con).get(i);
+			EntryNode thruEntryNode = this.connectionEntryNodes.get(con).get(i);
 			if(thruEntryNode != null){
 				thruEntryNode.addSource(con.source);
-				RoutableTimingGroup.entryNodesExpanded.add(thruEntryNode);
+				RoutableNodeGroup.entryNodesExpanded.add(thruEntryNode);
 			}
 			return thruEntryNode;
 		}
@@ -1117,31 +1117,31 @@ public class RoutableGroupRouterWithVirtualMode{
 	}
 	
 	//adding parent needed for checking if there is any entry node that has multiple fanin
-	public void addEntryNodeParent(NodeWithFaninInfo thruEntryNode, RoutableTimingGroup parent){
+	public void addEntryNodeParent(EntryNode thruEntryNode, RoutableNodeGroup parent){
 		if(thruEntryNode != null){	
 			thruEntryNode.addParent(parent);
-			RoutableTimingGroup.entryNodesExpanded.add(thruEntryNode);
+			RoutableNodeGroup.entryNodesExpanded.add(thruEntryNode);
 		}
 			
 	}
 	
-	public NodeWithFaninInfo removeEntryNodeSource(RoutableTimingGroup rnode, Connection con, int i){
-		if(rnode.type != RoutableType.SOURCERR){//SOURCERR does not have a thruImmuTg (null)
-			NodeWithFaninInfo thruEntryNode = this.connectionEntryNodes.get(con).get(i);//thruImmuTg that should not be used here,
+	public EntryNode removeEntryNodeSource(RoutableNodeGroup rnode, Connection con, int i){
+		if(rnode.getRoutableType() != RoutableType.SOURCERR){//SOURCERR does not have a thruImmuTg (null)
+			EntryNode thruEntryNode = this.connectionEntryNodes.get(con).get(i);//thruImmuTg that should not be used here,
 			//because it might be changed during the routing process of other connections that use the same rnode
 			if(thruEntryNode != null){
 				thruEntryNode.removeSource(con.source);
-				RoutableTimingGroup.entryNodesExpanded.add(thruEntryNode);
+				RoutableNodeGroup.entryNodesExpanded.add(thruEntryNode);
 			}
 			return thruEntryNode;
 		}
 		return null;
 	}
 	
-	public void removeEntryNodeParent(NodeWithFaninInfo thruEntryNode, RoutableTimingGroup parent){
+	public void removeEntryNodeParent(EntryNode thruEntryNode, RoutableNodeGroup parent){
 		if(thruEntryNode != null){
 			thruEntryNode.removeParent(parent);
-			RoutableTimingGroup.entryNodesExpanded.add(thruEntryNode);
+			RoutableNodeGroup.entryNodesExpanded.add(thruEntryNode);
 		}
 	}
 	
@@ -1206,7 +1206,7 @@ public class RoutableGroupRouterWithVirtualMode{
 			if(net.getNet().getName().equals(netname)){
 				for(Connection con:net.getConnection()){
 					for(Routable rn:con.rnodes){
-						Node exitNode = ((RoutableTimingGroup)rn).getSiblingsTimingGroup().getExitNode();
+						Node exitNode = ((RoutableNodeGroup)rn).getNodeGroupSiblings().getExitNode();
 						System.out.println(exitNode.toString());
 					}
 				}
@@ -1244,8 +1244,8 @@ public class RoutableGroupRouterWithVirtualMode{
 		List<Node> conNodes = new ArrayList<>();
 		
 		for(int i = 0; i < con.rnodes.size() - 1; i++){		
-			RoutableTimingGroup rtg = ((RoutableTimingGroup) (con.rnodes.get(i)));
-			conNodes.add(rtg.getSiblingsTimingGroup().getExitNode());
+			RoutableNodeGroup rtg = ((RoutableNodeGroup) (con.rnodes.get(i)));
+			conNodes.add(rtg.getNodeGroupSiblings().getExitNode());
 			Node entry = this.connectionEntryNodes.get(con).get(i);
 			if(entry != null){
 				conNodes.add(entry);
@@ -1267,7 +1267,7 @@ public class RoutableGroupRouterWithVirtualMode{
 		return conPIPs;
 	}
 	
-	public void checkImmuTgOfNet(Connection con, String net1, String net2, ImmutableTimingGroup immu){
+	public void checkImmuTgOfNet(Connection con, String net1, String net2, NodeGroup immu){
 		if(con.getNet().getNet().getName().equals(net1) || con.getNet().getNet().getName().equals(net2)){
 			System.out.println(con.getNet().getNet().getName() + immu.toString());
 		}
@@ -1299,7 +1299,7 @@ public class RoutableGroupRouterWithVirtualMode{
 		Set<Float> costs = new HashSet<>();
 		float aver = 0;
 		float sum = 0;
-		for(RoutableTimingGroup rn:this.rnodesCreated.values()){
+		for(RoutableNodeGroup rn:this.rnodesCreated.values()){
 			sum += rn.getBase_cost();
 			costs.add(rn.getBase_cost());
 		}
@@ -1308,7 +1308,7 @@ public class RoutableGroupRouterWithVirtualMode{
 	}
 	
 	public void findCongestion(){
-		for(RoutableTimingGroup rn : this.rnodesCreated.values()){
+		for(RoutableNodeGroup rn : this.rnodesCreated.values()){
 			if(rn.overUsed()){
 				System.out.println(rn.toString());
 			}
@@ -1352,7 +1352,7 @@ public class RoutableGroupRouterWithVirtualMode{
 			
 		while(!this.targetReached(con)){
 			
-			RoutableTimingGroup rnode = (RoutableTimingGroup) queue.poll().rnode;
+			RoutableNodeGroup rnode = (RoutableNodeGroup) queue.poll().rnode;
 			
 			
 			if(!rnode.childrenSet){
@@ -1384,8 +1384,8 @@ public class RoutableGroupRouterWithVirtualMode{
 	}
 	
 	public void saveRouting(Connection con){
-		RoutableTimingGroup rn = (RoutableTimingGroup) con.getSinkRNode();
-		List<NodeWithFaninInfo> entryNodes;
+		RoutableNodeGroup rn = (RoutableNodeGroup) con.getSinkRNode();
+		List<EntryNode> entryNodes;
 		if(!this.connectionEntryNodes.containsKey(con)){
 			entryNodes = new ArrayList<>();
 		}else{
@@ -1394,42 +1394,42 @@ public class RoutableGroupRouterWithVirtualMode{
 		}
 		while (rn != null) {
 			con.addRNode(rn);
-			con.addTimingGroup(rn.getThruImmuTg());
-			entryNodes.add(rn.getThruImmuTg().entryNode());
-			rn = (RoutableTimingGroup) rn.rnodeData.getPrev();
+			con.addNodeGroup(rn.getThruNodeGroup());
+			entryNodes.add(rn.getThruNodeGroup().entryNode());
+			rn = (RoutableNodeGroup) rn.getRoutableData().getPrev();
 		}
 		this.connectionEntryNodes.put(con, entryNodes);
 	}
 
 	public void resetPathCost() {
-		for (RoutableTimingGroup node : this.rnodesTouched) {
-			node.rnodeData.setTouched(false);
+		for (RoutableNodeGroup node : this.rnodesTouched) {
+			node.getRoutableData().setTouched(false);
 			// TODO virtualMode be true
 			node.virtualMode = true;
 		}
 		this.rnodesTouched.clear();	
 	}
 	
-	public void exploringAndExpansion(RoutableTimingGroup rnode, Connection con){
+	public void exploringAndExpansion(RoutableNodeGroup rnode, Connection con){
 		this.nodesPopedFromQueue++;
 		
 		
-		for(Pair<RoutableTimingGroup, ImmutableTimingGroup> childRNode : rnode.childrenImmuTG){
-			RoutableTimingGroup child = childRNode.getFirst();
-			ImmutableTimingGroup thruImmu = childRNode.getSecond();
+		for(Pair<RoutableNodeGroup, NodeGroup> childRNode : rnode.childrenAndThruGroup){
+			RoutableNodeGroup child = childRNode.getFirst();
+			NodeGroup thruImmu = childRNode.getSecond();
 			
 			if(child.isTarget()){		
 				this.addNodeToQueue(rnode, child, thruImmu, con);
 				this.nodesExpanded++;
 				
-			}else if(child.type == RoutableType.INTERRR){
+			}else if(child.getRoutableType() == RoutableType.INTERRR){
 				if(child.isInBoundingBoxLimit(con)){
 					
 					if(!child.virtualMode){
 						this.addNodeToQueue(rnode, child, thruImmu, con);
 					}else{
 						//TODO copying costs from the parent
-						this.addRNodeToQueuePushing(con, child, rnode, thruImmu, rnode.rnodeData.getLevel() + 1, rnode.rnodeData.getPartialPathCost(), rnode.rnodeData.getLowerBoundTotalPathCost());
+						this.addRNodeToQueuePushing(con, child, rnode, thruImmu, rnode.getRoutableData().getLevel() + 1, rnode.getRoutableData().getPartialPathCost(), rnode.getRoutableData().getLowerBoundTotalPathCost());
 						child.virtualMode = false;
 					}
 					
@@ -1444,9 +1444,9 @@ public class RoutableGroupRouterWithVirtualMode{
 	
 	
 	
-	private boolean hasNodePinFeed(RoutableTimingGroup child){//TODO this takes time, should be avoided
+	private boolean hasNodePinFeed(RoutableNodeGroup child){//TODO this takes time, should be avoided
 		boolean hasNodePinFeed = false;
-		if(child.getSiblingsTimingGroup().groupDelayType() == GroupDelayType.PINFEED){//.getAllWiresInNode()[0].getIntentCode() == IntentCode.NODE_PINFEED){//*IMUX*
+		if(child.getNodeGroupSiblings().groupDelayType() == GroupDelayType.PINFEED){//.getAllWiresInNode()[0].getIntentCode() == IntentCode.NODE_PINFEED){//*IMUX*
 			hasNodePinFeed = true;
 		}
 		return hasNodePinFeed;
@@ -1456,26 +1456,26 @@ public class RoutableGroupRouterWithVirtualMode{
 		return true;
 	}
 	
-	private void addNodeToQueue(RoutableTimingGroup rnode, RoutableTimingGroup childRNode, ImmutableTimingGroup thruImmuTg, Connection con) {
-		RoutableData data = childRNode.rnodeData;
+	private void addNodeToQueue(RoutableNodeGroup rnode, RoutableNodeGroup childRNode, NodeGroup thruImmuTg, Connection con) {
+		RoutableData data = childRNode.getRoutableData();
 		int countSourceUses = data.countSourceUses(con.source);
 		
 //		if(this.debugExpansion && this.targetCon(con)){
 //			this.printInfo("\t\t childRNode " + childRNode.toString());
 //		}
 		
-		float partial_path_cost = rnode.rnodeData.getPartialPathCost();//upstream path cost
+		float partial_path_cost = rnode.getRoutableData().getPartialPathCost();//upstream path cost
 		
 //		this.routerTimer.getRouteNodeCost.start();
 		float rnodeCost = this.getRouteNodeCost(childRNode, thruImmuTg, con, countSourceUses);
 //		this.routerTimer.getRouteNodeCost.finish();
 		
 		float new_partial_path_cost = partial_path_cost + rnodeCost;
-		int childLevel = rnode.rnodeData.getLevel() + 1;
+		int childLevel = rnode.getRoutableData().getLevel() + 1;
 		float new_lower_bound_total_path_cost;
 		float expected_distance_cost = 0;
 		float expected_wire_cost;
-		if(childRNode.type == RoutableType.INTERRR){
+		if(childRNode.getRoutableType() == RoutableType.INTERRR){
 			
 //			if(this.debugExpansion) this.printInfo("\t\t target RNode " + con.targetName + " (" + con.sink.getTile().getColumn() + "," + con.sink.getTile().getRow() + ")");
 			expected_distance_cost = this.expectMahatD(childRNode, con);
@@ -1498,8 +1498,8 @@ public class RoutableGroupRouterWithVirtualMode{
 		this.addRNodeToQueuePushing(con, childRNode, rnode, thruImmuTg, childLevel, new_partial_path_cost, new_lower_bound_total_path_cost);	
 	}
 	
-	private void addRNodeToQueuePushing(Connection con, RoutableTimingGroup childRNode, RoutableTimingGroup rnode, ImmutableTimingGroup thruImmuTg, int level, float new_partial_path_cost, float new_lower_bound_total_path_cost) {
-		RoutableData data = childRNode.rnodeData;
+	private void addRNodeToQueuePushing(Connection con, RoutableNodeGroup childRNode, RoutableNodeGroup rnode, NodeGroup thruImmuTg, int level, float new_partial_path_cost, float new_lower_bound_total_path_cost) {
+		RoutableData data = childRNode.getRoutableData();
 		
 		//TODO ---- TO DEAL WITH VIRTUAL RNODES, --------
 		if(!data.isTouched()) {//visited or not
@@ -1509,7 +1509,7 @@ public class RoutableGroupRouterWithVirtualMode{
 			data.setLowerBoundTotalPathCost(new_lower_bound_total_path_cost);
 			data.setPartialPathCost(new_partial_path_cost);
 			data.setPrev(rnode);
-			childRNode.setThruImmuTg(thruImmuTg);
+			childRNode.setThruNodeGroup(thruImmuTg);
 			if(rnode != null) data.setLevel(level);
 			this.queue.add(new QueueElement(childRNode, new_lower_bound_total_path_cost));
 //			if(this.debugExpansion&& this.targetCon(con) ) this.printInfo("\t\t node added, queue size = " + this.queue.size());
@@ -1519,20 +1519,20 @@ public class RoutableGroupRouterWithVirtualMode{
 //			if(this.debugExpansion && this.targetCon(con)) this.printInfo("\t\t touched previously");
 			data.setPartialPathCost(new_partial_path_cost);
 			data.setPrev(rnode);
-			childRNode.setThruImmuTg(thruImmuTg);
+			childRNode.setThruNodeGroup(thruImmuTg);
 			if(rnode != null) data.setLevel(level);
 			this.queue.add(new QueueElement(childRNode, new_lower_bound_total_path_cost));
 		}//TODO check if this block is really needed
 		
 	}
 	
-	private float getRouteNodeCost(RoutableTimingGroup rnode, ImmutableTimingGroup thruImmuTg, Connection con, int countSourceUses) {
+	private float getRouteNodeCost(RoutableNodeGroup rnode, NodeGroup thruImmuTg, Connection con, int countSourceUses) {
 		//Present congestion cost
 		float pres_cost = this.getPresentCongestionCost(countSourceUses, rnode.getOccupancy(), rnode.getPres_cost());
 		float acc_cost = rnode.getAcc_cost();
 		
 		//add entry node cost to the Siblings
-		NodeWithFaninInfo entry = thruImmuTg.entryNode();
+		EntryNode entry = thruImmuTg.entryNode();
 		
 		if(entry != null){
 			pres_cost += this.getPresentCongestionCost(entry.countSourceUses(con.source), entry.getOcc(), entry.getPresCost());	
@@ -1541,7 +1541,7 @@ public class RoutableGroupRouterWithVirtualMode{
 		
 		//Bias cost
 		float bias_cost = 0;
-		if(rnode.type == RoutableType.INTERRR) {
+		if(rnode.getRoutableType() == RoutableType.INTERRR) {
 			Netplus net = con.getNet();
 			bias_cost = 0.5f * rnode.getBase_cost() / net.fanout * 
 					(Math.abs(rnode.getX() - net.x_geo) + Math.abs(rnode.getY() - net.y_geo)) / net.hpwl;
@@ -1573,7 +1573,7 @@ public class RoutableGroupRouterWithVirtualMode{
 		return pres_cost;
 	}
 	
-	private float expectMahatD(RoutableTimingGroup childRNode, Connection con){
+	private float expectMahatD(RoutableNodeGroup childRNode, Connection con){
 		float md;
 		md = Math.abs(childRNode.getX() - con.getSinkRNode().getX()) + Math.abs(childRNode.getY() - con.getSinkRNode().getY());
 		return md;
@@ -1592,11 +1592,11 @@ public class RoutableGroupRouterWithVirtualMode{
 		//set the sink rrg node of con as the target
 		con.getSinkRNode().setTarget(true);
 		//TODO currently, the one with index 1 is selected for delay estimation
-		this.sinkPinTG = ((RoutableTimingGroup)con.getSinkRNode()).getSiblingsTimingGroup().getSiblings()[1];
+		this.sinkPinTG = ((RoutableNodeGroup)con.getSinkRNode()).getNodeGroupSiblings().getSiblings()[1];
 		
 		// Add source to queue
-		RoutableTimingGroup source = (RoutableTimingGroup) con.getSourceRNode();
-		this.addRNodeToQueuePushing(con, source, null, source.getSiblingsTimingGroup().getSiblings()[0], 0, 0, 0);
+		RoutableNodeGroup source = (RoutableNodeGroup) con.getSourceRNode();
+		this.addRNodeToQueuePushing(con, source, null, source.getNodeGroupSiblings().getSiblings()[0], 0, 0, 0);
 	}
 	
 	public void checkAverageNumWires(){
@@ -1613,15 +1613,15 @@ public class RoutableGroupRouterWithVirtualMode{
 		float sumChildren = 0;
 		float sumRNodes = 0;
 		
-		for(RoutableTimingGroup rn:this.rnodesCreated.values()){	
+		for(RoutableNodeGroup rn:this.rnodesCreated.values()){	
 			if(rn.childrenSet){
-				sumChildren += rn.childrenImmuTG.size();
+				sumChildren += rn.childrenAndThruGroup.size();
 				sumRNodes++;
 			}
 			
-			ImmutableTimingGroup[] timingGroups = rn.getSiblingsTimingGroup().getSiblings();
+			NodeGroup[] timingGroups = rn.getNodeGroupSiblings().getSiblings();
 			sumTG += timingGroups.length;
-			for(ImmutableTimingGroup tg:timingGroups){
+			for(NodeGroup tg:timingGroups){
 				
 				Node entryNode = tg.entryNode();
 				Node exitNode = tg.exitNode();

@@ -3,6 +3,7 @@ package com.xilinx.rapidwright.routernew;
 public class RouterTimer {
 	public Timer firstIteration;
 	public Timer rerouteCongestion;
+	public Timer rerouteCriticalCon;
 	public Timer rerouteIllegal;
 	public Timer rnodesCreation;
 	public Timer updateTiming;
@@ -13,6 +14,7 @@ public class RouterTimer {
 	public RouterTimer() {
 		this.firstIteration = new Timer("first iteration");
 		this.rerouteCongestion = new Timer("reroute congestion");
+		this.rerouteCriticalCon = new Timer("reroute critical con");
 		this.rnodesCreation = new Timer("rnodes creation");	
 		this.rerouteIllegal = new Timer("fix illegal tree");
 		this.calculateStatistics = new Timer("calc stat");
@@ -27,6 +29,7 @@ public class RouterTimer {
 		
 		result += this.firstIteration;
 		result += this.rerouteCongestion;	
+		result += this.rerouteCriticalCon;
 		result += this.rnodesCreation;	
 		result += this.calculateStatistics;
 		result += this.updateTiming;

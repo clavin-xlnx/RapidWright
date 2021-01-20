@@ -29,20 +29,24 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 
 /**
- * A collection of utility methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND
+ * A collection of methods for routing global signals, i.e. GLOBAL_CLOCK, VCC and GND
  * Adapted from RW APIs
  */
-public class GlobalSignalRoutingTools {
+public class GlobalSignalRouting {
 	private static Map<Node, RoutableNode> rnodesCreated;
 	private static int rnodeId;
 	private static Design design;
 	private static RouteThruHelper routeThruHelper;
 	
-	public GlobalSignalRoutingTools(Design design, Map<Node, RoutableNode> rnodesCreated, int rnodeId, RouteThruHelper routeThruHelper) {
+	static boolean clkDebug = false;
+	static boolean debugPrintClkPIPs = false;
+	static ClockRegion assignedCentroid = null;
+	
+	public GlobalSignalRouting(Design design, Map<Node, RoutableNode> rnodesCreated, int rnodeId, RouteThruHelper routeThruHelper) {
 		setRnodesCreated(rnodesCreated);
 		setRnodeId(rnodeId);
-		GlobalSignalRoutingTools.design = design;
-		GlobalSignalRoutingTools.routeThruHelper = routeThruHelper;
+		GlobalSignalRouting.design = design;
+		GlobalSignalRouting.routeThruHelper = routeThruHelper;
 	}
 	
 	public static Map<Node, RoutableNode> getRnodesCreated() {
@@ -50,14 +54,14 @@ public class GlobalSignalRoutingTools {
 	}
 
 	public static void setRnodesCreated(Map<Node, RoutableNode> rnodesCreated) {
-		GlobalSignalRoutingTools.rnodesCreated = rnodesCreated;
+		GlobalSignalRouting.rnodesCreated = rnodesCreated;
 	}
 
 	public static int getRnodeId() {
 		return rnodeId;
 	}
 	public static void setRnodeId(int rnodeId) {
-		GlobalSignalRoutingTools.rnodeId = rnodeId;
+		GlobalSignalRouting.rnodeId = rnodeId;
 	}
 	
 	/**
@@ -65,10 +69,19 @@ public class GlobalSignalRoutingTools {
 	 * @param clk: GLBAL_CLOCK net
 	 * @param dev: the device that the design uses
 	 */
+	public static void setDebug() {
+		clkDebug = true;
+	}
+	public static void setPrintCLKPIPs() {
+		debugPrintClkPIPs = true;
+	}
+	public static void setCentroid(ClockRegion cr) {
+		assignedCentroid = cr;
+	}
+	
 	public static void clkRouting(Net clk, Device dev) {
-		boolean debug = false;
- 		boolean debugPrintPIPs = false;
- 		if(debug) System.out.println("\nROUTE CLK NET...");
+		
+ 		if(clkDebug) System.out.println("\nROUTE CLK NET...");
  		
 		List<ClockRegion> clockRegions = new ArrayList<>();
 		for(SitePinInst pin : clk.getPins()) {
@@ -77,65 +90,67 @@ public class GlobalSignalRoutingTools {
 			ClockRegion cr = t.getClockRegion();
 			if(!clockRegions.contains(cr)) clockRegions.add(cr);
 		}
-		if(debug) System.out.println("clock regions " + clockRegions);
+		if(clkDebug) System.out.println("clock regions " + clockRegions);
 		
-		ClockRegion centroid = findCentroid(clk, dev);
-		if(debug) System.out.println(" centroid clock region is  \n \t" + centroid);
+		ClockRegion centroid;
+		if (assignedCentroid != null) centroid = assignedCentroid;
+		else centroid = findCentroid(clk, dev);
+		if(clkDebug) System.out.println(" centroid clock region is  \n \t" + centroid);
 		
 		//Route from BUFG to Clock Routing Tracks
 		//using RouteNode would be better than rewriting the methods and chaning from RouteNode to RoutableNode
 		RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);//HROUTE
-		if(debug) System.out.println("route BUFG to nearest routing track: \n \t" + clkRoutingLine);
-		if(debugPrintPIPs) printCLKPIPs(clk);
+		if(clkDebug) System.out.println("route BUFG to nearest routing track: \n \t" + clkRoutingLine);
+		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
-		if(debug) System.out.println("route To Centroid ");
+		if(clkDebug) System.out.println("route To Centroid ");
 		RouteNode centroidRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid);//VROUTE
-		if(debug) System.out.println(" clk centroid route node is \n \t" + centroidRouteNode);
-		if(debugPrintPIPs) printCLKPIPs(clk);
+		if(clkDebug) System.out.println(" clk centroid route node is \n \t" + centroidRouteNode);
+		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		// Transition centroid from routing track to vertical distribution track
-		if(debug) System.out.println("transition Centroid To Distribution Line");
+		if(clkDebug) System.out.println("transition Centroid To Distribution Line");
 		RouteNode centroidDistNode = UltraScaleClockRouting.transitionCentroidToDistributionLine(clk,centroidRouteNode);
-		if(debug) System.out.println(" centroid distribution node is \n \t" + centroidDistNode);
-		if(debugPrintPIPs) printCLKPIPs(clk);
+		if(clkDebug) System.out.println(" centroid distribution node is \n \t" + centroidDistNode);
+		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		//routeCentroidToVerticalDistributionLines and routeCentroidToHorizontalDistributionLines could result in duplicated PIPs
-		if(debug) System.out.println("route Centroid To Vertical Distribution Lines");
+		if(clkDebug) System.out.println("route Centroid To Vertical Distribution Lines");
 		
 		//Each ClockRegion is not necessarily the one that each RouteNode value belongs to (same row is a must)
 		Map<ClockRegion, RouteNode> vertDistLines = UltraScaleClockRouting.routeCentroidToVerticalDistributionLines(clk,centroidDistNode, clockRegions);
-		if(debug) {
+		if(clkDebug) {
 			System.out.println(" clock region - vertical distribution node ");
 			for(ClockRegion cr : vertDistLines.keySet()) System.out.println(" \t" + cr + " \t " + vertDistLines.get(cr));
 		}
-		if(debugPrintPIPs) printCLKPIPs(clk);
+		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
-		if(debug) System.out.println("route Centroid To Horizontal Distribution Lines");
+		if(clkDebug) System.out.println("route Centroid To Horizontal Distribution Lines");
 		List<RouteNode> distLines = new ArrayList<>();
 		distLines.addAll(UltraScaleClockRouting.routeCentroidToHorizontalDistributionLines(clk, centroidDistNode, vertDistLines));
-		if(debug) System.out.println(" dist lines are \n \t" + distLines);
-		if(debugPrintPIPs) printCLKPIPs(clk);
+		if(clkDebug) System.out.println(" dist lines are \n \t" + distLines);
+		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		//I changed this method to just map connected node to SitePinInsts
-		if(debug) System.out.println("get LCB Pin mappings");
+		if(clkDebug) System.out.println("get LCB Pin mappings");
 		Map<RouteNode, ArrayList<SitePinInst>> lcbMappings = getLCBPinMappings(clk);
 		
 		// Route from clock distribution to all leaf clock buffers
-		if(debug) System.out.println("route distribution to LCBs");
+		if(clkDebug) System.out.println("route distribution to LCBs");
 		UltraScaleClockRouting.routeDistributionToLCBs(clk, distLines, lcbMappings.keySet());		
-		if(debugPrintPIPs) printCLKPIPs(clk);
+		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		// Route from each LCB to sinks
-		if(debug) System.out.println("route LCBs to sinks");
+		if(clkDebug) System.out.println("route LCBs to sinks");
 		UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings);
-		if(debugPrintPIPs) printCLKPIPs(clk);
+		if(debugPrintClkPIPs) printCLKPIPs(clk);
 		
 		Set<PIP> clkPIPsWithoutDuplication = new HashSet<>();
 		clkPIPsWithoutDuplication.addAll(clk.getPIPs());
 		clk.getPIPs().clear();
 		clk.setPIPs(clkPIPsWithoutDuplication);
 		
-		if(debugPrintPIPs) {
+		if(debugPrintClkPIPs) {
 			System.out.println("Final CLK routing");
 			printCLKPIPs(clk);
 		}
@@ -440,8 +455,5 @@ public class GlobalSignalRoutingTools {
 		}
 		return false;
 	}
-	
-	
-	
 	
 }

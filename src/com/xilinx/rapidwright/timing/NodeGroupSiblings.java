@@ -33,19 +33,19 @@ import java.util.regex.Pattern;
 
 
 /**
- * A class to represent a list of ImmutableTimingGroups that share the same exit node.
+ * A class to represent a list of NodeGroups that share the same exit node.
  * This class is immutable because its states never change after construction.
  * There only two way to instantiate object of this class.
  * 1) Call constructor on a SitePinInst.
- * 2) Call getNextSiblingTimingGroups to get a downhill siblings of the given sibling.
+ * 2) Call getNextNodeGroups to get a downhill siblings of the given sibling.
  */
-public class SiblingsTimingGroup {
+public class NodeGroupSiblings {
 
-    public NodeWithFaninInfo getExitNode() {
+    public EntryNode getExitNode() {
         return siblings[0].exitNode();
     }
     
-    public ImmutableTimingGroup[] getSiblings() {
+    public NodeGroup[] getSiblings() {
         return siblings;
     }
 
@@ -57,26 +57,26 @@ public class SiblingsTimingGroup {
         return this.siblings[0].wireDirection();
     }
     
-    public ImmutableTimingGroup getThruImmuTg(NodeWithFaninInfo lastExitNode){
+    public NodeGroup getThruNodeGroup(EntryNode lastExitNode){
     	if(this.fanins.size() > 0)
     		return this.fanins.get(lastExitNode);
     	return this.siblings[0];
     }
     
     /**
-     * Construct SiblingsTimingGroup from a sitePin which can be input or output.
-     * This is the only public constructor of this class. Other SiblingsTimingGroups can be created indirectly from an object of this class.
+     * Construct NodeGroupSiblings from a sitePin which can be input or output.
+     * This is the only public constructor of this class. Other NodeGroupSiblings can be created indirectly from an object of this class.
      * @param sitePin
      * @throws IllegalArgumentException
      */
     // This method don't check if the corresponding node of the sitePin is reserved node.
-    // It is because, there is way to not create SiblingsTimingGroup if the node is reserved.
+    // It is because, there is way to not create NodeGroupSiblings if the node is reserved.
     // Thus, the caller must check that before calling this ctor.
-    public SiblingsTimingGroup (SitePinInst sitePin) {
+    public NodeGroupSiblings (SitePinInst sitePin) {
 
         Node node = sitePin.getConnectedNode();
 
-        List<ImmutableTimingGroup> siblings    = new ArrayList<>();
+        List<NodeGroup> siblings    = new ArrayList<>();
         this.fanins = new HashMap<>();
         //TODO YZ: connected node of IN sitePinInst to BRAM has INTENT_DEFAULT code
         if (sitePin.getPinType() == PinType.IN) {
@@ -86,20 +86,20 @@ public class SiblingsTimingGroup {
 
             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) {
                 IntentCode nextPrvIc = nextPrvNode.getIntentCode();
-                ImmutableTimingGroup newTS = new ImmutableTimingGroup(
-                        NodeWithFaninInfo.create(nextNextNode),
-                        NodeWithFaninInfo.create(nextPrvNode),
+                NodeGroup newTS = new NodeGroup(
+                        EntryNode.create(nextNextNode),
+                        EntryNode.create(nextPrvNode),
                         nextNextIc, nextPrvIc);
                 siblings.add(newTS);
             }
         } else {
             // output sitepin has only one node
-            ImmutableTimingGroup tg = new ImmutableTimingGroup(
-                    NodeWithFaninInfo.create(node), node.getIntentCode());
-            siblings.add(tg);
+            NodeGroup ng = new NodeGroup(
+                    EntryNode.create(node), node.getIntentCode());
+            siblings.add(ng);
         }
 
-        this.siblings = siblings.toArray(new ImmutableTimingGroup[siblings.size()]);
+        this.siblings = siblings.toArray(new NodeGroup[siblings.size()]);
         this.hashCode = this.siblings[0].exitNode().hashCode();
         this.type     = GroupDelayType.PINFEED;
         this.populateFanin();
@@ -154,12 +154,12 @@ public class SiblingsTimingGroup {
 
 
     /**
-     * Find all downhill timing groups of the current timing group.
-     * @return a list of list of timing groups representing a list of siblings -- timing groups sharing the same last nodes,
-     * instead of an array of timing groups, returned by getNextTimingGroups().
+     * Find all downhill node groups of the current node group.
+     * @return a list of list of node groups representing a list of siblings -- node groups sharing the same last nodes,
+     * instead of an array of node groups, returned by getNextNodeGroupSiblings().
      */
-    public List<SiblingsTimingGroup> getNextSiblingTimingGroups(Set<Node> reservedNodes) {
-        List<SiblingsTimingGroup> result =  new ArrayList<>();
+    public List<NodeGroupSiblings> getNextNodeGroupSiblings(Set<Node> reservedNodes) {
+        List<NodeGroupSiblings> result =  new ArrayList<>();
 
         Node prevNode = siblings[0].exitNode();
         if(prevNode.getIntentCode() == IntentCode.NODE_PINFEED){ 
@@ -177,7 +177,7 @@ public class SiblingsTimingGroup {
                     continue;
                 
                 IntentCode ic = nextNode.getIntentCode();
-                //TODO check: only excluding NODE_CLE_OUTUT will cause an issue of non-thruImmuTg between two ITERRR in setChildren()
+                //TODO check: only excluding NODE_CLE_OUTUT will cause an issue of non-thruNodeGroup between two ITERRR in setChildren()
                 if(ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_CLE_OUTPUT){ 
                 	continue;
                 }
@@ -190,25 +190,25 @@ public class SiblingsTimingGroup {
                         nextNodeHasGlobalWire = true;
                 }
 
-                // CLE_OUT, GLOBAL, LONG TGs have only one node, others have 2 nodes.
-                // TG with one node has no siblings.
+                // CLE_OUT, GLOBAL, LONG NGs have only one node, others have 2 nodes.
+                // NG with one node has no siblings.
                 if (nextNodeHasGlobalWire) {
-                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>() {{add(newTS);}}, 
+                    NodeGroup newTS = new NodeGroup(EntryNode.create(nextNode), ic);
+                    result.add(new NodeGroupSiblings(new ArrayList<NodeGroup>() {{add(newTS);}}, 
                     		GroupDelayType.GLOBAL));
 
                 } else if (ic == IntentCode.NODE_CLE_OUTPUT) {
-                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }},
+                    NodeGroup newTS = new NodeGroup(EntryNode.create(nextNode), ic);
+                    result.add(new NodeGroupSiblings(new ArrayList<NodeGroup>(){{ add(newTS); }},
                                                                   GroupDelayType.OTHER));
 
                 } else if (ic == IntentCode.NODE_HLONG || ic == IntentCode.NODE_VLONG) {
-                    ImmutableTimingGroup newTS = new ImmutableTimingGroup(NodeWithFaninInfo.create(nextNode), ic);
-                    result.add(new SiblingsTimingGroup(new ArrayList<ImmutableTimingGroup>(){{ add(newTS); }}, 
+                    NodeGroup newTS = new NodeGroup(EntryNode.create(nextNode), ic);
+                    result.add(new NodeGroupSiblings(new ArrayList<NodeGroup>(){{ add(newTS); }}, 
                     									GroupDelayType.LONG));
 
                 } else {
-                    // for other TGs look for the 2nd node
+                    // for other NGs look for the 2nd node
                     for (Node nextNextNode : nextNode.getAllDownhillNodes()) {
 
                         if (isExcluded(nextNextNode))
@@ -216,8 +216,8 @@ public class SiblingsTimingGroup {
                         
                         if (!reservedNodes.contains(nextNextNode)) {
                             IntentCode nextNextIc = nextNextNode.getIntentCode();
-                            List<ImmutableTimingGroup> tgs = new ArrayList<>();
-                            ImmutableTimingGroup throughTg = null;
+                            List<NodeGroup> ngs = new ArrayList<>();
+                            NodeGroup throughNg = null;
                             for (Node nextPrvNode : nextNextNode.getAllUphillNodes()) { // need to get all downhill PIPs
 
                                 String[] int_node = nextPrvNode.toString().split("/");
@@ -236,20 +236,20 @@ public class SiblingsTimingGroup {
                                 // TODO: (need to revisit this if the assumption changes.)
                                 // TODO: Thus only check nodes that can be key nodes. nextPrvNode is not a key node.
                                 IntentCode nextPrvIc       = nextPrvNode.getIntentCode();
-                                ImmutableTimingGroup newTS = new ImmutableTimingGroup(
-                                        NodeWithFaninInfo.create(nextNextNode),
-                                        NodeWithFaninInfo.create(nextPrvNode),
+                                NodeGroup newTS = new NodeGroup(
+                                        EntryNode.create(nextNextNode),
+                                        EntryNode.create(nextPrvNode),
                                         nextNextIc, nextPrvIc);
-                                tgs.add(newTS);
+                                ngs.add(newTS);
                                 if (nextPrvNode.equals(nextNode))
-                                    throughTg = newTS;
+                                    throughNg = newTS;
                                     /*if(prevNode.toString().equals("INT_X12Y97/EE12_BEG7") && 
                                     		nextNextNode.toString().equals("INT_X18Y97/INT_INT_SDQ_7_INT_OUT0"))
-                                    		System.out.println(throughTg.toString());*/
+                                    		System.out.println(throughNg.toString());*/
                                 
                             }
                             // TODO: find out the type if the type is needed. Don't do it to reduce runtime
-                            result.add(new SiblingsTimingGroup(tgs, tgs.get(0).delayType()));//GroupDelayType.OTHER));
+                            result.add(new NodeGroupSiblings(ngs, ngs.get(0).delayType()));//GroupDelayType.OTHER));
                         }
                     }
                 }
@@ -259,7 +259,7 @@ public class SiblingsTimingGroup {
     }
 
     /**
-     * @return a brief description of SiblingsTimingGroup. The key node is listed first follows by ':"
+     * @return a brief description of SiblingsNodeGroup. The key node is listed first follows by ':"
      * and then the list of first node of each sibling. For example, an object with 2 siblings will return
      * A : B C . An object with no sibling returns "A :" if it has only one node (no sibling by definition) or "A : B"
      * if it has two nodes. Each node information is the name of the first wire of the node.
@@ -277,9 +277,9 @@ public class SiblingsTimingGroup {
 ////        builder.append(siblings[0].exitNode().getAllWiresInNode()[0].getWireName());
 //        builder.append("  : ");
 //
-//        for (ImmutableTimingGroup tg : siblings) {
+//        for (NodeGroup ng : siblings) {
 //            builder.append(" , ");
-//            Node entryNode = tg.entryNode();
+//            Node entryNode = ng.entryNode();
 //            if (entryNode != null) {
 //                builder.append(entryNode.toString());
 ////                builder.append("  - ");
@@ -300,29 +300,29 @@ public class SiblingsTimingGroup {
     // ------------------------------------   private ----------------------------------------
 
 
-    final private ImmutableTimingGroup[] siblings;
+    final private NodeGroup[] siblings;
     final private int                    hashCode;
     final private GroupDelayType         type;
-    private Map<NodeWithFaninInfo,ImmutableTimingGroup> fanins; //for nextSiblings <last exit node, timingGroup in this siblings>
+    private Map<EntryNode,NodeGroup> fanins; //for nextSiblings <last exit node, nodeGroup in this siblings>
 
 
-    private SiblingsTimingGroup (List<ImmutableTimingGroup> tgs, GroupDelayType type) {
-        this.siblings = tgs.toArray(new ImmutableTimingGroup[tgs.size()]); // *******
+    private NodeGroupSiblings (List<NodeGroup> ngs, GroupDelayType type) {
+        this.siblings = ngs.toArray(new NodeGroup[ngs.size()]); // *******
         this.hashCode = this.siblings[0].hashCode();
         this.type     = type;
         this.fanins = new HashMap<>();
-        this.populateFanin();//use the List<Pair<SiblingsTimingGroup, ImmutbleTimingGroup>> returned from getNextSiblingsTimingGroups()
+        this.populateFanin();//use the List<Pair<nodeGroupSiblings, NodeGroup>> returned from getNextNodeGroupSiblings()
     }
     
     private void populateFanin(){
-		for(ImmutableTimingGroup immuTg : this.siblings){
-    		if(immuTg.entryNode() != null){
-    			for(Node n:immuTg.entryNode().getAllUphillNodes()){
-        			this.fanins.put(NodeWithFaninInfo.create(n), immuTg);
+		for(NodeGroup nodeGroup : this.siblings){
+    		if(nodeGroup.entryNode() != null){
+    			for(Node n:nodeGroup.entryNode().getAllUphillNodes()){
+        			this.fanins.put(EntryNode.create(n), nodeGroup);
         		}
     		}else{//output pin Sibling and global siblings
     			for(Node n:this.siblings[0].exitNode().getAllUphillNodes()){
-        			this.fanins.put(NodeWithFaninInfo.create(n), this.siblings[0]);
+        			this.fanins.put(EntryNode.create(n), this.siblings[0]);
         		}
     		}
 		}

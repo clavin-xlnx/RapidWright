@@ -32,7 +32,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.routernew.Connection;
 import com.xilinx.rapidwright.routernew.Netplus;
-import com.xilinx.rapidwright.routernew.RoutableTimingGroupRouter;
+import com.xilinx.rapidwright.routernew.RoutableNodeGroupRouter;
 import com.xilinx.rapidwright.util.Pair;
 
 
@@ -105,7 +105,7 @@ public class TimingManager {
     	return maxs;
     }
     
-    public void getCriticalPathInfo(RoutableTimingGroupRouter router){
+    public void getCriticalPathInfo(RoutableNodeGroupRouter router){
     	TimingVertex maxV = router.maxDelayAndTimingVertex.getSecond();
     	float maxDelay = router.maxDelayAndTimingVertex.getFirst();
     	System.out.println("Max delay: " + maxDelay);
@@ -157,7 +157,7 @@ public class TimingManager {
     	for(TimingEdge e : criticalEdges) {
     		if(timingEdgeConnctionMap.containsKey(e)){
     			System.out.println(timingEdgeConnctionMap.get(e));
-    			List<ImmutableTimingGroup> groups = timingEdgeConnctionMap.get(e).timingGroups;
+    			List<NodeGroup> groups = timingEdgeConnctionMap.get(e).getNodeGroups();
     			for(int iGroup = groups.size() -1; iGroup >= 0; iGroup--) {
     				System.out.println("\t " + groups.get(iGroup));
     			}

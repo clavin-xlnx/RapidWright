@@ -254,5 +254,11 @@ public class RoutableNode implements Routable{
 	public List<Routable> getChildren() {
 		return this.children;
 	}
+
+	@Override
+	public void setDelay(short delay) {
+		// TODO Auto-generated method stub
+		
+	}
 	
 }

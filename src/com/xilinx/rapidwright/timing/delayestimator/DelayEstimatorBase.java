@@ -30,7 +30,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.GroupDelayType;
-import com.xilinx.rapidwright.timing.ImmutableTimingGroup;
+import com.xilinx.rapidwright.timing.NodeGroup;
 import com.xilinx.rapidwright.timing.TimingModel;
 import com.xilinx.rapidwright.util.Pair;
 
@@ -113,7 +113,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         }
     }
 
-    public short getDelayOf(ImmutableTimingGroup tg) {
+    public short getDelayOf(NodeGroup tg) {
 		Double delay = (double) -3;
 		try{
 	        RoutingNode node = getTermInfo(tg);
@@ -240,24 +240,24 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
     // INT_X0Y0/INT_INT_SDQ_33_INT_OUT1  - NODE_SINGLE  :
     // INT_X29Y205/INT_NODE_GLOBAL_0_INT_OUT1 - NODE_LOCAL
 
-    protected Pair<RoutingNode,RoutingNode> getClosetSrcDstSitePin(ImmutableTimingGroup frTg, ImmutableTimingGroup toTg) {
+    protected Pair<RoutingNode,RoutingNode> getClosetSrcDstSitePin(NodeGroup frTg, NodeGroup toTg) {
         RoutingNode src = getClosetOutSitePin(frTg);
         RoutingNode dst = getClosetInSitePin(toTg);
         if (src.side == T.TileSide.M)
             src.side = dst.side;
         return new Pair<>(src,dst);
     }
-    protected RoutingNode getClosetOutSitePin(ImmutableTimingGroup tg) {
+    protected RoutingNode getClosetOutSitePin(NodeGroup tg) {
         RoutingNode res = getClosetSitePin(tg);
         res.tg = T.TimingGroup.CLE_OUT;
         return res;
     }
-    protected RoutingNode getClosetInSitePin(ImmutableTimingGroup tg) {
+    protected RoutingNode getClosetInSitePin(NodeGroup tg) {
         RoutingNode res = getClosetSitePin(tg);
         res.tg = T.TimingGroup.CLE_IN;
         return res;
     }
-    private RoutingNode getClosetSitePin(ImmutableTimingGroup tg) {
+    private RoutingNode getClosetSitePin(NodeGroup tg) {
         RoutingNode res = new RoutingNode();
         res.orientation = T.Orientation.S;
 
@@ -302,12 +302,12 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
             return null;
         }
     }
-    protected Pair<RoutingNode,RoutingNode> getSrcDstTermInfo(ImmutableTimingGroup frTg, ImmutableTimingGroup toTg) {
+    protected Pair<RoutingNode,RoutingNode> getSrcDstTermInfo(NodeGroup frTg, NodeGroup toTg) {
         RoutingNode src = getTermInfo(frTg);
         RoutingNode dst = getTermInfo(toTg);
         return new Pair<>(src,dst);
     }
-    private RoutingNode getTermInfo(ImmutableTimingGroup tg) {
+    private RoutingNode getTermInfo(NodeGroup tg) {
 
         Node node = tg.exitNode();
         IntentCode ic = node.getAllWiresInNode()[0].getIntentCode();
@@ -695,7 +695,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
         }
     }
 
-    protected boolean isSwitchingSide(TimingGroupEdge e) {
+    protected boolean isSwitchingSide(NodeGroupEdge e) {
         T.TimingGroup tg = e.getTimingGroup();
         if (tg != null &&
             (tg == T.TimingGroup.HORT_LONG || tg == T.TimingGroup.VERT_LONG || tg.type() == GroupDelayType.PIN_BOUNCE))
@@ -711,7 +711,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @param isBackward Direction of the edge
      * @return
      */
-    protected double updateVertex(TimingGroupEdge e, Double dly, boolean isBackward) {
+    protected double updateVertex(NodeGroupEdge e, Double dly, boolean isBackward) {
 
         boolean isReverseDirection =  e.isReverseDirection() ^ isBackward;
         if (verbose > 4) {
@@ -731,7 +731,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @param isBackward Direction of the edge
      * @return Location at the targetof the edge
      */
-    protected short[] discoverVertex(TimingGroupEdge e, short x, short y, Double dly, boolean isBackward) {
+    protected short[] discoverVertex(NodeGroupEdge e, short x, short y, Double dly, boolean isBackward) {
 //        // TRY
 //        if (e.getTimingGroup() == null)
 //            return loc;
@@ -774,7 +774,7 @@ public abstract class DelayEstimatorBase<T extends InterconnectInfo>  implements
      * @param isBackward
      * @return
      */
-    protected double calcTimingGroupDelayOnEdge(TimingGroupEdge e, Object u, Object dst, short x, short y, Double dly,
+    protected double calcTimingGroupDelayOnEdge(NodeGroupEdge e, Object u, Object dst, short x, short y, Double dly,
                                                 boolean isBackward) {
         // For testing, to not explore known high delay
 //        if (dly > 444) {

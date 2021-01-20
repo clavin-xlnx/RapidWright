@@ -172,7 +172,7 @@ public class RoutableNodeRouter{
  		if(this.clkNets.size() > 0) System.out.println("Route CLK nets");
  		for(Net clk : this.clkNets) {
 			clk.unroute();
-			GlobalSignalRoutingTools.clkRouting(clk, this.design.getDevice());
+			GlobalSignalRouting.clkRouting(clk, this.design.getDevice());
  		}
 	}
 	
@@ -219,19 +219,19 @@ public class RoutableNodeRouter{
 	
 	public void routeStaticNets(){
 		if(!config.isPartialRouting()){
-			GlobalSignalRoutingTools routingTool = new GlobalSignalRoutingTools(this.design, this.rnodesCreated, this.rnodeId, this.routethruHelper);
+			GlobalSignalRouting routingTool = new GlobalSignalRouting(this.design, this.rnodesCreated, this.rnodeId, this.routethruHelper);
 			Set<Node> unavailbleNodes = getAllUsedNodesOfRoutedNets();
 			unavailbleNodes.addAll(this.reservedNodes.keySet());
 			for(Net n:this.staticNetAndRoutingTargets.keySet()){
 				n.unroute();
-				Map<SitePinInst, List<Node>> spiRoutedNodes = GlobalSignalRoutingTools.routeStaticNet(n, unavailbleNodes);
+				Map<SitePinInst, List<Node>> spiRoutedNodes = GlobalSignalRouting.routeStaticNet(n, unavailbleNodes);
 				this.reserveNet(n);
 				for(SitePinInst spi : spiRoutedNodes.keySet()) {
 					unavailbleNodes.addAll(spiRoutedNodes.get(spi));
 				}
 			}
-			this.rnodesCreated = GlobalSignalRoutingTools.getRnodesCreated();
-			this.rnodeId = GlobalSignalRoutingTools.getRnodeId();
+			this.rnodesCreated = GlobalSignalRouting.getRnodesCreated();
+			this.rnodeId = GlobalSignalRouting.getRnodeId();
 		}else {
 			for(Net n:this.staticNetAndRoutingTargets.keySet()){
 				this.reserveNet(n);
@@ -587,7 +587,7 @@ public class RoutableNodeRouter{
 		}
 		
 		if (this.itry == config.getNrOfTrials() + 1) {
-			System.out.println("Routing failled after " + this.itry + " trials!");
+			System.out.println("Routing terminated after " + this.itry + " trials!");
 		}
 		
 		return;

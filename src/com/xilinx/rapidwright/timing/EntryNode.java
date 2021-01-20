@@ -9,14 +9,14 @@ import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.routernew.CountingSet;
 import com.xilinx.rapidwright.routernew.Routable;
 
-public class NodeWithFaninInfo extends Node{
+public class EntryNode extends Node{
 	
     CountingSet<SitePinInst> sources;
     CountingSet<Routable> parents;
     float pres_cost;
     float acc_cost; 
     
-    static Map<Node, NodeWithFaninInfo> nodePairs;
+    static Map<Node, EntryNode> nodePairs;
     
     static{
     	nodePairs = new HashMap<>();
@@ -25,14 +25,14 @@ public class NodeWithFaninInfo extends Node{
     //  To convert Node to NodeWithFaninInfo.
     //	from: Node              n = axyz();
     //	to:   NodeWithFaninInfo n = NodeWithFaninInfo.create(axyz());
-    public static NodeWithFaninInfo create(Node node){
+    public static EntryNode create(Node node){
     	//merge() is not desired 
-    	NodeWithFaninInfo nodeWithFaninInfo = nodePairs.get(node);
+    	EntryNode nodeWithFaninInfo = nodePairs.get(node);
     	if(nodeWithFaninInfo != null) {
     		return nodeWithFaninInfo;
     	}else {
     		Wire wire = node.getAllWiresInNode()[0];
-        	NodeWithFaninInfo newNodeWithFaninInfo = new NodeWithFaninInfo(wire);
+        	EntryNode newNodeWithFaninInfo = new EntryNode(wire);
         	nodePairs.put(node, newNodeWithFaninInfo);
         	return newNodeWithFaninInfo;
     	}
@@ -45,7 +45,7 @@ public class NodeWithFaninInfo extends Node{
     	this.parents = null;
     }
     
-    public NodeWithFaninInfo(Wire wire){
+    public EntryNode(Wire wire){
         super(wire);
     }
     
