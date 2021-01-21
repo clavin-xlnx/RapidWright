@@ -105,10 +105,12 @@ public class NodeGroupSiblings {
         this.populateFanin();
     }
 
-    // TODO: this should come from device model
-    boolean isExcluded(Node node) {
+
+    private static HashSet<String> excludeAboveRclk;
+    private static HashSet<String> excludeBelowRclk;
+    static {
         // these nodes are bleeding down
-        HashSet<String> excludeAboveRclk = new HashSet<String>() {{
+        excludeAboveRclk = new HashSet<String>() {{
             add("SDQNODE_E_0_FT1");
             add("SDQNODE_E_2_FT1");
             add("SDQNODE_W_0_FT1");
@@ -118,7 +120,7 @@ public class NodeGroupSiblings {
             add("WW2_W_BEG0");
         }};
         // these nodes are bleeding up
-        HashSet<String> excludeBelowRclk = new HashSet<String>() {{
+        excludeBelowRclk = new HashSet<String>() {{
             add("SDQNODE_E_91_FT0");
             add("SDQNODE_E_93_FT0");
             add("SDQNODE_E_95_FT0");
@@ -128,26 +130,15 @@ public class NodeGroupSiblings {
             add("EE12_BEG7");
             add("WW1_W_BEG7");
         }};
-
-        Pattern pattern = Pattern.compile("^INT_X[\\d]+Y([\\d]+)");
-        List<String> items  = Arrays.asList(node.toString().split("/"));
-        Matcher matcher = pattern.matcher(items.get(0));
-
-        if (matcher.find()) {
-            String yCoorStr = matcher.group(1);
-            int y = Integer.parseInt(yCoorStr);
-
-            if ((y-30)%60 == 0) { // above RCLK
-                if (excludeAboveRclk.contains(items.get(1))) {
-                    return true;
-                }
-            } else if ((y-29)%60 == 0) { // below RCLK
-                if (excludeBelowRclk.contains(items.get(1))) {
-                    return true;
-                }
-            }
-        } else {
-
+    }
+    
+    
+    boolean isExcluded(Node node) {
+        int y = node.getTile().getTileYCoordinate();
+        if ((y-30)%60 == 0) { // above RCLK
+            return excludeAboveRclk.contains(node.getWireName());
+        } else if ((y-29)%60 == 0) { // below RCLK
+            return excludeBelowRclk.contains(node.getWireName());
         }
         return false;
     }
